@@ -115,7 +115,7 @@ check("APA export writes a bib file", existsSync(apa.paths?.bibtex ?? ""));
 check("markdown has the evidence outline", apa.markdown.includes("## 证据大纲"));
 check("markdown has page anchors", /p\.\d+ \[E:[0-9a-f]{8}\]/.test(apa.markdown));
 check("markdown has a bibliography", apa.markdown.includes("## 参考文献"));
-check("bibtex contains an entry", apa.bibtex.includes("@misc{"));
+check("bibtex contains an entry", /@(article|misc)\{/.test(apa.bibtex));
 check("bibtex entries carry titles", apa.bibtex.includes("title = {"));
 check("bibtex keys are reported", apa.entries.every((entry) => entry.citekey.length > 0));
 

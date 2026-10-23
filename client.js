@@ -50,6 +50,7 @@ window.__ModuleLoader__.load({
         selected: "已选中",
         noSelection: "先在 PDF 里选中文字",
         askHint: "提问会带上论文、页码与引文",
+        askDefault: "请解释这段内容，并说明它与论文主题的关系。",
         delete: "删除",
         confirmDelete: "确认删除？",
         cancel: "取消",
@@ -159,6 +160,7 @@ window.__ModuleLoader__.load({
         selected: "Selected",
         noSelection: "Select text in the PDF first",
         askHint: "The question carries paper, page and quote",
+        askDefault: "Explain this passage and its role in the paper.",
         delete: "Delete",
         confirmDelete: "Delete this paper?",
         cancel: "Cancel",
@@ -396,7 +398,10 @@ window.__ModuleLoader__.load({
     }
 
     function normalizeSelection(text) {
-      return String(text ?? "").replace(/\s+/g, " ").trim();
+      const collapsed = String(text ?? "").replace(/\s+/g, " ").trim();
+      // A text layer splits CJK runs into per-glyph spans; joining them with
+      // spaces would corrupt the stored quote and the page-text anchor.
+      return collapsed.replace(/([\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])/g, "$1");
     }
 
     /**
@@ -526,7 +531,7 @@ window.__ModuleLoader__.load({
             hasPdf ? null : h(Badge, { style: styles.badgeMissing }, t("noPdf")),
           ),
           meta ? h("div", { style: styles.muted }, meta) : null,
-          h("div", { style: styles.muted }, `${paper.numPages || 0} ${t("pages")}`),
+          h("div", { style: styles.muted }, `${paper.numPages || 0} ${t("pages")}${paper.hitCount > 1 ? ` · ${paper.hitCount} 处命中` : ""}`),
           paper.snippet
             ? h("p", { style: styles.snippet, dangerouslySetInnerHTML: { __html: sanitizeSnippet(paper.snippet) } })
             : null,
@@ -805,9 +810,7 @@ window.__ModuleLoader__.load({
           )
           : null,
         selected
-          ? h("div", { style: styles.selectionBar },
-            h("span", { style: { flex: 1, fontSize: "0.85em" } }, `${t("selected")} · ${t("page")} ${selected.pageIndex + 1} · ${selected.text.slice(0, 80)}…`),
-          )
+          ? null
           : h("p", { style: styles.muted }, t("noSelection")),
       );
     }
@@ -1033,16 +1036,16 @@ window.__ModuleLoader__.load({
         if (!sessionId || !editing) return;
         setBusy("metadata");
         try {
-          const result = await callRemote(sessionId, "updatePaper", { paperId: editing.paperId, ...form });
+          await callRemote(sessionId, "updatePaper", { paperId: editing.paperId, ...form });
           setEditing(null);
-          setPapers((current) => current.map((paper) => (paper.paperId === result.paper.paperId ? result.paper : paper)));
+          await refresh();
           setNote(t("save"));
         } catch (saveError) {
           setError(saveError?.message ?? String(saveError));
         } finally {
           setBusy(null);
         }
-      }, [sessionId, editing, t]);
+      }, [sessionId, editing, t, refresh]);
 
       const deletePaper = useCallback(async (paperId) => {
         if (!sessionId) return;
@@ -1067,7 +1070,11 @@ window.__ModuleLoader__.load({
         }
         try {
           const span = actions.captureInsertion();
-          actions.insertText({ ...span, text });
+          if (!span || typeof span.draftRev !== "number") {
+            throw new Error("captureInsertion returned no draft revision");
+          }
+          const accepted = actions.insertText(text, span);
+          if (accepted === false) throw new Error("the composer rejected the insertion");
           setNote(t("sentToChat"));
           return true;
         } catch (insertError) {
@@ -1078,7 +1085,7 @@ window.__ModuleLoader__.load({
 
       const askSelection = useCallback(() => {
         if (!selection || !reader) return;
-        const text = question.trim() === "" ? t("askHint") : question.trim();
+        const text = question.trim() === "" ? t("askDefault") : question.trim();
         const composed = [
           `【论文】${reader.title || reader.paperId}`,
           `【页码】第 ${selection.pageIndex + 1} 页`,
@@ -1098,13 +1105,13 @@ window.__ModuleLoader__.load({
             quote: selection.text,
           });
           setNote(`${t("evidenceSaved")} #${String(result.evidenceId).slice(0, 8)}${result.anchored ? "" : ` · ${t("evidenceUnanchored")}`}`);
-          await loadEvidence();
+          await refresh();
         } catch (evidenceError) {
           setError(evidenceError?.message ?? String(evidenceError));
         } finally {
           setBusy(null);
         }
-      }, [selection, reader, sessionId, t, loadEvidence]);
+      }, [selection, reader, sessionId, t, refresh]);
 
       const collectEvidence = useCallback(async () => {
         if (!sessionId || collectQuery.trim() === "") return;
@@ -1113,23 +1120,23 @@ window.__ModuleLoader__.load({
         try {
           const result = await callRemote(sessionId, "collectEvidence", { query: collectQuery.trim(), limit: 20 });
           setNote(`${t("added")} ${result.evidence?.length ?? 0} ${t("evidenceCount")}`);
-          await loadEvidence();
+          await refresh();
         } catch (collectError) {
           setError(collectError?.message ?? String(collectError));
         } finally {
           setBusy(null);
         }
-      }, [sessionId, collectQuery, t, loadEvidence]);
+      }, [sessionId, collectQuery, t, refresh]);
 
       const removeEvidence = useCallback(async (evidenceId) => {
         if (!sessionId) return;
         try {
           await callRemote(sessionId, "deleteEvidence", { evidenceId });
-          await loadEvidence();
+          await refresh();
         } catch (removeError) {
           setError(removeError?.message ?? String(removeError));
         }
-      }, [sessionId, loadEvidence]);
+      }, [sessionId, refresh]);
 
       const checkMatrix = useCallback(async (claim) => {
         if (!sessionId) return;
@@ -1229,10 +1236,19 @@ window.__ModuleLoader__.load({
       const cmapFailure = failures.map((failure) => `${failure.source} (${failure.reason})`).join(", ");
       const paperById = new Map(papers.map((paper) => [paper.paperId, paper]));
       // Search hits carry only display fields; merge in the stored row so the
-      // card knows whether a PDF exists before offering the reader.
-      const list = hits === null
-        ? papers
-        : hits.map((hit) => ({ ...(paperById.get(hit.paperId) ?? {}), ...hit }));
+      // card knows whether a PDF exists. Group multiple page hits of the same
+      // paper into one card instead of printing the title once per page.
+      let list = papers;
+      if (hits !== null) {
+        const grouped = new Map();
+        for (const hit of hits) {
+          const merged = { ...(paperById.get(hit.paperId) ?? {}), ...hit };
+          const existing = grouped.get(hit.paperId);
+          if (existing === undefined) grouped.set(hit.paperId, { ...merged, hitCount: 1 });
+          else existing.hitCount += 1;
+        }
+        list = [...grouped.values()];
+      }
 
       const renderLibrary = () => h("div", { style: styles.group },
         h("div", { style: styles.row },

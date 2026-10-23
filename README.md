@@ -32,6 +32,19 @@ require a DSH restart; client changes are served with a new content rev and may
 need a page reload. Restarting DSH is a separate, explicit step — see the
 workspace recovery record.
 
+## Status (2026-10-23)
+
+The core loop was exercised in the real DSH GUI: import, Chinese full-text
+search, page jump, canvas + text layer, selection, evidence save/delete, matrix,
+metadata edit, APA/GB-T citations, Markdown + BibTeX export, outline insertion
+into chat, external search, and restart persistence. Evidence is under
+`reports/evidence/paper-tool-gui/` in the workspace.
+
+Known gaps: CNKI still needs one manual login and was not re-tested live; scanned
+PDFs have no OCR; PDF metadata guesses are approximate and should be corrected
+with **编辑元数据** before citing. A `@article` BibTeX tweak is on disk and takes
+effect on the next DSH process restart (current exports remain valid `@misc`).
+
 ## Agent tools
 
 Six tools, deliberately few: schema text is paid on every request, so related
