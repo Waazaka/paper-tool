@@ -1,0 +1,4 @@
+- insert:
+    - id: paper-tool
+      name: '@local/paper-tool'
+      config: {}
