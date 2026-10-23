@@ -36,6 +36,7 @@ window.__ModuleLoader__.load({
         page: "第",
         pages: "页",
         reading: "阅读中",
+        open: "阅读",
         closeReader: "返回列表",
         prevPage: "上一页",
         nextPage: "下一页",
@@ -144,6 +145,7 @@ window.__ModuleLoader__.load({
         page: "Page",
         pages: "pages",
         reading: "Reading",
+        open: "Open",
         closeReader: "Back to list",
         prevPage: "Prev",
         nextPage: "Next",
@@ -360,7 +362,7 @@ window.__ModuleLoader__.load({
     function ensureCss() {
       if (cssInjected || typeof document === "undefined") return;
       const style = document.createElement("style");
-      style.dataset.paperTool = "1";
+      style.dataset.paperToolStyle = "1";
       style.textContent = `
         .pt-textLayer {
           position: absolute; inset: 0; overflow: hidden; opacity: 1;
@@ -464,7 +466,21 @@ window.__ModuleLoader__.load({
         return bytes;
       };
 
-      class HostBinaryDataFactory extends pdfjs.DOMBinaryDataFactory {
+      // pdfjs's DOMBinaryDataFactory is internal (not exported from the main
+      // build), so implement the small public contract it consumes instead of
+      // extending an undefined symbol. `fetch` is called by the document
+      // transport; `_fetch` maps the fake base URL back to a Host RPC.
+      class HostBinaryDataFactory {
+        constructor({ cMapUrl = null, standardFontDataUrl = null, wasmUrl = null } = {}) {
+          this.cMapUrl = cMapUrl;
+          this.standardFontDataUrl = standardFontDataUrl;
+          this.wasmUrl = wasmUrl;
+        }
+        async fetch({ kind, filename }) {
+          const base = this[kind];
+          if (!base) throw new Error(`missing ${kind} base URL`);
+          return await this._fetch(`${base}${filename}`, kind);
+        }
         async _fetch(url, kind) {
           if (kind === "cMapUrl") return await load("cmaps", url.slice(CMAP_BASE.length));
           if (kind === "standardFontDataUrl") return await load("standard_fonts", url.slice(FONT_BASE.length));
@@ -524,7 +540,7 @@ window.__ModuleLoader__.load({
               }),
               disabled: !hasPdf,
               primary: true,
-            }, t("reading")),
+            }, t("open")),
             h(IconButton, { onClick: () => onEdit(paper) }, t("editMeta")),
             confirming
               ? h(React.Fragment, null,
