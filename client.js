@@ -235,11 +235,25 @@ window.__ModuleLoader__.load({
 
     let sharedCtx = null;
 
+    // Source-mode Remote descriptors flatten method parameters into wire
+    // fields. Every business method here takes one `input` object, so the
+    // client must send `{ input: {...} }` rather than spreading its keys.
+    const INPUT_METHODS = new Set([
+      "importPdf", "updatePaper", "listPapers", "search", "readPaper",
+      "getPdfAsset", "readPaperBytes", "deletePaper", "addEvidence",
+      "deleteEvidence", "collectEvidence", "listEvidence", "reviewMatrix",
+      "formatCitations", "exportReview", "searchExternal", "addCandidates",
+      "cnkiSearch", "cnkiDownload",
+    ]);
+
     async function callRemote(sessionId, method, args = {}, signal) {
+      const payload = INPUT_METHODS.has(method)
+        ? { paperSessionId: sessionId, input: args }
+        : { paperSessionId: sessionId, ...args };
       const envelope = await sharedCtx.connection.rpc.call(
         "/api",
         `paperTool/${method}`,
-        { args: { paperSessionId: sessionId, ...args } },
+        { args: payload },
         signal,
       );
       if (envelope && envelope.ok === false) {
@@ -980,15 +994,17 @@ window.__ModuleLoader__.load({
             const file = fileList[index];
             setNote(`${t("importing")} ${index + 1}/${fileList.length}`);
             const buffer = await file.arrayBuffer();
-            files.push({ name: file.name, data: new Uint8Array(buffer) });
+            // The wire is JSON: send a number array, not a Uint8Array (which
+            // would serialize as an object and fail the Host's byte parser).
+            files.push({ name: file.name, data: Array.from(new Uint8Array(buffer)) });
           }
           const result = await callRemote(sessionId, "importPdf", { files });
           const okCount = result.imported?.length ?? 0;
           const failCount = result.failed?.length ?? 0;
+          await refresh();
           setNote(`✓ ${okCount}${failCount > 0 ? ` / ✗ ${failCount}` : ""}`);
           setHits(null);
           setError(failCount > 0 ? result.failed.map((item) => `${item.filename}: ${item.reason}`).join("; ") : null);
-          await refresh();
         } catch (importError) {
           setError(importError?.message ?? String(importError));
         } finally {
