@@ -1,0 +1,18 @@
+Node v24.21.0 (bundled with DSH)
+Run from packages/paper-tool
+
+s1-library.mjs        PASS
+s2-host.mjs           PASS
+s3-evidence.mjs       PASS
+s4-tools.mjs          PASS
+s5-export.mjs         PASS
+s3-real-protocol.mjs  PASS
+wiring.mjs            PASS
+
+Command used:
+  $node = 'C:\Users\wazaka\.dsh-desktop\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\node.exe'
+  & $node test\s1-library.mjs "$env:USERPROFILE\Zotero\storage"
+  ... same for s2, s3, s4, s5, s3-real-protocol
+  & $node test\wiring.mjs
+
+Date: 2026-10-23

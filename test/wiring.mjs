@@ -14,4 +14,21 @@ const missingDef = called.filter((name) => !defined.includes(name));
 const missingRemote = called.filter((name) => !marked.includes(name));
 console.log("missing method:", missingDef.length === 0 ? "none" : missingDef.join(", "));
 console.log("missing @Remote:", missingRemote.length === 0 ? "none" : missingRemote.join(", "));
-process.exit(missingDef.length + missingRemote.length === 0 ? 0 : 1);
+
+// Feature wiring that a refactor could silently drop. These strings are the
+// contract between the usable UI and the Host methods added for it.
+const features = [
+  ["PDF text layer", /new pdfjs\.TextLayer\(/],
+  ["library list on mount", /"listPapers"/],
+  ["metadata editing", /"updatePaper"/],
+  ["evidence deletion", /"deleteEvidence"/],
+  ["matrix UI", /"reviewMatrix"/],
+  ["citation UI", /"formatCitations"/],
+  ["export UI", /"exportReview"/],
+  ["chat insertion", /captureInsertion\(\)/],
+];
+const missingFeatures = features
+  .filter(([, pattern]) => !pattern.test(client))
+  .map(([label]) => label);
+console.log("missing feature:", missingFeatures.length === 0 ? "none" : missingFeatures.join(", "));
+process.exit(missingDef.length + missingRemote.length + missingFeatures.length === 0 ? 0 : 1);

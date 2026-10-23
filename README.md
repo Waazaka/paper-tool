@@ -12,17 +12,25 @@ sidebar, build an evidence matrix, and generate traceable citations.
 |---|---|
 | Library | Import PDFs; text is extracted and indexed per page |
 | Search | Chinese and English full-text search with page numbers and snippets |
-| Reader | Right-sidebar PDF reader: page navigation, zoom, text selection |
-| Evidence | Save a selection as an evidence row anchored to paper + page + offsets |
+| Library | Browse imported papers without searching; edit metadata; delete with confirmation |
+| Reader | PDF canvas + selectable text layer: page jump, navigation, zoom |
+| Evidence | Save a selection (or collect by topic) anchored to paper + page + offsets |
 | Review | Evidence outline, claim × paper matrix (support / conflict / not found) |
-| Citations | CSL rendering: APA, IEEE, MLA, Chicago, GB/T 7714 (numeric + author-date), Harvard, Nature |
+| Citations | CSL rendering: APA, IEEE, MLA, Chicago, GB/T 7714 (numeric + author-date) |
+| Export | Writes `review.md` + `references.bib` under `.dsh/paper-tool/exports/` with checks |
 | External | Search OpenAlex / Crossref / arXiv for new candidates |
 | CNKI | One manual login, then automated search and PDF download |
 
+The sidebar has three views: **文献库**, **证据**, **综述**. The reader keeps the
+PDF text layer over the canvas; when that layer cannot be created, it falls back
+to a selectable text panel instead of silently disabling selection.
+
 ## Install
 
-The plugin is installed as a bundle in a DSH profile. It is already linked into
-the `desktop` profile; restart DSH to activate it.
+The plugin is installed as a bundle in the DSH `desktop` profile. Host changes
+require a DSH restart; client changes are served with a new content rev and may
+need a page reload. Restarting DSH is a separate, explicit step — see the
+workspace recovery record.
 
 ## Agent tools
 
@@ -35,7 +43,7 @@ operations share one tool.
 | `paper_import` | Save external candidates as metadata-only entries |
 | `paper_read` | Read extracted page text with honest coverage reporting |
 | `paper_evidence` | `action=collect` finds and stores passages; `action=list` lists them |
-| `paper_review` | `action=outline` / `matrix` / `citations` |
+| `paper_review` | `action=outline` / `matrix` / `citations` / `export` |
 | `paper_status` | Library coverage, evidence count, available styles |
 
 ## Honesty rules
@@ -102,9 +110,13 @@ node test\s1-library.mjs   "$env:USERPROFILE\Zotero\storage"   # import + search
 node test\s2-host.mjs      "$env:USERPROFILE\Zotero\storage"   # host service contract
 node test\s3-evidence.mjs  "$env:USERPROFILE\Zotero\storage"   # evidence matrix + citations
 node test\s4-tools.mjs     "$env:USERPROFILE\Zotero\storage"   # tool registration + external search
+node test\s5-export.mjs    "$env:USERPROFILE\Zotero\storage"   # metadata edit + export bundle
 node test\s3-real-protocol.mjs "$env:USERPROFILE\Zotero\storage" # real protocol dependency
 node test\wiring.mjs                                            # client RPC ↔ host methods
 ```
+
+`wiring.mjs` must be run from `packages\paper-tool` because it reads the client
+and host sources by relative path.
 
 Any directory of PDFs works; the paths above are only a convenient corpus.
 Each script prints `PASS` and exits 0, or lists failures and exits 1.
