@@ -1,0 +1,8 @@
+# Normalise line endings so a checkout on any platform produces identical files.
+# The gates read source with string comparisons, so a CRLF-converted file can
+# change what they see.
+* text=auto eol=lf
+
+# Fixtures are binary; never touch them.
+*.png binary
+*.pdf binary

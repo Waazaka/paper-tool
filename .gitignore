@@ -1,0 +1,28 @@
+# Installable artifacts
+node_modules/
+.pnpm-store/
+
+# Gate scratch space and output. The gate runner writes .results/*.json and
+# prove-s14 writes a temporary regressed bundle while it runs.
+test/.results/
+test/.scratch/
+test/.shim/
+test/.client-regressed.mjs
+
+# Developer probes: ad-hoc diagnostic scripts that are not gates. The real gates
+# are s*.mjs and are all listed in test/all.mjs.
+test/probe-*.mjs
+
+# Local runtime data. The plugin stores its SQLite library, imported PDFs and
+# exports here when run inside DSH; none of it belongs in the repo.
+.dsh/
+
+# OS noise
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp

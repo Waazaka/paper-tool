@@ -3,6 +3,17 @@
 // One right-sidebar tab with three views: library, evidence, review. The tab
 // never invents citations: it shows stored metadata, page-anchored evidence and
 // CSL-rendered bibliographies, and hands prose writing to the chat model.
+//
+// Visual conventions that are load-bearing, not decorative:
+//   * Every colour comes from a documented host alias token. An earlier version
+//     used five variable names that do not exist in the host bundle, so every
+//     `var()` silently fell back to a literal and the primary button became
+//     invisible in dark mode. `test/wiring.mjs` now fails if a token is unknown.
+//   * Surface pairs (`background` + `color`) are always set together through
+//     `.pt-surface-*` classes, because setting one without the other is exactly
+//     how content disappeared in dark mode.
+//   * The sidebar is routinely 320-420px wide, so layout is driven by CSS
+//     container queries, not by the viewport.
 window.__ModuleLoader__.load({
   id: "@local/paper-tool",
   factory(require) {
@@ -14,9 +25,16 @@ window.__ModuleLoader__.load({
     const TAB_ID = "@local/paper-tool/library";
     const KIND = "paper-tool";
 
+    // Bounds mirrored from the Host service. Duplicated here so the browser can
+    // reject a file before reading it into memory; the Host still enforces them.
+    const MAX_PDF_BYTES = 64 * 1024 * 1024;
+    const MAX_QUOTE_CHARS = 500;
+    const MAX_IMPORT_FILES = 32;
+
     const DICTS = {
       zh: {
         title: "论文",
+        "guide.description": "导入 PDF、检索全文、按页码存证据，生成可回溯的引用与综述材料",
         library: "文献库",
         evidenceTab: "证据",
         reviewTab: "综述",
@@ -29,12 +47,41 @@ window.__ModuleLoader__.load({
         searching: "搜索中…",
         clear: "清空",
         empty: "库是空的。点「导入 PDF」把论文放进来。",
+        emptyHint: "也可以先「外部检索」找条目，或连接知网下载。",
         noResults: "没有匹配结果。",
-        fulltext: "有全文",
+        noResultsHint: "换个词试试；中文支持任意长度，英文按整词匹配。",
+        fulltext: "全文",
+        ocrText: "扫描识别",
+        ocrHint: "该 PDF 没有文本层，正文由 OCR 识别，个别字可能不准。",
+        ocrQuoteHint: "此引文来自 OCR 文本，引用前建议对照原文页面核实。",
+        // Metadata is recovered heuristically; these label what still needs a
+        // human eye. A field the user edits stops being listed.
+        guessBadge: "待核对：{fields}",
+        guessHint: "这些字段是从 PDF 版面或文件名推测的，不是出版社写入的元数据，建议引用前确认。",
+        reextract: "重新识别",
+        reextractHint: "重新读取这篇 PDF 的书目信息。你已手动改过的字段不会被覆盖。",
+        reextractDone: "已更新 {count} 个字段：{fields}",
+        reextractNoChange: "重新识别完成，没有发现可更新的字段。",
+        reextractDisagreed: "PDF 里的信息与已保存的 {fields} 不一致，但你没有标记为猜测，因此保留了原值。",
+        working: "处理中…",
+        viewCrashed: "这个视图出错了",
+        retry: "重试",
+        fieldTitle: "标题",
+        fieldAuthors: "作者",
+        fieldYear: "年份",
+        fieldVenue: "期刊",
+        fieldDoi: "DOI",
+        listSep: "、",
         metaOnly: "仅书目",
         noPdf: "无 PDF",
+        sourceLine: "正文来源：{source}",
+        sourceTextLayer: "PDF 文本层",
+        sourceOcr: "OCR 识别，个别字可能不准",
+        sourceNone: "没有正文，只有书目",
         page: "第",
         pages: "页",
+        pageOf: "页",
+        of: "/",
         reading: "阅读中",
         open: "阅读",
         closeReader: "返回列表",
@@ -48,7 +95,7 @@ window.__ModuleLoader__.load({
         ask: "就这段提问",
         askPlaceholder: "就这段内容提问…",
         selected: "已选中",
-        noSelection: "先在 PDF 里选中文字",
+        noSelection: "在 PDF 里选中文字后，可以提问或存为证据",
         askHint: "提问会带上论文、页码与引文",
         askDefault: "请解释这段内容，并说明它与论文主题的关系。",
         delete: "删除",
@@ -65,8 +112,11 @@ window.__ModuleLoader__.load({
         evidence: "存为证据",
         evidenceSaved: "已存为证据",
         evidenceEmpty: "还没有证据。阅读时选中文字，或按主题收集。",
-        evidenceAnchored: "已定位",
-        evidenceUnanchored: "页码已记录，原文偏移未定位",
+        evidenceEmptyHint: "证据 = 论文 + 页码 + 原文引文，导出时逐条可回溯。",
+        evidenceAnchored: "已定位原文",
+        evidenceUnanchored: "仅记录页码",
+        evidenceUnanchoredHint: "这段引文没能在该页文本中定位，跳转只到页码。",
+        quoteTooLong: "选中的文字超过 {limit} 字，请缩短后再存。",
         collect: "按主题收集",
         collectPlaceholder: "输入主题，例如：碳排放 影响因素",
         collectHint: "在全部已索引页里找相关句子，并保存为证据",
@@ -77,6 +127,7 @@ window.__ModuleLoader__.load({
         support: "支持",
         conflict: "冲突",
         notFound: "未提及",
+        noEvidenceStance: "无证据",
         covered: "有证据",
         emptyCoverage: "无证据",
         jumpToPage: "跳转",
@@ -105,10 +156,12 @@ window.__ModuleLoader__.load({
         cnkiRecheck: "重新检测",
         cnkiConnected: "已登录",
         cnkiNotLoggedIn: "未登录",
+        cnkiHint: "浏览器打开后手动登录一次，会话约保留 30 天。",
         cnkiConnecting: "正在打开浏览器…",
         cnkiSearch: "检索知网",
         addSelected: "加入文献库",
         added: "已加入",
+        skipped: "已存在",
         downloading: "下载中…",
         noCandidates: "没有结果。",
         sourcesFailed: "部分来源失败",
@@ -118,15 +171,40 @@ window.__ModuleLoader__.load({
         retry: "重试",
         confirm: "确认",
         back: "返回",
-        total: "共",
+        total: "条命中",
         noEvidence: "还没有证据，无法生成引用。",
-        selectEvidence: "选择证据后生成引用；默认使用全部证据。",
+        selectEvidence: "引用默认使用全部证据。",
         evidenceCount: "条证据",
-        paperCount: "篇论文",
+        paperCount: "篇文献",
         generatedAt: "生成时间",
+        tooLarge: "文件超过 {limit} MB，请先压缩或拆分。",
+        tooManyFiles: "一次最多导入 {limit} 个文件。",
+        duplicates: "个已存在，已跳过",
+        noPdfForPaper: "这篇只有书目，没有 PDF。",
+        anchoredCount: "条可定位原文",
+        textFallbackNote: "PDF 文本层无法叠加，改为显示抽取文本，仍可选中。",
+        highlightMissed: "已打开对应页，但未在文本层中定位到该引文。",
+        readerLoading: "正在加载 PDF…",
+        pageCount: "共 {n} 页",
+        searchScope: "检索范围",
+        localLibrary: "本地库",
+        statusLine: "{papers} 篇 · {pages} 页 · {evidence} 条证据",
+        evidenceScopeHint: "共 {total} 条，本页显示 {shown} 条",
+        filterAll: "全部",
+        filterAnchored: "已定位",
+        filterUnanchored: "仅页码",
+        exportScope: "导出范围",
+        exportAll: "全部证据",
+        exportAnchored: "仅已定位",
+        evidenceOnly: "仅已定位证据可导出（{n} 条）",
+        unlocatedExcluded: "已排除 {n} 条仅记录页码的证据。",
+        errorTitle: "出错了",
+        dismiss: "知道了",
+        selfCheck: "自检",
       },
       en: {
         title: "Papers",
+        "guide.description": "Import PDFs, search full text, save page-anchored evidence, and produce traceable citations",
         library: "Library",
         evidenceTab: "Evidence",
         reviewTab: "Review",
@@ -139,12 +217,39 @@ window.__ModuleLoader__.load({
         searching: "Searching…",
         clear: "Clear",
         empty: "Library is empty. Click “Import PDF” to add papers.",
+        emptyHint: "Or use External search, or connect CNKI to download.",
         noResults: "No matches.",
+        noResultsHint: "Try another term. CJK matches any length; English matches whole words.",
         fulltext: "full text",
+        ocrText: "scanned OCR",
+        ocrHint: "This PDF has no text layer; the text was recognised by OCR and individual characters may be wrong.",
+        ocrQuoteHint: "This quote came from OCR text. Check it against the page image before citing it.",
+        guessBadge: "Check: {fields}",
+        guessHint: "These fields were inferred from the PDF layout or the file name, not written by the publisher. Confirm them before citing.",
+        reextract: "Re-read metadata",
+        reextractHint: "Re-extract the bibliographic details from this PDF. Fields you edited by hand are never overwritten.",
+        reextractDone: "Updated {count} field(s): {fields}",
+        reextractNoChange: "Re-extraction finished; nothing new to update.",
+        reextractDisagreed: "The PDF disagrees with the saved {fields}, but you confirmed them, so the stored values were kept.",
+        working: "Working…",
+        viewCrashed: "This view hit an error",
+        retry: "Try again",
+        fieldTitle: "title",
+        fieldAuthors: "authors",
+        fieldYear: "year",
+        fieldVenue: "journal",
+        fieldDoi: "DOI",
+        listSep: ", ",
         metaOnly: "metadata only",
         noPdf: "no PDF",
+        sourceLine: "Text source: {source}",
+        sourceTextLayer: "PDF text layer",
+        sourceOcr: "OCR — individual characters may be wrong",
+        sourceNone: "no body text, bibliography only",
         page: "Page",
         pages: "pages",
+        pageOf: "page",
+        of: "of",
         reading: "Reading",
         open: "Open",
         closeReader: "Back to list",
@@ -158,7 +263,7 @@ window.__ModuleLoader__.load({
         ask: "Ask about selection",
         askPlaceholder: "Ask about this passage…",
         selected: "Selected",
-        noSelection: "Select text in the PDF first",
+        noSelection: "Select text in the PDF to ask or save evidence",
         askHint: "The question carries paper, page and quote",
         askDefault: "Explain this passage and its role in the paper.",
         delete: "Delete",
@@ -175,8 +280,11 @@ window.__ModuleLoader__.load({
         evidence: "Save as evidence",
         evidenceSaved: "Evidence saved",
         evidenceEmpty: "No evidence yet. Select text while reading, or collect by topic.",
-        evidenceAnchored: "anchored",
-        evidenceUnanchored: "page recorded, offset not located",
+        evidenceEmptyHint: "Evidence = paper + page + exact quote; every export traces back.",
+        evidenceAnchored: "located in source",
+        evidenceUnanchored: "page only",
+        evidenceUnanchoredHint: "This quote could not be located in the page text, so jumps land on the page.",
+        quoteTooLong: "Selection exceeds {limit} characters. Shorten it before saving.",
         collect: "Collect by topic",
         collectPlaceholder: "Topic, e.g. carbon emissions determinants",
         collectHint: "Find relevant sentences in indexed pages and store them",
@@ -186,7 +294,8 @@ window.__ModuleLoader__.load({
         coverage: "Coverage only",
         support: "support",
         conflict: "conflict",
-        notFound: "not found",
+        notFound: "not mentioned",
+        noEvidenceStance: "no evidence",
         covered: "covered",
         emptyCoverage: "empty",
         jumpToPage: "Open",
@@ -215,10 +324,12 @@ window.__ModuleLoader__.load({
         cnkiRecheck: "Re-check",
         cnkiConnected: "Logged in",
         cnkiNotLoggedIn: "Not logged in",
+        cnkiHint: "Log in once in the browser window; the session lasts ~30 days.",
         cnkiConnecting: "Opening browser…",
         cnkiSearch: "Search CNKI",
         addSelected: "Add to library",
         added: "Added",
+        skipped: "already present",
         downloading: "Downloading…",
         noCandidates: "No results.",
         sourcesFailed: "Some sources failed",
@@ -228,12 +339,36 @@ window.__ModuleLoader__.load({
         retry: "Retry",
         confirm: "Confirm",
         back: "Back",
-        total: "total",
+        total: "hits",
         noEvidence: "No evidence yet; cannot render citations.",
         selectEvidence: "Citations use all evidence by default.",
         evidenceCount: "evidence",
         paperCount: "papers",
         generatedAt: "Generated",
+        tooLarge: "File exceeds {limit} MB. Compress or split it first.",
+        tooManyFiles: "At most {limit} files per import.",
+        duplicates: "already present, skipped",
+        noPdfForPaper: "This entry is metadata only; there is no PDF.",
+        anchoredCount: "locatable in source",
+        textFallbackNote: "The PDF text layer could not be overlaid; showing extracted text, still selectable.",
+        highlightMissed: "Opened the page, but the quote was not found in the text layer.",
+        readerLoading: "Loading PDF…",
+        pageCount: "{n} pages",
+        searchScope: "Search in",
+        localLibrary: "Local library",
+        statusLine: "{papers} papers · {pages} pages · {evidence} evidence",
+        evidenceScopeHint: "{shown} of {total} shown",
+        filterAll: "All",
+        filterAnchored: "Located",
+        filterUnanchored: "Page only",
+        exportScope: "Export scope",
+        exportAll: "All evidence",
+        exportAnchored: "Located only",
+        evidenceOnly: "Only located evidence can be exported ({n}).",
+        unlocatedExcluded: "{n} page-only evidence row(s) excluded.",
+        errorTitle: "Something went wrong",
+        dismiss: "Dismiss",
+        selfCheck: "Self-check",
       },
     };
 
@@ -246,9 +381,19 @@ window.__ModuleLoader__.load({
       "importPdf", "updatePaper", "listPapers", "search", "readPaper",
       "getPdfAsset", "readPaperBytes", "deletePaper", "addEvidence",
       "deleteEvidence", "collectEvidence", "listEvidence", "reviewMatrix",
-      "formatCitations", "exportReview", "searchExternal", "addCandidates",
-      "cnkiSearch", "cnkiDownload",
+      "reviewOutline", "formatCitations", "exportReview", "searchExternal",
+      "addCandidates", "cnkiSearch", "cnkiDownload",
     ]);
+
+    /** Typed transport failure. `code` drives the recovery the UI offers. */
+    class RpcError extends Error {
+      constructor(message, code, details) {
+        super(message);
+        this.name = "RpcError";
+        this.code = code ?? "unknown";
+        this.details = details ?? null;
+      }
+    }
 
     async function callRemote(sessionId, method, args = {}, signal) {
       const payload = INPUT_METHODS.has(method)
@@ -261,140 +406,348 @@ window.__ModuleLoader__.load({
         signal,
       );
       if (envelope && envelope.ok === false) {
-        const error = new Error(envelope.error?.message ?? "rpc failed");
-        error.code = envelope.error?.code;
-        throw error;
+        // The host classifies failures (paper-tool/paper-not-found,
+        // paper-tool/too-large, …). Dropping the code here would collapse
+        // "this paper was deleted" and "the gateway is down" into one message.
+        throw new RpcError(
+          envelope.error?.message ?? "rpc failed",
+          envelope.error?.code,
+          envelope.error?.details,
+        );
       }
       return envelope?.ok === true ? envelope.value : envelope;
     }
 
-    const styles = {
-      root: {
-        display: "flex", flexDirection: "column", gap: 8, padding: "10px 12px",
-        minHeight: "100%", font: "inherit", color: "inherit", boxSizing: "border-box",
-      },
-      header: { display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" },
-      row: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" },
-      input: {
-        flex: "1 1 130px", minWidth: 0, padding: "5px 8px", fontSize: "inherit",
-        color: "inherit", background: "transparent", borderRadius: 6,
-        border: "1px solid var(--dsw-alias-border, #8884)",
-      },
-      textarea: {
-        width: "100%", boxSizing: "border-box", minHeight: 52, resize: "vertical",
-        padding: "5px 8px", fontSize: "inherit", color: "inherit",
-        background: "transparent", borderRadius: 6,
-        border: "1px solid var(--dsw-alias-border, #8884)",
-      },
-      button: {
-        padding: "4px 9px", fontSize: "inherit", color: "inherit", cursor: "pointer",
-        background: "transparent", borderRadius: 6,
-        border: "1px solid var(--dsw-alias-border, #8884)",
-      },
-      primary: {
-        borderColor: "var(--dsw-alias-accent, #3b82f6)",
-        background: "var(--dsw-alias-accent-soft, #3b82f61a)",
-      },
-      danger: { borderColor: "var(--dsw-alias-danger, #d33)", color: "var(--dsw-alias-danger, #d33)" },
-      muted: { fontSize: "0.82em", opacity: 0.72, margin: 0 },
-      list: { display: "flex", flexDirection: "column", gap: 6, margin: 0, padding: 0, listStyle: "none" },
-      card: {
-        padding: "7px 9px", borderRadius: 8,
-        border: "1px solid var(--dsw-alias-border, #8884)",
-      },
-      cardButton: {
-        padding: "7px 9px", borderRadius: 8, cursor: "pointer", textAlign: "left",
-        color: "inherit", background: "transparent", width: "100%",
-        border: "1px solid var(--dsw-alias-border, #8884)",
-      },
-      snippet: { fontSize: "0.83em", opacity: 0.8, margin: "3px 0 0", wordBreak: "break-word" },
-      badge: {
-        fontSize: "0.72em", padding: "1px 6px", borderRadius: 999, whiteSpace: "nowrap",
-        border: "1px solid var(--dsw-alias-border, #8884)", opacity: 0.85,
-      },
-      badgeSupport: { borderColor: "#2e9d63", color: "#2e9d63" },
-      badgeConflict: { borderColor: "#d97706", color: "#d97706" },
-      badgeMissing: { opacity: 0.6 },
-      nav: { display: "flex", gap: 4, borderBottom: "1px solid var(--dsw-alias-border, #8884)", paddingBottom: 6 },
-      navItem: {
-        padding: "3px 8px", fontSize: "0.9em", cursor: "pointer", borderRadius: 6,
-        color: "inherit", background: "transparent", border: "1px solid transparent",
-      },
-      navActive: {
-        borderColor: "var(--dsw-alias-border, #8884)",
-        background: "var(--dsw-alias-accent-soft, #3b82f61a)",
-      },
-      reader: {
-        display: "flex", flexDirection: "column", gap: 8,
-        borderTop: "1px solid var(--dsw-alias-border, #8884)", paddingTop: 8, marginTop: 2,
-      },
-      canvasWrap: {
-        overflow: "auto", maxHeight: "56vh", borderRadius: 6,
-        border: "1px solid var(--dsw-alias-border, #8884)",
-        background: "var(--dsw-alias-bg, #fff)",
-        padding: 6,
-      },
-      pageWrap: { position: "relative", margin: "0 auto" },
-      askBox: { display: "flex", flexDirection: "column", gap: 6 },
-      error: { fontSize: "0.85em", color: "var(--dsw-alias-danger, #d33)", margin: 0, whiteSpace: "pre-wrap" },
-      note: { fontSize: "0.82em", opacity: 0.8, margin: 0 },
-      pre: {
-        whiteSpace: "pre-wrap", wordBreak: "break-word", userSelect: "text",
-        fontSize: "0.85em", lineHeight: 1.5, margin: 0, maxHeight: "28vh", overflow: "auto",
-        padding: "6px 8px", borderRadius: 6,
-        border: "1px solid var(--dsw-alias-border, #8884)",
-        background: "var(--dsw-alias-bg, #fff)",
-      },
-      group: { display: "flex", flexDirection: "column", gap: 4 },
-      evidenceRow: {
-        display: "flex", gap: 6, alignItems: "flex-start", padding: "5px 7px",
-        borderRadius: 6, border: "1px solid var(--dsw-alias-border, #8884)",
-      },
-      quote: { flex: 1, margin: 0, fontSize: "0.84em", wordBreak: "break-word" },
-      field: { display: "flex", flexDirection: "column", gap: 2, fontSize: "0.85em" },
-      spacer: { flex: 1 },
-      selectionBar: {
-        display: "flex", gap: 8, alignItems: "center", padding: "6px 8px", borderRadius: 6,
-        background: "var(--dsw-alias-accent-soft, #3b82f61a)",
-        border: "1px solid var(--dsw-alias-accent, #3b82f6)",
-      },
-    };
+    /** Human-readable, in-language message for a typed transport failure. */
+    function describeError(error, t) {
+      if (error === null || error === undefined) return "";
+      if (error instanceof RpcError) {
+        if (error.code === "paper-tool/paper-not-found") return t("noPdfForPaper");
+        if (error.code === "paper-tool/quote-too-long") {
+          const limit = error.details?.limit ?? MAX_QUOTE_CHARS;
+          return t("quoteTooLong", { limit });
+        }
+        if (error.code === "paper-tool/too-large") {
+          const limit = Math.round((error.details?.limit ?? MAX_PDF_BYTES) / 1024 / 1024);
+          return t("tooLarge", { limit });
+        }
+        if (error.code === "paper-tool/too-many-files") {
+          return t("tooManyFiles", { limit: error.details?.limit ?? MAX_IMPORT_FILES });
+        }
+        return error.message;
+      }
+      return error?.message ?? String(error);
+    }
+
+    /**
+     * Which surfaces a piece of text lives on.
+     *
+     * Set as a pair, always. The previous version set `background` on <pre>
+     * without setting `color`, which inherited the host's near-white body text
+     * and rendered white-on-white in dark mode — the outline, the in-text
+     * citation and the whole bibliography became invisible.
+     */
+    const CSS = `
+      .pt-root {
+        box-sizing: border-box; height: 100%; min-height: 100%;
+        display: flex; flex-direction: column;
+        background: var(--dsw-alias-bg-layer-1);
+        color: var(--dsw-alias-label-primary);
+        font: inherit; font-size: 13px; line-height: 20px;
+        container-type: inline-size; container-name: pt;
+      }
+      .pt-root *, .pt-root *::before, .pt-root *::after { box-sizing: border-box; }
+
+      /* Typography: one family (inherited), deliberate scale.
+         Contrast budget, measured against the resolved host values:
+           label-primary   light 18.90:1 / dark 15.03:1  — passes AA
+           label-secondary light  5.80:1 / dark 10.42:1  — passes AA
+           label-tertiary  light  3.71:1 / dark  7.36:1  — fails AA below 18px
+           label-caption   light  2.13:1 / dark  4.24:1  — fails AA below 18px
+         So text that carries information at 11-12px must be secondary or
+         better; hierarchy comes from size, weight and spacing rather than from
+         fading text out. tertiary is kept for non-text strokes (field rules,
+         hairlines) and caption for decorative separators only. */
+      .pt-h1 { font-size: 14px; line-height: 22px; font-weight: 600; color: var(--dsw-alias-label-primary); }
+      .pt-h2 { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--dsw-alias-label-primary); }
+      .pt-meta { font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); }
+      .pt-caption { font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-secondary); }
+      .pt-body { font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-primary); }
+      .pt-num { font-variant-numeric: tabular-nums; }
+
+      /* Surfaces. Background and foreground are decided together. */
+      .pt-surface-1 { background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); }
+      .pt-surface-2 { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); }
+      .pt-surface-3 { background: var(--dsw-alias-bg-layer-3); color: var(--dsw-alias-label-primary); }
+      .pt-well {
+        background: var(--dsw-alias-bg-layer-2);
+        color: var(--dsw-alias-label-primary);
+        border: 1px solid var(--dsw-alias-border-l1);
+        border-radius: var(--dsw-radius-md);
+      }
+      .pt-pre {
+        margin: 0; padding: 8px 10px; max-height: 34vh; overflow: auto;
+        white-space: pre-wrap; word-break: break-word; user-select: text;
+        font-family: inherit; font-size: 12px; line-height: 18px;
+        background: var(--dsw-alias-bg-layer-2);
+        color: var(--dsw-alias-label-primary);
+        border: 1px solid var(--dsw-alias-border-l1);
+        border-radius: var(--dsw-radius-md);
+      }
+
+      /* Buttons: every one is a real <button> with a visible focus ring. */
+      .pt-btn {
+        display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+        min-height: 28px; padding: 3px 10px;
+        font: inherit; font-size: 12px; line-height: 18px; white-space: nowrap;
+        color: var(--dsw-alias-label-secondary);
+        background: transparent;
+        border: 1px solid var(--dsw-alias-border-l2);
+        border-radius: var(--dsw-radius-sm);
+        cursor: pointer;
+      }
+      .pt-btn:hover:not(:disabled) {
+        background: var(--dsw-alias-interactive-bg-hover-accent);
+        color: var(--dsw-alias-label-primary);
+      }
+      .pt-btn:focus-visible {
+        outline: 2px solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary));
+        outline-offset: 1px;
+      }
+      .pt-btn:disabled { opacity: .45; cursor: default; }
+      .pt-btn-primary {
+        color: var(--dsw-alias-label-primary);
+        border-color: var(--dsw-alias-brand-primary);
+        background: color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, transparent);
+      }
+      .pt-btn-primary:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--dsw-alias-brand-primary) 20%, transparent);
+      }
+      .pt-btn-danger { color: var(--dsw-alias-state-error-primary); border-color: var(--dsw-alias-state-error-primary); }
+      .pt-btn-danger:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 14%, transparent);
+        color: var(--dsw-alias-state-error-primary);
+      }
+      .pt-btn-ghost { border-color: transparent; color: var(--dsw-alias-label-tertiary); }
+      .pt-btn-icon { padding: 3px 6px; min-width: 28px; }
+
+      /* Inputs. */
+      .pt-input, .pt-select, .pt-textarea {
+        width: 100%; min-width: 0; min-height: 28px; padding: 3px 8px;
+        font: inherit; font-size: 12px; line-height: 18px;
+        color: var(--dsw-alias-label-primary);
+        background: var(--dsw-alias-bg-layer-2);
+        border: 1px solid var(--dsw-alias-border-l2);
+        border-radius: var(--dsw-radius-sm);
+      }
+      .pt-textarea { min-height: 64px; resize: vertical; line-height: 19px; }
+      .pt-input::placeholder, .pt-textarea::placeholder { color: var(--dsw-alias-label-caption); }
+      .pt-input:focus-visible, .pt-select:focus-visible, .pt-textarea:focus-visible {
+        outline: 2px solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary));
+        outline-offset: -1px;
+        border-color: var(--dsw-alias-brand-primary);
+      }
+
+      /* Tabs: an underline rule, not a row of buttons that all look primary. */
+      .pt-tabs { display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--dsw-alias-border-l1); }
+      .pt-tab {
+        position: relative; flex: 1 1 0; min-width: 0; min-height: 34px; padding: 6px 2px;
+        font: inherit; font-size: 12px; line-height: 18px;
+        color: var(--dsw-alias-label-tertiary); background: none; border: 0; cursor: pointer;
+      }
+      .pt-tab:hover { color: var(--dsw-alias-label-primary); }
+      .pt-tab:focus-visible { outline: 2px solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)); outline-offset: -2px; }
+      .pt-tab[aria-selected="true"] { color: var(--dsw-alias-label-primary); font-weight: 600; }
+      .pt-tab[aria-selected="true"]::after {
+        content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px;
+        background: var(--dsw-alias-brand-primary); border-radius: 2px;
+      }
+      .pt-tab-count { color: var(--dsw-alias-label-caption); font-variant-numeric: tabular-nums; font-weight: 400; }
+
+      /* Cards. */
+      .pt-card {
+        padding: 9px 10px; border-radius: var(--dsw-radius-md);
+        background: var(--dsw-alias-bg-layer-1);
+        border: 1px solid var(--dsw-alias-border-l1);
+        color: var(--dsw-alias-label-primary);
+      }
+      .pt-card:hover { border-color: var(--dsw-alias-border-l2); }
+      .pt-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+      .pt-divider { height: 1px; background: var(--dsw-alias-border-l1); border: 0; margin: 0; }
+
+      /* Badges. Small labels stay at 11px so they keep 4.5:1 contrast; the old
+         0.72em (9.4px) + opacity .85 landed support at 2.8:1. */
+      .pt-badge {
+        display: inline-flex; align-items: center; gap: 3px;
+        padding: 0 6px; height: 18px; white-space: nowrap;
+        font-size: 11px; line-height: 16px; font-weight: 500;
+        color: var(--dsw-alias-label-tertiary);
+        background: transparent;
+        border: 1px solid var(--dsw-alias-border-l2);
+        border-radius: var(--dsw-radius-xs);
+      }
+      .pt-badge-support { color: var(--dsw-alias-state-success-primary); border-color: var(--dsw-alias-state-success-secondary); }
+      .pt-badge-conflict { color: var(--dsw-alias-state-error-primary); border-color: var(--dsw-alias-state-error-secondary); }
+      .pt-badge-warn { color: var(--dsw-alias-state-warn-primary); border-color: var(--dsw-alias-state-warn-primary); }
+      .pt-badge-info { color: var(--dsw-alias-state-business-primary); border-color: var(--dsw-alias-border-l2); }
+      .pt-badge-quiet { color: var(--dsw-alias-label-caption); border-color: transparent; }
+
+      /* Messages. */
+      .pt-banner {
+        display: flex; gap: 8px; align-items: flex-start;
+        padding: 8px 10px; font-size: 12px; line-height: 18px;
+        border-radius: var(--dsw-radius-md);
+        border: 1px solid var(--dsw-alias-border-l2);
+        background: var(--dsw-alias-bg-layer-2);
+        color: var(--dsw-alias-label-primary);
+      }
+      .pt-banner-error {
+        border-color: var(--dsw-alias-state-error-secondary);
+        background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, var(--dsw-alias-bg-layer-1));
+      }
+      .pt-banner-note { color: var(--dsw-alias-label-secondary); }
+
+      /* Empty states are an instruction, not a mood. */
+      .pt-empty { padding: 24px 12px; text-align: center; }
+      .pt-empty-title { font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-secondary); }
+      .pt-empty-hint { margin-top: 4px; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-caption); }
+
+      /* Toolbar: wraps by priority, never overflows. */
+      .pt-toolbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+      .pt-toolbar-grow { flex: 1 1 140px; min-width: 0; }
+      .pt-spacer { flex: 1 1 auto; }
+
+      /* Reader */
+      .pt-reader { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; min-height: 0; }
+      .pt-reader-bar {
+        display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
+        padding: 6px 0; border-bottom: 1px solid var(--dsw-alias-border-l1);
+      }
+      .pt-canvas-wrap {
+        flex: 1 1 auto; min-height: 180px; max-height: 62vh; overflow: auto;
+        display: flex; justify-content: center; align-items: flex-start;
+        padding: 8px;
+        background: var(--dsw-alias-bg-layer-2);
+        border: 1px solid var(--dsw-alias-border-l1);
+        border-radius: var(--dsw-radius-md);
+      }
+      .pt-page { position: relative; flex: none; }
+      .pt-textLayer {
+        position: absolute; inset: 0; overflow: hidden; opacity: 1;
+        line-height: 1; text-align: initial; text-size-adjust: none;
+        forced-color-adjust: none; transform-origin: 0 0; z-index: 2;
+        --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+        --min-font-size-inv: calc(1 / var(--min-font-size));
+      }
+      .pt-textLayer span, .pt-textLayer br {
+        color: transparent; position: absolute; white-space: pre;
+        cursor: text; transform-origin: 0% 0%;
+        font-size: calc(var(--text-scale-factor) * var(--font-height));
+        --scale-x: 1; --rotate: 0deg;
+        transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+      }
+      .pt-textLayer .markedContent { display: contents; }
+      .pt-textLayer ::selection { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 35%, transparent); }
+      .pt-textLayer .pt-hit { background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 45%, transparent); }
+
+      .pt-snippet mark {
+        background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 32%, transparent);
+        color: var(--dsw-alias-label-primary);
+        border-radius: 2px;
+      }
+
+      /* Row layouts collapse before they squeeze. */
+      .pt-row { display: flex; gap: 8px; align-items: flex-start; }
+      .pt-row-main { flex: 1 1 auto; min-width: 0; }
+      .pt-row-aside { flex: none; display: flex; gap: 4px; align-items: center; }
+
+      @container pt (max-width: 340px) {
+        .pt-btn-label { display: none; }
+        .pt-btn { padding: 3px 7px; }
+        .pt-tab { font-size: 11px; }
+        .pt-row-aside { flex-direction: column; align-items: stretch; }
+      }
+    `;
 
     let cssInjected = false;
     function ensureCss() {
       if (cssInjected || typeof document === "undefined") return;
-      const style = document.createElement("style");
-      style.dataset.paperToolStyle = "1";
-      style.textContent = `
-        .pt-textLayer {
-          position: absolute; inset: 0; overflow: hidden; opacity: 1;
-          line-height: 1; text-align: initial; text-size-adjust: none;
-          forced-color-adjust: none; transform-origin: 0 0; z-index: 2;
-          --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
-          --min-font-size-inv: calc(1 / var(--min-font-size));
-        }
-        .pt-textLayer span, .pt-textLayer br {
-          color: transparent; position: absolute; white-space: pre;
-          cursor: text; transform-origin: 0% 0%;
-          font-size: calc(var(--text-scale-factor) * var(--font-height));
-          --scale-x: 1; --rotate: 0deg;
-          transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
-        }
-        .pt-textLayer .markedContent { display: contents; }
-        .pt-textLayer ::selection { background: rgba(59, 130, 246, 0.35); }
-        .pt-textLayer .pt-hit { background: rgba(250, 204, 21, 0.45); }
-      `;
-      document.head.appendChild(style);
+      if (document.querySelector("style[data-paper-tool-style]") === null) {
+        const style = document.createElement("style");
+        style.dataset.paperToolStyle = "1";
+        style.textContent = CSS;
+        document.head.appendChild(style);
+      }
       cssInjected = true;
     }
 
-    function sanitizeSnippet(text) {
-      const escaped = String(text)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-      return escaped.replace(/\[([^\]]*)\]/g, "<mark>$1</mark>");
+    /**
+     * Which bibliographic fields are still unverified guesses.
+     *
+     * The Host stores `metadataSource` as a JSON object of field → provenance
+     * ("xmp", "info", "subject", "filename", "layout", "page-text"). A field
+     * present there was recovered heuristically; a field the user edited is
+     * removed from it. So the set difference is exactly "please check this".
+     *
+     * An unparseable value must not make the card look verified: the honest
+     * fallback is to assume nothing is confirmed, because the alternative is
+     * presenting a guess as a fact.
+     */
+    function guessedFields(paper) {
+      const known = ["title", "authors", "year", "venue", "doi"];
+      const raw = paper?.metadataSource;
+      // No provenance at all means the row predates v4 or was never imported
+      // through the extractor; either way we cannot claim it was checked.
+      if (typeof raw !== "string" || raw.trim() === "") return [];
+      let parsed = null;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        return [];
+      }
+      if (parsed === null || typeof parsed !== "object") return [];
+      return known.filter((field) => {
+        const source = parsed[field];
+        if (typeof source !== "string" || source === "") return false;
+        // Only values that are actually present can be doubted.
+        const value = typeof paper[field] === "string" ? paper[field].trim() : "";
+        if (value === "") return false;
+        // A high-confidence source is not a guess. XMP came from the file itself,
+        // and `info`/`subject` were written by the publisher.
+        return source === "layout" || source === "filename" || source === "page-text";
+      });
+    }
+
+    /** Dictionary key for a field name, used in the "guessed" badge. */
+    function fieldLabelKey(field) {
+      switch (field) {
+        case "title": return "fieldTitle";
+        case "authors": return "fieldAuthors";
+        case "year": return "fieldYear";
+        case "venue": return "fieldVenue";
+        case "doi": return "fieldDoi";
+        default: return field;
+      }
+    }
+
+    /**
+     * Turn a search snippet into React nodes, marking the bracketed hits.
+     *
+     * The Host brackets matches with [..]. Building elements directly means PDF
+     * text never becomes markup, so no escaping step can be got wrong and no
+     * raw-HTML injection point exists in this file.
+     */
+    function snippetNodes(text) {
+      const value = String(text ?? "");
+      const parts = [];
+      let last = 0;
+      for (const match of value.matchAll(/\[([^\]]*)\]/g)) {
+        if (match.index > last) parts.push(value.slice(last, match.index));
+        parts.push(h("mark", { key: `m${match.index}` }, match[1]));
+        last = match.index + match[0].length;
+      }
+      if (last < value.length) parts.push(value.slice(last));
+      return parts.length === 0 ? value : parts;
     }
 
     function normalizeSelection(text) {
@@ -444,17 +797,24 @@ window.__ModuleLoader__.load({
       return true;
     }
 
-    /** Load the pdfjs runtime once per page via the authenticated channel. */
-    let pdfjsCache = null;
+    /**
+     * Load the pdfjs runtime once per page and keep its Blob URLs for the
+     * lifetime of the module, revoking them only if the module is torn down.
+     * The previous version rebuilt them per session id and never released the
+     * PDFDocumentProxy, so every opened paper leaked a worker and its fonts.
+     */
+    const pdfjsCache = new Map();
     async function loadPdfjs(sessionId) {
-      if (pdfjsCache) return pdfjsCache;
+      const cached = pdfjsCache.get(sessionId);
+      if (cached !== undefined) return cached;
       const runtime = await callRemote(sessionId, "getPdfRuntime");
       const mainUrl = URL.createObjectURL(new Blob([runtime.pdfMainSource], { type: "text/javascript" }));
       const workerUrl = URL.createObjectURL(new Blob([runtime.pdfWorkerSource], { type: "text/javascript" }));
       const pdfjs = await import(mainUrl);
       pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
-      pdfjsCache = { pdfjs, workerUrl, sessionId };
-      return pdfjsCache;
+      const entry = { pdfjs, workerUrl, mainUrl };
+      pdfjsCache.set(sessionId, entry);
+      return entry;
     }
 
     /** Serve CMaps and standard fonts from the Host; required for CJK PDFs. */
@@ -500,65 +860,237 @@ window.__ModuleLoader__.load({
       };
     }
 
-    function Badge({ children, style }) {
-      return h("span", { style: { ...styles.badge, ...(style ?? null) } }, children);
+    /**
+     * Release a PDF document and its worker.
+     *
+     * PDF.js 6 exposes `loadingTask.destroy()` and `document.cleanup()`; the
+     * document proxy has NO `destroy()`. This code used to call `doc.destroy()`
+     * in both teardown paths, so closing the reader threw
+     * "doc.destroy is not a function" — which is exactly what the user saw when
+     * pressing 「返回列表」.
+     *
+     * Every call is guarded on `typeof … === "function"`: a defensive check here
+     * is not cargo-culting, because the API genuinely differs across PDF.js
+     * majors and a teardown path that throws takes down the whole view.
+     */
+    function releasePdfDocument(loadingTask, doc) {
+      const attempt = (label, run) => {
+        try {
+          const result = run();
+          if (result && typeof result.catch === "function") result.catch(() => {});
+        } catch {
+          // Teardown must never throw: it runs while React is unmounting, and an
+          // exception here surfaces as a blank pane.
+          void label;
+        }
+      };
+      if (loadingTask && typeof loadingTask.destroy === "function") {
+        attempt("loadingTask.destroy", () => loadingTask.destroy());
+      } else if (doc && typeof doc.cleanup === "function") {
+        // No task to destroy; at least drop the cached page/font data.
+        attempt("doc.cleanup", () => doc.cleanup());
+      }
     }
 
-    function IconButton({ children, onClick, title, danger, primary, disabled, style }) {
-      return h("button", {
-        type: "button", title, disabled,
-        style: {
-          ...styles.button,
-          ...(danger ? styles.danger : null),
-          ...(primary ? styles.primary : null),
-          ...(disabled ? { opacity: 0.5, cursor: "default" } : null),
-          ...(style ?? null),
-        },
-        onClick,
+    // --- primitives -------------------------------------------------------
+
+    function Badge({ tone, children, title }) {
+      return h("span", {
+        className: `pt-badge${tone ? ` pt-badge-${tone}` : ""}`,
+        title,
       }, children);
     }
 
-    function PaperCard({ paper, t, onOpen, onEdit, onDelete }) {
-      const fulltext = paper.material === "fulltext";
-      const hasPdf = typeof paper.pdfPath === "string" && paper.pdfPath !== "";
-      const [confirming, setConfirming] = useState(false);
-      const meta = [paper.authors, paper.year, paper.venue].filter(Boolean).join(" · ");
-      return h("li", null,
-        h("div", { style: styles.card },
-          h("div", { style: { display: "flex", gap: 6, alignItems: "baseline" } },
-            h("span", { style: { fontWeight: 600, wordBreak: "break-word", flex: 1 } }, paper.title || "(untitled)"),
-            h(Badge, null, fulltext ? t("fulltext") : t("metaOnly")),
-            hasPdf ? null : h(Badge, { style: styles.badgeMissing }, t("noPdf")),
-          ),
-          meta ? h("div", { style: styles.muted }, meta) : null,
-          h("div", { style: styles.muted }, `${paper.numPages || 0} ${t("pages")}${paper.hitCount > 1 ? ` · ${paper.hitCount} 处命中` : ""}`),
-          paper.snippet
-            ? h("p", { style: styles.snippet, dangerouslySetInnerHTML: { __html: sanitizeSnippet(paper.snippet) } })
-            : null,
-          h("div", { style: { ...styles.row, marginTop: 4 } },
-            h(IconButton, {
-              onClick: () => onOpen({
-                paperId: paper.paperId,
-                title: paper.title,
-                pageIndex: Number.isInteger(paper.pageIndex) ? paper.pageIndex : 0,
-                paper,
-              }),
-              disabled: !hasPdf,
-              primary: true,
-            }, t("open")),
-            h(IconButton, { onClick: () => onEdit(paper) }, t("editMeta")),
-            confirming
-              ? h(React.Fragment, null,
-                h(IconButton, { danger: true, onClick: () => { setConfirming(false); onDelete(paper.paperId); } }, t("confirm")),
-                h(IconButton, { onClick: () => setConfirming(false) }, t("cancel")),
-              )
-              : h(IconButton, { danger: true, onClick: () => setConfirming(true) }, t("delete")),
-          ),
-        ),
+    function Button({ children, onClick, variant, disabled, title, label, icon }) {
+      const cls = `pt-btn${variant === "primary" ? " pt-btn-primary" : variant === "danger" ? " pt-btn-danger" : variant === "ghost" ? " pt-btn-ghost" : ""}${icon ? " pt-btn-icon" : ""}`;
+      return h("button", {
+        type: "button", className: cls, onClick, disabled, title: title ?? label,
+        "aria-label": icon && label ? label : undefined,
+      }, children);
+    }
+
+    function Empty({ title, hint, action }) {
+      return h("div", { className: "pt-empty" },
+        h("div", { className: "pt-empty-title" }, title),
+        hint ? h("div", { className: "pt-empty-hint" }, hint) : null,
+        action ? h("div", { style: { marginTop: 10 } }, action) : null,
       );
     }
 
-    function MetadataEditor({ paper, t, onSave, onCancel }) {
+    /**
+     * Keep one broken view from taking the whole pane with it.
+     *
+     * The sidebar is a single React tree with no boundary above it, so any throw
+     * during render, or in a lifecycle method, unmounted the entire plugin and
+     * left the user with a blank pane and no way back except a reload. An error
+     * in the PDF reader is the most likely trigger, because it is the only view
+     * that drives a worker and a canvas.
+     *
+     * The fallback deliberately offers a reset: a stuck reader usually recovers
+     * once its subtree is thrown away and remounted, and forcing the user to
+     * reload the whole app for that is not acceptable.
+     */
+    class ViewBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { error: null };
+      }
+      static getDerivedStateFromError(error) {
+        return { error };
+      }
+      componentDidCatch(error, info) {
+        // Keep the detail in the console: the message shown in the pane has to
+        // stay short and translated, but a stack is what makes a report useful.
+        console.error("paper-tool view crashed:", error, info?.componentStack ?? "");
+      }
+      render() {
+        if (this.state.error !== null) {
+          return h("div", { style: { padding: "10px 12px" } },
+            h(Banner, { tone: "error", title: this.props.t("viewCrashed") },
+              `${this.state.error.message ?? String(this.state.error)}`),
+            h("div", { style: { marginTop: 8 } },
+              h(Button, {
+                variant: "primary",
+                onClick: () => this.setState({ error: null }),
+              }, this.props.t("retry"))));
+        }
+        return this.props.children;
+      }
+    }
+
+    function Banner({ tone, title, children, onDismiss, dismissLabel }) {
+      return h("div", {
+        className: `pt-banner${tone === "error" ? " pt-banner-error" : " pt-banner-note"}`,
+        role: tone === "error" ? "alert" : "status",
+      },
+        h("div", { className: "pt-row-main" },
+          title ? h("div", { style: { fontWeight: 600 } }, title) : null,
+          h("div", { style: title ? { marginTop: 2 } : null }, children),
+        ),
+        onDismiss ? h(Button, { variant: "ghost", onClick: onDismiss, label: dismissLabel }, "✕") : null,
+      );
+    }
+
+    // --- library ----------------------------------------------------------
+
+    function PaperCard({ paper, t, onOpen, onEdit, onReextract, onDelete, busy }) {
+      // Three states, three different claims. Folding OCR into "full text"
+      // would present guessed characters as if they were the PDF's own text,
+      // and folding it into "metadata only" would deny that the paper is
+      // searchable at all.
+      const isFulltext = paper.material === "fulltext";
+      const isOcr = paper.material === "ocr";
+      const materialLabel = isFulltext ? t("fulltext") : isOcr ? t("ocrText") : t("metaOnly");
+      const hasPdf = typeof paper.pdfPath === "string" && paper.pdfPath !== "";
+      const [confirming, setConfirming] = useState(false);
+      // Outcome of the last re-extraction, shown next to the buttons that caused
+      // it. A silent success would leave the user unsure whether the repaired
+      // fields are actually new.
+      const [reextractResult, setReextractResult] = useState(null);
+      const meta = [paper.authors, paper.year, paper.venue].filter(Boolean).join(" · ");
+      // Which fields are still guesses. `metadataSource` records where each value
+      // came from; a user correction removes its entry, so this list shrinks as
+      // the bibliography is checked. Showing it on the card is the difference
+      // between "the app claims this is the journal" and "the app is asking".
+      const guessed = guessedFields(paper);
+      return h("li", { className: "pt-card" },
+        h("div", { className: "pt-row" },
+          h("div", { className: "pt-row-main" },
+            h("div", { style: { display: "flex", gap: 6, alignItems: "baseline" } },
+              h("span", {
+                className: "pt-h2",
+                style: { flex: 1, minWidth: 0, fontWeight: 600, color: "var(--dsw-alias-label-primary)", wordBreak: "break-word" },
+              }, paper.title || "(untitled)"),
+            ),
+            meta ? h("div", { className: "pt-meta", style: { marginTop: 2, wordBreak: "break-word" } }, meta) : null,
+            h("div", { style: { display: "flex", gap: 4, alignItems: "center", marginTop: 4, flexWrap: "wrap" } },
+              h(Badge, { tone: isFulltext ? "info" : isOcr ? "warn" : undefined, title: isOcr ? t("ocrHint") : undefined }, materialLabel),
+              hasPdf ? null : h(Badge, { tone: "quiet" }, t("noPdf")),
+              guessed.length > 0
+                ? h(Badge, { tone: "warn", title: t("guessHint") }, t("guessBadge", { fields: guessed.map((field) => t(fieldLabelKey(field))).join(t("listSep")) }))
+                : null,
+              h("span", { className: "pt-caption pt-num" },
+                `${paper.numPages || 0} ${t("pages")}${paper.hitCount > 1 ? ` · ${paper.hitCount} ${t("total")}` : ""}`),
+            ),
+            // Where the readable text came from, in words rather than a glyph.
+            // The OCR badge above says "scanned", but the consequence — that
+            // quotes taken from it may carry misread characters — is what the
+            // user needs before citing, and a title tooltip needs a hover to
+            // discover. This line is always visible. The label goes through the
+            // dictionary with a placeholder so the colon is localised too.
+            h("div", { className: "pt-caption", style: { marginTop: 3 } },
+              t("sourceLine", {
+                source: isOcr ? t("sourceOcr") : isFulltext ? t("sourceTextLayer") : t("sourceNone"),
+              })),
+            paper.snippet
+              ? h("p", { className: "pt-meta pt-snippet", style: { margin: "6px 0 0", wordBreak: "break-word" } },
+                snippetNodes(paper.snippet))
+              : null,
+          ),
+        ),
+        h("div", { style: { display: "flex", gap: 4, marginTop: 8, flexWrap: "wrap" } },
+          h(Button, {
+            variant: "primary",
+            disabled: !hasPdf || busy === "open",
+            title: hasPdf ? t("open") : t("noPdfForPaper"),
+            onClick: () => onOpen({
+              paperId: paper.paperId,
+              title: paper.title,
+              pageIndex: Number.isInteger(paper.pageIndex) ? paper.pageIndex : 0,
+              quote: paper.snippet ? null : null,
+              paper,
+            }),
+          }, t("open")),
+          h(Button, { onClick: () => onEdit(paper), disabled: busy !== null }, t("editMeta")),
+          // Only offered when there is a PDF to re-read. Showing it on a
+          // metadata-only entry would promise an action that must fail.
+          hasPdf
+            ? h(Button, {
+              variant: "ghost",
+              disabled: busy !== null,
+              title: t("reextractHint"),
+              onClick: async () => {
+                const result = await onReextract(paper);
+                if (result === null) return;
+                setReextractResult(result);
+              },
+            }, busy === "reextract" ? t("working") : t("reextract"))
+            : null,
+          confirming
+            ? h(React.Fragment, null,
+              h(Button, { variant: "danger", onClick: () => { setConfirming(false); onDelete(paper.paperId); }, disabled: busy !== null },
+                t("confirm")),
+              h(Button, { variant: "ghost", onClick: () => setConfirming(false) }, t("cancel")),
+            )
+            : h(Button, { variant: "ghost", onClick: () => setConfirming(true), disabled: busy !== null },
+              t("delete")),
+        ),
+        reextractResult !== null
+          ? h("p", { className: "pt-caption", role: "status", style: { margin: "6px 0 0" } },
+            reextractResult.changed.length === 0 && reextractResult.disagreed.length === 0
+              ? t("reextractNoChange")
+              : [
+                reextractResult.changed.length === 0
+                  ? null
+                  : t("reextractDone", {
+                    count: reextractResult.changed.length,
+                    fields: reextractResult.changed.map((field) => t(fieldLabelKey(field))).join(t("listSep")),
+                  }),
+                // Saying "nothing new" while the extractor disagrees with a kept
+                // value would be a lie: the guard refused to overwrite what looks
+                // like the user's own edit, but the user still deserves to know
+                // what the PDF actually says.
+                reextractResult.disagreed.length === 0
+                  ? null
+                  : t("reextractDisagreed", {
+                    fields: reextractResult.disagreed.map((field) => t(fieldLabelKey(field))).join(t("listSep")),
+                  }),
+              ].filter((line) => line !== null).join(" — "))
+          : null,
+      );
+    }
+
+    function MetadataEditor({ paper, t, onSave, onCancel, busy }) {
       const [form, setForm] = useState({
         title: paper.title ?? "",
         authors: paper.authors ?? "",
@@ -567,60 +1099,53 @@ window.__ModuleLoader__.load({
         doi: paper.doi ?? "",
         abstract: paper.abstract ?? "",
       });
-      const field = (key, label, textarea) => h("label", { style: styles.field },
-        h("span", null, label),
+      const set = (key) => (event) => setForm({ ...form, [key]: event.target.value });
+      const field = (key, label, textarea) => h("label", { style: { display: "block" } },
+        h("span", { className: "pt-caption", style: { display: "block", marginBottom: 3 } }, label),
         textarea
-          ? h("textarea", {
-            style: styles.textarea, value: form[key],
-            onChange: (event) => setForm({ ...form, [key]: event.target.value }),
-          })
-          : h("input", {
-            style: styles.input, value: form[key],
-            onChange: (event) => setForm({ ...form, [key]: event.target.value }),
-          }),
+          ? h("textarea", { className: "pt-textarea", value: form[key], onChange: set(key) })
+          : h("input", { className: "pt-input", value: form[key], onChange: set(key) }),
       );
-      return h("div", { style: { ...styles.card, display: "flex", flexDirection: "column", gap: 6 } },
-        h("strong", null, t("editMeta")),
+      return h("div", { className: "pt-card", style: { display: "flex", flexDirection: "column", gap: 8 } },
+        h("div", { className: "pt-h2" }, t("editMeta")),
         field("title", t("titleLabel")),
         field("authors", t("authorsLabel")),
-        h("div", { style: styles.row },
-          h("div", { style: { flex: "0 0 90px" } }, field("year", t("yearLabel"))),
-          h("div", { style: { flex: "1 1 140px" } }, field("venue", t("venueLabel"))),
+        h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+          h("div", { style: { flex: "0 0 96px" } }, field("year", t("yearLabel"))),
+          h("div", { style: { flex: "1 1 160px", minWidth: 0 } }, field("venue", t("venueLabel"))),
         ),
         field("doi", t("doiLabel")),
         field("abstract", t("abstractLabel"), true),
-        h("div", { style: styles.row },
-          h(IconButton, { primary: true, onClick: () => onSave(form) }, t("save")),
-          h(IconButton, { onClick: onCancel }, t("cancel")),
+        h("div", { style: { display: "flex", gap: 6, justifyContent: "flex-end" } },
+          h(Button, { variant: "ghost", onClick: onCancel }, t("cancel")),
+          h(Button, { variant: "primary", onClick: () => onSave(form), disabled: busy !== null }, t("save")),
         ),
       );
     }
 
-    /**
-     * Pick a page range and render a selectable text layer over the canvas.
-     *
-     * Canvas alone is not selectable: without the text layer the reader can be
-     * looked at but not quoted from. If the TextLayer API fails (for example a
-     * CSP change), the extracted page text is shown in a selectable <pre> so the
-     * evidence workflow still works instead of silently breaking.
-     */
+    // --- reader -----------------------------------------------------------
+
     function PdfReader({ sessionId, paper, initialPage, highlight, t, onSelectionChange, onClose }) {
-      ensureCss();
       const canvasRef = useRef(null);
       const textLayerRef = useRef(null);
       const pageWrapRef = useRef(null);
       const docRef = useRef(null);
       const pdfjsRef = useRef(null);
       const tokenRef = useRef(0);
+      const renderTaskRef = useRef(null);
       const [pageNumber, setPageNumber] = useState(Math.max(1, (initialPage ?? 0) + 1));
       const [numPages, setNumPages] = useState(0);
       const [scale, setScale] = useState(1.15);
+      const [autoFit, setAutoFit] = useState(true);
       const [pageInput, setPageInput] = useState("");
       const [loading, setLoading] = useState(true);
       const [error, setError] = useState(null);
       const [textFallback, setTextFallback] = useState(null);
       const [selected, setSelected] = useState(null);
       const [highlightMissed, setHighlightMissed] = useState(false);
+      // The loading task owns the worker; the document proxy does not. Keeping it
+      // is what makes a clean teardown possible (see releasePdfDocument).
+      const loadingTaskRef = useRef(null);
 
       useEffect(() => {
         setPageNumber(Math.max(1, (initialPage ?? 0) + 1));
@@ -640,7 +1165,14 @@ window.__ModuleLoader__.load({
             if (cancelled) return;
             pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
             const assets = makeAssetFactory(pdfjs, sessionId);
-            const doc = await pdfjs.getDocument({
+            // Hold the loading task, not just the document. In PDF.js 6 the
+            // document proxy has cleanup() but no destroy(); the worker thread is
+            // owned by the loading task and is only released by loadingTask.
+            // destroy(). Calling doc.destroy() — which this code did — throws
+            // "doc.destroy is not a function", and because it ran inside the
+            // effect's teardown it surfaced the moment the user pressed
+            // 「返回列表」 to close the reader.
+            const loadingTask = pdfjs.getDocument({
               data: new Uint8Array(payload.data),
               BinaryDataFactory: assets.BinaryDataFactory,
               cMapUrl: assets.cMapUrl,
@@ -649,19 +1181,61 @@ window.__ModuleLoader__.load({
               isEvalSupported: false,
               useWorkerFetch: false,
               enableXfa: false,
-            }).promise;
-            if (cancelled) return;
+            });
+            loadingTaskRef.current = loadingTask;
+            const doc = await loadingTask.promise;
+            if (cancelled) {
+              // The effect was torn down while the document was still loading:
+              // release it, or the worker and parsed fonts outlive the view.
+              releasePdfDocument(loadingTask, doc);
+              return;
+            }
             docRef.current = doc;
             setNumPages(doc.numPages);
             setPageNumber((current) => Math.min(Math.max(1, current), doc.numPages));
           } catch (loadError) {
-            if (!cancelled) setError(loadError?.message ?? String(loadError));
+            if (!cancelled) setError(describeError(loadError, t));
           } finally {
             if (!cancelled) setLoading(false);
           }
         })();
-        return () => { cancelled = true; controller.abort(); };
-      }, [sessionId, paper.paperId]);
+        return () => {
+          cancelled = true;
+          controller.abort();
+          // Never leave a PDF attached to a dead view: it owns a worker thread
+          // and the parsed font/CMap caches.
+          const task = loadingTaskRef.current;
+          loadingTaskRef.current = null;
+          const doc = docRef.current;
+          docRef.current = null;
+          releasePdfDocument(task, doc);
+        };
+      }, [sessionId, paper.paperId, t]);
+
+      // Fit-to-width: the sidebar is narrow and dragged often, so the default
+      // scale is derived from the available width instead of a fixed 1.15.
+      useEffect(() => {
+        if (!autoFit) return undefined;
+        const wrap = canvasRef.current?.parentElement?.parentElement;
+        if (!wrap) return undefined;
+        const apply = () => {
+          const doc = docRef.current;
+          const width = wrap.clientWidth - 18;
+          if (!doc || !Number.isFinite(width) || width <= 0) return;
+          doc.getPage(Math.min(pageNumber, doc.numPages || 1))
+            .then((page) => {
+              const base = page.getViewport({ scale: 1 });
+              const next = Math.max(0.3, Math.min(3, width / base.width));
+              setScale(+next.toFixed(2));
+            })
+            .catch(() => {});
+        };
+        apply();
+        if (typeof ResizeObserver === "undefined") return undefined;
+        const observer = new ResizeObserver(() => apply());
+        observer.observe(wrap);
+        return () => observer.disconnect();
+      }, [autoFit, pageNumber, numPages]);
 
       useEffect(() => {
         const doc = docRef.current;
@@ -692,11 +1266,40 @@ window.__ModuleLoader__.load({
             textLayerDiv.style.setProperty("--total-scale-factor", String(scale));
             textLayerDiv.style.setProperty("--scale-factor", String(scale));
             const context = canvas.getContext("2d");
-            await page.render({
+            // A canvas can refuse a context — the GPU process died, too many
+            // contexts are open in this document, or the element was already
+            // detached. Passing null to page.render() throws inside PDF.js and,
+            // with no error boundary above this view, that blanked the whole pane.
+            // Fall back to the text layer instead, which still lets the user read
+            // and quote the page.
+            if (!context) {
+              const read = await callRemote(sessionId, "readPaper", {
+                paperId: paper.paperId,
+                fromPage: pageNumber - 1,
+                toPage: pageNumber,
+              }).catch(() => null);
+              const text = read?.pages?.[0]?.text ?? "";
+              if (!cancelled && token === tokenRef.current) {
+                setTextFallback(text === "" ? t("textFallbackNote") : text);
+                setError(null);
+              }
+              return;
+            }
+            // pdfjs refuses a second render on a canvas whose previous render is
+            // still in flight ("Cannot use the same canvas during multiple
+            // render tasks"), and rapid zoom/page clicks do exactly that.
+            if (renderTaskRef.current !== null) {
+              try { renderTaskRef.current.cancel(); } catch { /* already done */ }
+              renderTaskRef.current = null;
+            }
+            const task = page.render({
               canvasContext: context,
               viewport,
               transform: ratio === 1 ? null : [ratio, 0, 0, ratio, 0, 0],
-            }).promise;
+            });
+            renderTaskRef.current = task;
+            await task.promise;
+            renderTaskRef.current = null;
             if (cancelled || token !== tokenRef.current) return;
             try {
               const textLayer = new pdfjs.TextLayer({
@@ -728,16 +1331,27 @@ window.__ModuleLoader__.load({
                   toPage: pageNumber,
                 }).catch(() => null);
                 const text = read?.pages?.[0]?.text ?? "";
-                setTextFallback(text === "" ? `Text layer unavailable: ${layerError?.message ?? layerError}` : text);
+                setTextFallback(text === "" ? `${t("textFallbackNote")} (${layerError?.message ?? layerError})` : text);
               }
             }
             if (!cancelled && token === tokenRef.current) setError(null);
           } catch (renderError) {
-            if (!cancelled && token === tokenRef.current) setError(renderError?.message ?? String(renderError));
+            // A cancelled render rejects with RenderingCancelledException; that
+            // is the normal outcome of clicking faster than the page renders.
+            const cancelledRender = renderError?.name === "RenderingCancelledException";
+            if (!cancelled && token === tokenRef.current && !cancelledRender) {
+              setError(describeError(renderError, t));
+            }
           }
         })();
-        return () => { cancelled = true; };
-      }, [pageNumber, scale, numPages, sessionId, paper.paperId, highlight]);
+        return () => {
+          cancelled = true;
+          if (renderTaskRef.current !== null) {
+            try { renderTaskRef.current.cancel(); } catch { /* already done */ }
+            renderTaskRef.current = null;
+          }
+        };
+      }, [pageNumber, scale, numPages, sessionId, paper.paperId, highlight, onSelectionChange, t]);
 
       const onMouseUp = useCallback(() => {
         const layer = textLayerRef.current;
@@ -747,7 +1361,7 @@ window.__ModuleLoader__.load({
         if (anchor && !layer.contains(anchor)) return;
         const text = normalizeSelection(selection.toString());
         if (text === "") return;
-        const next = { text: text.slice(0, 2000), pageIndex: pageNumber - 1 };
+        const next = { text: text.slice(0, MAX_QUOTE_CHARS), pageIndex: pageNumber - 1 };
         setSelected(next);
         onSelectionChange(next);
       }, [pageNumber, onSelectionChange]);
@@ -761,48 +1375,64 @@ window.__ModuleLoader__.load({
         onSelectionChange(null);
       }, [pageInput, numPages, onSelectionChange]);
 
-      return h("div", { style: styles.reader },
-        h("div", { style: styles.row },
-          h(IconButton, { onClick: onClose }, `← ${t("closeReader")}`),
-          h("span", { style: styles.muted }, `${t("page")} ${pageNumber} / ${numPages || "?"}`),
-          h(IconButton, {
-            disabled: pageNumber <= 1,
+      const step = useCallback((delta) => {
+        setAutoFit(false);
+        setScale((current) => Math.max(0.3, Math.min(3, +(current + delta).toFixed(2))));
+      }, []);
+
+      return h("div", { className: "pt-reader" },
+        h("div", { className: "pt-reader-bar" },
+          h(Button, { variant: "ghost", onClick: onClose, icon: true, label: t("closeReader") }, "←"),
+          h("span", { className: "pt-meta pt-num", style: { marginLeft: 2 } },
+            `${pageNumber} ${t("of")} ${numPages || "?"}`),
+          h("div", { className: "pt-spacer" }),
+          h(Button, {
+            icon: true, label: t("prevPage"), disabled: pageNumber <= 1,
             onClick: () => { setPageNumber((n) => Math.max(1, n - 1)); setSelected(null); onSelectionChange(null); },
-          }, t("prevPage")),
-          h(IconButton, {
-            disabled: pageNumber >= numPages,
+          }, "‹"),
+          h(Button, {
+            icon: true, label: t("nextPage"), disabled: pageNumber >= numPages,
             onClick: () => { setPageNumber((n) => Math.min(numPages, n + 1)); setSelected(null); onSelectionChange(null); },
-          }, t("nextPage")),
-          h(IconButton, { disabled: scale <= 0.6, onClick: () => setScale((s) => Math.max(0.6, +(s - 0.2).toFixed(2))) }, "−"),
-          h("span", { style: styles.muted }, `${Math.round(scale * 100)}%`),
-          h(IconButton, { disabled: scale >= 3, onClick: () => setScale((s) => Math.min(3, +(s + 0.2).toFixed(2))) }, "+"),
+          }, "›"),
           h("input", {
-            style: { ...styles.input, flex: "0 0 46px", padding: "3px 5px" },
-            value: pageInput, placeholder: t("jumpPlaceholder"),
+            className: "pt-input", style: { width: 52, minHeight: 26, padding: "2px 6px" },
+            value: pageInput, placeholder: t("jumpPlaceholder"), "aria-label": t("jumpPlaceholder"),
             onChange: (event) => setPageInput(event.target.value),
             onKeyDown: (event) => { if (event.key === "Enter") goToPage(); },
           }),
-          h(IconButton, { onClick: goToPage }, t("jump")),
+          h(Button, {
+            className: "pt-btn", icon: true, label: t("jump"),
+            onClick: goToPage, disabled: pageInput.trim() === "",
+          }, "↵"),
+          h(Button, { icon: true, label: t("zoomOut"), disabled: scale <= 0.3, onClick: () => step(-0.15) }, "−"),
+          h(Button, {
+            icon: true, label: t("fitWidth"), title: t("fitWidth"),
+            onClick: () => setAutoFit((current) => !current),
+            variant: autoFit ? "primary" : undefined,
+          }, "⤢"),
+          h(Button, { icon: true, label: t("zoomIn"), disabled: scale >= 3, onClick: () => step(0.15) }, "+"),
         ),
-        h("div", { style: styles.muted }, paper.title || paper.paperId),
-        highlightMissed ? h("p", { style: styles.note }, "已打开对应页，但未在文本层中定位到该引文。") : null,
-        loading ? h("p", { style: styles.muted }, "…") : null,
-        error ? h("p", { style: styles.error }, error) : null,
-        h("div", { style: styles.canvasWrap },
-          h("div", { ref: pageWrapRef, style: styles.pageWrap },
+        h("div", { className: "pt-caption", style: { wordBreak: "break-word" } },
+          paper.title || paper.paperId),
+        highlightMissed ? h("p", { className: "pt-meta", style: { margin: 0 } }, t("highlightMissed")) : null,
+        loading ? h("p", { className: "pt-meta", style: { margin: 0 } }, t("readerLoading")) : null,
+        error ? h(Banner, { tone: "error" }, error) : null,
+        h("div", { className: "pt-canvas-wrap" },
+          h("div", { ref: pageWrapRef, className: "pt-page" },
             h("canvas", { ref: canvasRef, style: { display: "block" } }),
             h("div", { ref: textLayerRef, className: "pt-textLayer", onMouseUp }),
           ),
         ),
         textFallback !== null
-          ? h("div", { style: styles.group },
-            h("p", { style: styles.muted }, "文本面板模式：PDF 文本层无法叠加，改为显示抽取文本，仍可选中。"),
+          ? h("div", null,
+            h("p", { className: "pt-caption", style: { margin: "0 0 4px" } }, t("textFallbackNote")),
             h("pre", {
-              style: styles.pre,
+              className: "pt-pre",
+              style: { maxHeight: "26vh" },
               onMouseUp: () => {
                 const text = normalizeSelection(window.getSelection()?.toString() ?? "");
                 if (text === "") return;
-                const next = { text: text.slice(0, 2000), pageIndex: pageNumber - 1 };
+                const next = { text: text.slice(0, MAX_QUOTE_CHARS), pageIndex: pageNumber - 1 };
                 setSelected(next);
                 onSelectionChange(next);
               },
@@ -810,32 +1440,65 @@ window.__ModuleLoader__.load({
           )
           : null,
         selected
-          ? null
-          : h("p", { style: styles.muted }, t("noSelection")),
+          ? h("p", { className: "pt-caption", style: { margin: 0 } },
+            `${t("selected")} · ${selected.text.length} / ${MAX_QUOTE_CHARS}`)
+          : h("p", { className: "pt-caption", style: { margin: 0 } }, t("noSelection")),
       );
     }
+
+    // --- evidence ---------------------------------------------------------
+
+    const STANCE_TONE = {
+      support: "support",
+      conflict: "conflict",
+      not_found: undefined,
+      no_evidence: "quiet",
+      covered: "info",
+      empty: "quiet",
+    };
 
     function StanceBadge({ stance, t }) {
       const label = stance === "support"
         ? t("support")
         : stance === "conflict"
           ? t("conflict")
-          : stance === "covered"
-            ? t("covered")
-            : stance === "empty"
-              ? t("emptyCoverage")
-              : t("notFound");
-      const style = stance === "support"
-        ? styles.badgeSupport
-        : stance === "conflict"
-          ? styles.badgeConflict
-          : stance === "covered"
-            ? styles.badgeSupport
-            : styles.badgeMissing;
-      return h(Badge, { style }, label);
+          : stance === "no_evidence"
+            ? t("noEvidenceStance")
+            : stance === "covered"
+              ? t("covered")
+              : stance === "empty"
+                ? t("emptyCoverage")
+                : t("notFound");
+      return h(Badge, { tone: STANCE_TONE[stance] }, label);
     }
 
+    function EvidenceRow({ row, t, onJump, onDelete, busy }) {
+      const anchored = Number.isInteger(row.charStart) && row.charStart >= 0;
+      // A quote from OCR text may contain misread characters. Saying so here is
+      // the difference between "I can cite this" and "I should re-read the page".
+      const fromOcr = row.paperTextSource === "ocr";
+      return h("div", { style: { display: "flex", gap: 8, alignItems: "flex-start", padding: "7px 0" } },
+        h("div", { className: "pt-row-main" },
+          h("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 3, flexWrap: "wrap" } },
+            h(Badge, { tone: anchored ? "info" : "warn" }, anchored ? t("evidenceAnchored") : t("evidenceUnanchored")),
+            fromOcr ? h(Badge, { tone: "warn", title: t("ocrHint") }, t("ocrText")) : null,
+            h("span", { className: "pt-caption pt-num" }, `${t("page")} ${row.pageIndex + 1}`),
+          ),
+          h("p", { className: "pt-body", style: { margin: 0, wordBreak: "break-word" } }, row.quote),
+          anchored ? null : h("p", { className: "pt-caption", style: { margin: "3px 0 0" } }, t("evidenceUnanchoredHint")),
+          fromOcr ? h("p", { className: "pt-caption", style: { margin: "3px 0 0" } }, t("ocrQuoteHint")) : null,
+        ),
+        h("div", { className: "pt-row-aside" },
+          h(Button, { icon: true, label: t("jumpToPage"), onClick: () => onJump(row), disabled: busy !== null }, "↗"),
+          h(Button, { icon: true, variant: "ghost", label: t("delete"), onClick: () => onDelete(row.evidenceId), disabled: busy !== null }, "✕"),
+        ),
+      );
+    }
+
+    // --- body -------------------------------------------------------------
+
     function Body({ sessionId, inputActions, t }) {
+      ensureCss();
       const [view, setView] = useState("library");
       const [mode, setMode] = useState("library");
       const [query, setQuery] = useState("");
@@ -854,6 +1517,7 @@ window.__ModuleLoader__.load({
       const [note, setNote] = useState("");
       const [error, setError] = useState(null);
       const [evidence, setEvidence] = useState([]);
+      const [evidenceFilter, setEvidenceFilter] = useState("all");
       const [collectQuery, setCollectQuery] = useState("");
       const [matrixClaim, setMatrixClaim] = useState("");
       const [matrix, setMatrix] = useState(null);
@@ -871,9 +1535,11 @@ window.__ModuleLoader__.load({
       }, []);
 
       const loadEvidence = useCallback(async () => {
-        if (!sessionId) return;
-        const result = await callRemote(sessionId, "listEvidence", { limit: 1000 });
-        setEvidence(result.evidence ?? []);
+        if (!sessionId) return [];
+        const result = await callRemote(sessionId, "listEvidence", { limit: 2000 });
+        const rows = result.evidence ?? [];
+        setEvidence(rows);
+        return rows;
       }, [sessionId]);
 
       const refresh = useCallback(async () => {
@@ -888,9 +1554,9 @@ window.__ModuleLoader__.load({
           setError(null);
           await loadEvidence();
         } catch (statusError) {
-          setError(statusError?.message ?? String(statusError));
+          setError(describeError(statusError, t));
         }
-      }, [sessionId, loadEvidence]);
+      }, [sessionId, loadEvidence, t]);
 
       useEffect(() => { refresh(); }, [refresh]);
 
@@ -942,16 +1608,16 @@ window.__ModuleLoader__.load({
           } else {
             const result = await callRemote(sessionId, "search", { query, limit: 50 });
             setHits(result.hits ?? []);
-            setStatus((current) => ({ ...(current ?? {}), library: result.library }));
+            setStatus((current) => (current === null ? current : { ...current, library: result.library }));
             setCandidates(null);
             setFailures([]);
           }
         } catch (searchError) {
-          setError(searchError?.message ?? String(searchError));
+          setError(describeError(searchError, t));
         } finally {
           setBusy(null);
         }
-      }, [sessionId, query, mode]);
+      }, [sessionId, query, mode, t]);
 
       const addPicked = useCallback(async () => {
         if (!sessionId || !candidates) return;
@@ -968,7 +1634,7 @@ window.__ModuleLoader__.load({
               const candidate = chosen[index];
               setNote(`${t("downloading")} ${index + 1}/${chosen.length}`);
               if (!candidate.href) {
-                problems.push(`${candidate.title}: 没有可下载链接`);
+                problems.push(`${candidate.title}: ${t("noCandidates")}`);
                 continue;
               }
               try {
@@ -980,23 +1646,24 @@ window.__ModuleLoader__.load({
                   venue: candidate.venue,
                 });
                 if (result.ok === true && (result.imported?.length ?? 0) > 0) added += 1;
-                else problems.push(`${candidate.title}: ${result.reason ?? "下载失败"}`);
+                else problems.push(`${candidate.title}: ${result.reason ?? "download failed"}`);
               } catch (downloadError) {
-                problems.push(`${candidate.title}: ${downloadError?.message ?? String(downloadError)}`);
+                problems.push(`${candidate.title}: ${describeError(downloadError, t)}`);
               }
             }
-            setNote(`${t("added")} ${added}${problems.length > 0 ? ` · ${problems.length} 失败` : ""}`);
+            setNote(`${t("added")} ${added}${problems.length > 0 ? ` · ${problems.length} ✕` : ""}`);
             if (problems.length > 0) setError(problems.slice(0, 3).join("; "));
             setPicked({});
           } else {
             const result = await callRemote(sessionId, "addCandidates", { candidates: chosen });
-            setNote(`${t("added")} ${result.imported?.length ?? 0}`);
+            const skipped = result.duplicates?.length ?? 0;
+            setNote(`${t("added")} ${result.imported?.length ?? 0}${skipped > 0 ? ` · ${skipped} ${t("skipped")}` : ""}`);
             setPicked({});
             setCandidates(candidates.filter((_candidate, index) => !picked[index]));
           }
           await refresh();
         } catch (addError) {
-          setError(addError?.message ?? String(addError));
+          setError(describeError(addError, t));
         } finally {
           setBusy(null);
         }
@@ -1008,9 +1675,19 @@ window.__ModuleLoader__.load({
         setNote("");
         setError(null);
         try {
+          if (fileList.length > MAX_IMPORT_FILES) {
+            setError(t("tooManyFiles", { limit: MAX_IMPORT_FILES }));
+            return;
+          }
           const files = [];
           for (let index = 0; index < fileList.length; index += 1) {
             const file = fileList[index];
+            // Check the size before reading: turning a 300MB file into a number
+            // array blocks the tab long before the Host can reject it.
+            if (file.size > MAX_PDF_BYTES) {
+              setError(t("tooLarge", { limit: Math.round(MAX_PDF_BYTES / 1024 / 1024) }));
+              return;
+            }
             setNote(`${t("importing")} ${index + 1}/${fileList.length}`);
             const buffer = await file.arrayBuffer();
             // The wire is JSON: send a number array, not a Uint8Array (which
@@ -1019,13 +1696,18 @@ window.__ModuleLoader__.load({
           }
           const result = await callRemote(sessionId, "importPdf", { files });
           const okCount = result.imported?.length ?? 0;
+          const dupCount = result.duplicates?.length ?? 0;
           const failCount = result.failed?.length ?? 0;
           await refresh();
-          setNote(`✓ ${okCount}${failCount > 0 ? ` / ✗ ${failCount}` : ""}`);
+          setNote([
+            okCount > 0 ? `✓ ${okCount}` : "",
+            dupCount > 0 ? `= ${dupCount}` : "",
+            failCount > 0 ? `✕ ${failCount}` : "",
+          ].filter(Boolean).join(" · "));
           setHits(null);
           setError(failCount > 0 ? result.failed.map((item) => `${item.filename}: ${item.reason}`).join("; ") : null);
         } catch (importError) {
-          setError(importError?.message ?? String(importError));
+          setError(describeError(importError, t));
         } finally {
           setBusy(null);
           if (fileInputRef.current) fileInputRef.current.value = "";
@@ -1041,7 +1723,7 @@ window.__ModuleLoader__.load({
           await refresh();
           setNote(t("save"));
         } catch (saveError) {
-          setError(saveError?.message ?? String(saveError));
+          setError(describeError(saveError, t));
         } finally {
           setBusy(null);
         }
@@ -1056,11 +1738,43 @@ window.__ModuleLoader__.load({
           setHits((current) => (current ? current.filter((hit) => hit.paperId !== paperId) : current));
           await refresh();
         } catch (deleteError) {
-          setError(deleteError?.message ?? String(deleteError));
+          setError(describeError(deleteError, t));
         } finally {
           setBusy(null);
         }
-      }, [sessionId, reader, refresh]);
+      }, [sessionId, reader, refresh, t]);
+
+      /**
+       * Re-run bibliographic extraction on one paper's stored PDF.
+       *
+       * Needed because extraction only happens at import: a paper imported before
+       * the extractor improved keeps its old (often empty) authors and journal
+       * forever, and there is no other way to repair it short of deleting the
+       * entry and importing the file again.
+       *
+       * The outcome is returned to the caller rather than swallowed: the user asked
+       * to fix something and needs to know whether it worked and what moved.
+       */
+      const reextractOne = useCallback(async (paper) => {
+        if (!sessionId) return null;
+        setBusy("reextract");
+        setError("");
+        try {
+          const result = await callRemote(sessionId, "reextractMetadata", { paperId: paper.paperId });
+          await refresh();
+          return {
+            changed: Object.keys(result?.changed ?? {}),
+            // The host reports fields it found a better value for but kept, and
+            // dropping that here would present the stored value as confirmed.
+            disagreed: Object.keys(result?.disagreed ?? {}),
+          };
+        } catch (reextractError) {
+          setError(describeError(reextractError, t));
+          return null;
+        } finally {
+          setBusy(null);
+        }
+      }, [sessionId, refresh, t]);
 
       const insertToChat = useCallback((text) => {
         const actions = inputActions;
@@ -1078,7 +1792,7 @@ window.__ModuleLoader__.load({
           setNote(t("sentToChat"));
           return true;
         } catch (insertError) {
-          setError(insertError?.message ?? String(insertError));
+          setError(describeError(insertError, t));
           return false;
         }
       }, [inputActions, t]);
@@ -1097,17 +1811,22 @@ window.__ModuleLoader__.load({
 
       const saveEvidence = useCallback(async () => {
         if (!selection || !reader || !sessionId) return;
+        if (selection.text.length > MAX_QUOTE_CHARS) {
+          setError(t("quoteTooLong", { limit: MAX_QUOTE_CHARS }));
+          return;
+        }
         setBusy("evidence");
+        setError(null);
         try {
           const result = await callRemote(sessionId, "addEvidence", {
             paperId: reader.paperId,
             pageIndex: selection.pageIndex,
             quote: selection.text,
           });
-          setNote(`${t("evidenceSaved")} #${String(result.evidenceId).slice(0, 8)}${result.anchored ? "" : ` · ${t("evidenceUnanchored")}`}`);
+          setNote(`${t("evidenceSaved")}${result.anchored ? "" : ` · ${t("evidenceUnanchored")}`}`);
           await refresh();
         } catch (evidenceError) {
-          setError(evidenceError?.message ?? String(evidenceError));
+          setError(describeError(evidenceError, t));
         } finally {
           setBusy(null);
         }
@@ -1122,7 +1841,7 @@ window.__ModuleLoader__.load({
           setNote(`${t("added")} ${result.evidence?.length ?? 0} ${t("evidenceCount")}`);
           await refresh();
         } catch (collectError) {
-          setError(collectError?.message ?? String(collectError));
+          setError(describeError(collectError, t));
         } finally {
           setBusy(null);
         }
@@ -1134,9 +1853,9 @@ window.__ModuleLoader__.load({
           await callRemote(sessionId, "deleteEvidence", { evidenceId });
           await refresh();
         } catch (removeError) {
-          setError(removeError?.message ?? String(removeError));
+          setError(describeError(removeError, t));
         }
-      }, [sessionId, refresh]);
+      }, [sessionId, refresh, t]);
 
       const checkMatrix = useCallback(async (claim) => {
         if (!sessionId) return;
@@ -1146,26 +1865,39 @@ window.__ModuleLoader__.load({
           const result = await callRemote(sessionId, "reviewMatrix", { claim });
           setMatrix(result);
         } catch (matrixError) {
-          setError(matrixError?.message ?? String(matrixError));
+          setError(describeError(matrixError, t));
         } finally {
           setBusy(null);
         }
-      }, [sessionId]);
+      }, [sessionId, t]);
 
       const buildOutline = useCallback(async () => {
         if (!sessionId) return;
         setBusy("outline");
+        setError(null);
         try {
           const result = await callRemote(sessionId, "reviewOutline");
           setOutline(result);
         } catch (outlineError) {
-          setError(outlineError?.message ?? String(outlineError));
+          setError(describeError(outlineError, t));
         } finally {
           setBusy(null);
         }
-      }, [sessionId]);
+      }, [sessionId, t]);
 
-      const evidenceIds = useMemo(() => evidence.map((row) => row.evidenceId), [evidence]);
+      // Only evidence whose offsets were located in the page text may be
+      // exported: a citation that cannot point at the source is exactly what
+      // the traceability claim forbids.
+      const locatedEvidence = useMemo(
+        () => evidence.filter((row) => Number.isInteger(row.charStart) && row.charStart >= 0),
+        [evidence],
+      );
+      const evidenceIds = useMemo(
+        () => locatedEvidence.map((row) => row.evidenceId),
+        [locatedEvidence],
+      );
+      const excludedCount = evidence.length - locatedEvidence.length;
+
       const readerHighlight = useMemo(
         () => (reader?.quote ? { quote: reader.quote, pageIndex: reader.pageIndex } : null),
         [reader?.quote, reader?.pageIndex],
@@ -1177,15 +1909,15 @@ window.__ModuleLoader__.load({
         setError(null);
         try {
           const result = await callRemote(sessionId, "formatCitations", {
-            style: citationStyle, locale: citationLocale,
+            style: citationStyle, locale: citationLocale, evidenceIds,
           });
           setCitation(result);
         } catch (citationError) {
-          setError(citationError?.message ?? String(citationError));
+          setError(describeError(citationError, t));
         } finally {
           setBusy(null);
         }
-      }, [sessionId, citationStyle, citationLocale]);
+      }, [sessionId, citationStyle, citationLocale, evidenceIds, t]);
 
       const doExport = useCallback(async () => {
         if (!sessionId) return;
@@ -1207,7 +1939,7 @@ window.__ModuleLoader__.load({
             });
           }
         } catch (exportError) {
-          setError(exportError?.message ?? String(exportError));
+          setError(describeError(exportError, t));
         } finally {
           setBusy(null);
         }
@@ -1233,13 +1965,12 @@ window.__ModuleLoader__.load({
         ].join("\n\n"));
       }, [outline, insertToChat]);
 
-      const cmapFailure = failures.map((failure) => `${failure.source} (${failure.reason})`).join(", ");
-      const paperById = new Map(papers.map((paper) => [paper.paperId, paper]));
       // Search hits carry only display fields; merge in the stored row so the
       // card knows whether a PDF exists. Group multiple page hits of the same
       // paper into one card instead of printing the title once per page.
-      let list = papers;
-      if (hits !== null) {
+      const list = useMemo(() => {
+        if (hits === null) return papers;
+        const paperById = new Map(papers.map((paper) => [paper.paperId, paper]));
         const grouped = new Map();
         for (const hit of hits) {
           const merged = { ...(paperById.get(hit.paperId) ?? {}), ...hit };
@@ -1247,285 +1978,590 @@ window.__ModuleLoader__.load({
           if (existing === undefined) grouped.set(hit.paperId, { ...merged, hitCount: 1 });
           else existing.hitCount += 1;
         }
-        list = [...grouped.values()];
-      }
+        return [...grouped.values()];
+      }, [hits, papers]);
 
-      const renderLibrary = () => h("div", { style: styles.group },
-        h("div", { style: styles.row },
-          h("input", {
-            style: styles.input, value: query, placeholder: t("searchPlaceholder"),
-            onChange: (event) => setQuery(event.target.value),
-            onKeyDown: (event) => { if (event.key === "Enter") doSearch(); },
-          }),
-          h(IconButton, { primary: true, onClick: doSearch, disabled: busy !== null || query.trim() === "" },
-            busy === "search" ? t("searching") : t("search")),
-          hits !== null ? h(IconButton, { onClick: () => { setHits(null); setQuery(""); } }, t("clear")) : null,
+      const evidenceGroups = useMemo(() => {
+        const grouped = new Map();
+        for (const row of evidence) {
+          if (evidenceFilter === "anchored" && !(Number.isInteger(row.charStart) && row.charStart >= 0)) continue;
+          if (evidenceFilter === "unanchored" && Number.isInteger(row.charStart) && row.charStart >= 0) continue;
+          if (!grouped.has(row.paperId)) grouped.set(row.paperId, []);
+          grouped.get(row.paperId).push(row);
+        }
+        return [...grouped.entries()];
+      }, [evidence, evidenceFilter]);
+
+      const jumpToEvidence = useCallback((row) => {
+        openReader({
+          paperId: row.paperId,
+          title: row.paperTitle,
+          pageIndex: row.pageIndex,
+          quote: row.quote,
+          paper: { paperId: row.paperId, title: row.paperTitle },
+        });
+      }, [openReader]);
+
+      const failureText = failures.map((failure) => `${failure.source} (${failure.reason})`).join(", ");
+      const libraryCount = status?.library?.papers ?? papers.length;
+
+      const counts = {
+        library: libraryCount,
+        evidence: evidence.length,
+      };
+
+      // --- views ----------------------------------------------------------
+
+      const renderLibrary = () => h(React.Fragment, null,
+        h("div", { style: { padding: "10px 12px 0", display: "flex", flexDirection: "column", gap: 8 } },
+          h("div", { className: "pt-toolbar" },
+            h("input", {
+              className: "pt-input pt-toolbar-grow",
+              value: query,
+              placeholder: t("searchPlaceholder"),
+              "aria-label": t("searchPlaceholder"),
+              onChange: (event) => setQuery(event.target.value),
+              onKeyDown: (event) => { if (event.key === "Enter") doSearch(); },
+            }),
+            h(Button, { variant: "primary", onClick: doSearch, disabled: busy !== null || query.trim() === "" },
+              busy === "search" ? t("searching") : t("search")),
+            hits !== null ? h(Button, { variant: "ghost", onClick: () => { setHits(null); setQuery(""); } }, t("clear")) : null,
+          ),
+          h("div", { className: "pt-toolbar" },
+            h("span", { className: "pt-caption" }, t("searchScope")),
+            h(Button, {
+              variant: mode === "library" ? "primary" : "ghost",
+              onClick: () => { setMode("library"); setCandidates(null); setFailures([]); setHits(null); },
+            }, t("localLibrary")),
+            h(Button, {
+              variant: mode === "external" ? "primary" : "ghost",
+              onClick: () => { setMode("external"); setHits(null); },
+            }, t("external")),
+            h(Button, {
+              variant: mode === "cnki" ? "primary" : "ghost",
+              onClick: () => { setMode("cnki"); setHits(null); },
+            }, t("cnki")),
+            h("div", { className: "pt-spacer" }),
+            h(Button, { onClick: () => fileInputRef.current?.click(), disabled: busy !== null },
+              busy === "import" ? t("importing") : t("import")),
+            h("input", {
+              ref: fileInputRef, type: "file", accept: "application/pdf", multiple: true,
+              "aria-label": t("import"),
+              style: { display: "none" },
+              onChange: (event) => doImport(event.target.files),
+            }),
+          ),
+          (mode === "external" || mode === "cnki") ? h("div", { className: "pt-toolbar" },
+            h(Badge, { tone: cnki?.loggedIn ? "support" : undefined },
+              `${t("cnki")} · ${cnki === null ? "—" : cnki.loggedIn ? t("cnkiConnected") : t("cnkiNotLoggedIn")}`),
+            h("div", { className: "pt-spacer" }),
+            h(Button, {
+              disabled: busy !== null,
+              onClick: async () => {
+                setBusy("cnki");
+                setNote(t("cnkiConnecting"));
+                setError(null);
+                try {
+                  const state = await callRemote(sessionId, "cnkiConnect");
+                  setCnki(state);
+                  setNote(state.hint ?? "");
+                  if (state.ok === false) setError(state.reason ?? "CNKI unavailable");
+                } catch (connectError) {
+                  setError(describeError(connectError, t));
+                } finally {
+                  setBusy(null);
+                }
+              },
+            }, cnki?.loggedIn ? t("cnkiRecheck") : t("cnkiConnect")),
+          ) : null,
+          mode === "cnki" ? h("p", { className: "pt-caption", style: { margin: 0 } }, t("cnkiHint")) : null,
+          failures.length > 0 ? h(Banner, { tone: "error", title: t("sourcesFailed") }, failureText) : null,
+          editing ? h(MetadataEditor, { paper: editing, t, onSave: saveMetadata, onCancel: () => setEditing(null), busy }) : null,
         ),
-        h("div", { style: styles.row },
-          h(IconButton, { primary: mode === "library", onClick: () => { setMode("library"); setCandidates(null); setFailures([]); } }, t("library")),
-          h(IconButton, { primary: mode === "external", onClick: () => { setMode("external"); setHits(null); } }, t("external")),
-          h(IconButton, { primary: mode === "cnki", onClick: () => { setMode("cnki"); setHits(null); } }, t("cnki")),
-          h("span", { style: styles.spacer }),
-          h(IconButton, { onClick: () => fileInputRef.current?.click(), disabled: busy !== null }, busy === "import" ? t("importing") : t("import")),
-          h("input", {
-            ref: fileInputRef, type: "file", accept: "application/pdf", multiple: true,
-            style: { display: "none" },
-            onChange: (event) => doImport(event.target.files),
+
+        reader ? h("div", { style: { padding: "8px 12px 0", flex: "1 1 auto", minHeight: 0, display: "flex" } },
+          h(PdfReader, {
+            sessionId, paper: reader, initialPage: reader.pageIndex,
+            highlight: readerHighlight,
+            t,
+            onSelectionChange: setSelection,
+            onClose: () => { setReader(null); setSelection(null); },
           }),
-        ),
-        (mode === "external" || mode === "cnki") ? h("div", { style: styles.row },
-          h("span", { style: styles.muted }, cnki === null ? t("cnki") : `${t("cnki")} · ${cnki.loggedIn ? t("cnkiConnected") : t("cnkiNotLoggedIn")}`),
-          h("span", { style: styles.spacer }),
-          h(IconButton, {
-            disabled: busy !== null,
-            onClick: async () => {
-              setBusy("cnki");
-              setNote(t("cnkiConnecting"));
-              try {
-                const state = await callRemote(sessionId, "cnkiConnect");
-                setCnki(state);
-                setNote(state.hint ?? "");
-                if (state.ok === false) setError(state.reason ?? "CNKI unavailable");
-              } catch (connectError) {
-                setError(connectError?.message ?? String(connectError));
-              } finally {
-                setBusy(null);
-              }
-            },
-          }, cnki?.loggedIn ? t("cnkiRecheck") : t("cnkiConnect")),
         ) : null,
-        failures.length > 0 ? h("p", { style: styles.note }, `${t("sourcesFailed")}: ${cmapFailure}`) : null,
-        editing ? h(MetadataEditor, { paper: editing, t, onSave: saveMetadata, onCancel: () => setEditing(null) }) : null,
-        reader ? h(PdfReader, {
-          sessionId, paper: reader, initialPage: reader.pageIndex,
-          highlight: readerHighlight,
-          t,
-          onSelectionChange: setSelection,
-          onClose: () => { setReader(null); setSelection(null); },
-        }) : null,
-        candidates !== null ? h("div", { style: styles.group },
-          h("div", { style: styles.row },
-            h("strong", null, `${mode === "cnki" ? t("cnki") : t("external")} · ${candidates.length}`),
-            h("span", { style: styles.spacer }),
-            h(IconButton, {
-              primary: true, disabled: busy !== null || !candidates.some((_candidate, index) => picked[index]),
+
+        selection && reader ? h("div", { style: { padding: "8px 12px 0" } },
+          h("div", { className: "pt-well", style: { padding: 8, display: "flex", flexDirection: "column", gap: 6 } },
+            h("div", { className: "pt-caption" },
+              `${t("selected")} · ${t("page")} ${selection.pageIndex + 1} · ${selection.text.length}/${MAX_QUOTE_CHARS}`),
+            h("p", { className: "pt-body", style: { margin: 0, maxHeight: 60, overflow: "auto", wordBreak: "break-word" } },
+              selection.text),
+            h("div", { className: "pt-toolbar" },
+              h("input", {
+                className: "pt-input pt-toolbar-grow",
+                value: question, placeholder: t("askPlaceholder"), "aria-label": t("askPlaceholder"),
+                onChange: (event) => setQuestion(event.target.value),
+                onKeyDown: (event) => { if (event.key === "Enter") askSelection(); },
+              }),
+              h(Button, { variant: "primary", onClick: askSelection, disabled: !inputActions }, t("ask")),
+              h(Button, { onClick: saveEvidence, disabled: busy !== null }, t("evidence")),
+            ),
+            h("p", { className: "pt-caption", style: { margin: 0 } }, t("askHint")),
+          ),
+        ) : null,
+
+        candidates !== null ? h("div", { style: { padding: "10px 12px 0", display: "flex", flexDirection: "column", gap: 8 } },
+          h("div", { className: "pt-toolbar" },
+            h("span", { className: "pt-h2" },
+              `${mode === "cnki" ? t("cnki") : t("external")} · ${candidates.length}`),
+            h("div", { className: "pt-spacer" }),
+            h(Button, {
+              variant: "primary",
+              disabled: busy !== null || !candidates.some((_candidate, index) => picked[index]),
               onClick: addPicked,
             }, busy === "add" ? t("downloading") : t("addSelected")),
           ),
-          mode === "external" ? h("p", { style: styles.muted }, t("metadataOnlyNote")) : null,
+          mode === "external" ? h("p", { className: "pt-caption", style: { margin: 0 } }, t("metadataOnlyNote")) : null,
           candidates.length === 0
-            ? h("p", { style: styles.muted }, t("noCandidates"))
-            : h("ul", { style: styles.list }, candidates.map((candidate, index) => h("li", {
+            ? h(Empty, { title: t("noCandidates") })
+            : h("ul", { className: "pt-list" }, candidates.map((candidate, index) => h("li", {
               key: `${candidate.doi || candidate.title}-${index}`,
             },
-              h("label", { style: { ...styles.card, display: "flex", gap: 8, alignItems: "flex-start" } },
+              h("label", { className: "pt-card", style: { display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" } },
                 h("input", {
                   type: "checkbox", checked: picked[index] === true,
+                  style: { marginTop: 3 },
                   onChange: (event) => setPicked((current) => ({ ...current, [index]: event.target.checked })),
                 }),
-                h("span", { style: { flex: 1 } },
-                  h("span", { style: { fontWeight: 600, wordBreak: "break-word", display: "block" } }, candidate.title),
-                  h("span", { style: styles.muted }, [candidate.authors, candidate.year, candidate.venue, candidate.source, candidate.doi].filter(Boolean).join(" · ")),
-                  candidate.abstract ? h("span", { style: styles.snippet }, candidate.abstract.slice(0, 220)) : null,
+                h("span", { className: "pt-row-main" },
+                  h("span", { className: "pt-h2", style: { display: "block", color: "var(--dsw-alias-label-primary)", wordBreak: "break-word" } }, candidate.title),
+                  h("span", { className: "pt-meta", style: { display: "block", marginTop: 2 } },
+                    [candidate.authors, candidate.year, candidate.venue, candidate.source, candidate.doi].filter(Boolean).join(" · ")),
+                  candidate.abstract
+                    ? h("span", { className: "pt-meta", style: { display: "block", marginTop: 4 } }, candidate.abstract.slice(0, 220))
+                    : null,
                 ),
               ),
             ))),
         ) : null,
-        selection && !reader ? null : selection && reader
-          ? h("div", { style: styles.askBox },
-            h("p", { style: styles.muted }, `${t("selected")} · ${t("page")} ${selection.pageIndex + 1} · ${selection.text.slice(0, 70)}…`),
-            h("div", { style: styles.row },
-              h("input", {
-                style: styles.input, value: question, placeholder: t("askPlaceholder"),
-                onChange: (event) => setQuestion(event.target.value),
-                onKeyDown: (event) => { if (event.key === "Enter") askSelection(); },
-              }),
-              h(IconButton, { primary: true, onClick: askSelection }, t("ask")),
-              h(IconButton, { onClick: saveEvidence, disabled: busy !== null }, t("evidence")),
-            ),
-          )
-          : null,
-        reader ? null : h("div", { style: styles.group },
-          h("p", { style: styles.muted }, hits !== null
-            ? `${hits.length} ${t("total")}`
-            : `${papers.length} ${t("papers")} · ${status?.library?.pages ?? 0} ${t("pagesLabel")}`),
+
+        reader ? null : h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 8 } },
+          h("div", { className: "pt-toolbar" },
+            h("span", { className: "pt-caption pt-num" }, hits !== null
+              ? `${hits.length} ${t("total")}`
+              : t("statusLine", {
+                papers: papers.length,
+                pages: status?.library?.pages ?? 0,
+                evidence: status?.library?.evidence ?? 0,
+              })),
+            h("div", { className: "pt-spacer" }),
+            h(Button, { variant: "ghost", onClick: refresh, disabled: busy !== null }, t("reload")),
+          ),
           list.length === 0
-            ? h("p", { style: styles.muted }, hits !== null ? t("noResults") : t("empty"))
-            : h("ul", { style: styles.list }, list.map((paper) => h(PaperCard, {
+            ? (hits !== null
+              ? h(Empty, { title: t("noResults"), hint: t("noResultsHint") })
+              : h(Empty, {
+                title: t("empty"),
+                hint: t("emptyHint"),
+                action: h(Button, { variant: "primary", onClick: () => fileInputRef.current?.click() }, t("import")),
+              }))
+            : h("ul", { className: "pt-list" }, list.map((paper) => h(PaperCard, {
               key: paper.paperId,
               paper,
               t,
+              busy,
               onOpen: openReader,
               onEdit: setEditing,
+              onReextract: reextractOne,
               onDelete: deletePaper,
             }))),
         ),
       );
 
       const renderEvidence = () => {
-        const grouped = new Map();
-        for (const row of evidence) {
-          if (!grouped.has(row.paperId)) grouped.set(row.paperId, []);
-          grouped.get(row.paperId).push(row);
-        }
-        return h("div", { style: styles.group },
-          h("div", { style: styles.row },
-            h("input", {
-              style: styles.input, value: collectQuery, placeholder: t("collectPlaceholder"),
-              onChange: (event) => setCollectQuery(event.target.value),
-              onKeyDown: (event) => { if (event.key === "Enter") collectEvidence(); },
-            }),
-            h(IconButton, { primary: true, onClick: collectEvidence, disabled: busy !== null || collectQuery.trim() === "" }, t("collect")),
-          ),
-          h("p", { style: styles.muted }, t("collectHint")),
-          evidence.length === 0
-            ? h("p", { style: styles.muted }, t("evidenceEmpty"))
-            : [...grouped.entries()].map(([paperId, rows]) => h("div", { key: paperId, style: styles.group },
-              h("strong", { style: { fontSize: "0.9em" } }, rows[0].paperTitle || paperId),
-              h("span", { style: styles.muted }, ` · ${rows.length} ${t("evidenceCount")}`),
-              rows.map((row) => h("div", { key: row.evidenceId, style: styles.evidenceRow },
-                h("div", { style: { flex: 1 } },
-                  h("div", { style: styles.muted }, `${t("page")} ${row.pageIndex + 1} · ${row.evidenceId.slice(0, 8)} · ${row.charStart >= 0 ? t("evidenceAnchored") : t("evidenceUnanchored")}`),
-                  h("p", { style: styles.quote }, row.quote),
-                ),
-                h("div", { style: { display: "flex", flexDirection: "column", gap: 3 } },
-                  h(IconButton, {
-                    onClick: () => openReader({ paperId: row.paperId, title: row.paperTitle, pageIndex: row.pageIndex, quote: row.quote, paper: { paperId: row.paperId, title: row.paperTitle } }),
-                  }, t("jumpToPage")),
-                  h(IconButton, { danger: true, onClick: () => removeEvidence(row.evidenceId) }, t("delete")),
-                ),
-              )),
+        const evidenceList = evidenceGroups.length === 0
+          ? h(Empty, { title: t("noResults") })
+          : h("div", { style: { display: "flex", flexDirection: "column", gap: 10 } },
+            evidenceGroups.map(([paperId, rows]) => h("section", { key: paperId },
+              h("div", { className: "pt-toolbar", style: { marginBottom: 2 } },
+                h("span", { className: "pt-h2", style: { flex: 1, minWidth: 0, wordBreak: "break-word" } },
+                  rows[0].paperTitle || paperId),
+                h("span", { className: "pt-caption pt-num" }, `${rows.length}`),
+              ),
+              h("div", { style: { borderTop: "1px solid var(--dsw-alias-border-l1)" } },
+                rows.map((row) => h(EvidenceRow, {
+                  key: row.evidenceId, row, t, busy,
+                  onJump: jumpToEvidence,
+                  onDelete: removeEvidence,
+                })),
+              ),
             )),
-          h("div", { style: { borderTop: "1px solid var(--dsw-alias-border, #8884)", paddingTop: 6, marginTop: 2 } },
-            h("strong", null, t("matrix")),
-            h("div", { style: styles.row },
-              h("input", {
-                style: styles.input, value: matrixClaim, placeholder: t("claimPlaceholder"),
-                onChange: (event) => setMatrixClaim(event.target.value),
-                onKeyDown: (event) => { if (event.key === "Enter") checkMatrix(matrixClaim); },
-              }),
-              h(IconButton, { primary: true, onClick: () => checkMatrix(matrixClaim), disabled: busy !== null }, t("checkStance")),
-              h(IconButton, { onClick: () => checkMatrix(""), disabled: busy !== null }, t("coverage")),
-            ),
-            matrix ? h("div", { style: styles.group },
-              h("p", { style: styles.note }, matrix.text?.split("\n").slice(0, 2).join(" ") ?? ""),
-              (matrix.rows ?? []).length === 0
-                ? h("p", { style: styles.muted }, t("noResults"))
-                : h("ul", { style: styles.list }, matrix.rows.map((row) => h("li", { key: row.paperId, style: styles.evidenceRow },
-                  h("div", { style: { flex: 1 } },
-                    h("div", { style: { display: "flex", gap: 6, alignItems: "baseline" } },
-                      h("span", { style: { flex: 1, fontSize: "0.88em" } }, row.title),
-                      h(StanceBadge, { stance: row.stance, t }),
-                    ),
-                    h("div", { style: styles.muted }, `${row.supportCount ?? 0} ${t("support")} · ${row.conflictCount ?? 0} ${t("conflict")} · ${row.notFoundCount ?? 0} ${t("notFound")}`),
-                  ),
-                  row.evidenceIds?.[0] ? h(IconButton, {
-                    onClick: () => {
-                      const target = evidence.find((item) => item.evidenceId === row.evidenceIds[0]);
-                      if (target) openReader({ paperId: target.paperId, title: target.paperTitle, pageIndex: target.pageIndex, quote: target.quote, paper: { paperId: target.paperId, title: target.paperTitle } });
-                    },
-                  }, t("jumpToPage")) : null,
-                ))),
-            ) : null,
-          ),
+          );
+
+        const filterBar = h("div", { className: "pt-toolbar" },
+          h("span", { className: "pt-caption pt-num" },
+            `${evidenceGroups.length} ${t("paperCount")} · ${evidence.length} ${t("evidenceCount")} · ${locatedEvidence.length} ${t("anchoredCount")}`),
+          h("div", { className: "pt-spacer" }),
+          h(Button, {
+            variant: evidenceFilter === "all" ? "primary" : "ghost",
+            onClick: () => setEvidenceFilter("all"),
+          }, t("filterAll")),
+          h(Button, {
+            variant: evidenceFilter === "anchored" ? "primary" : "ghost",
+            onClick: () => setEvidenceFilter("anchored"),
+          }, `${t("filterAnchored")} ${locatedEvidence.length}`),
+          excludedCount > 0 ? h(Button, {
+            variant: evidenceFilter === "unanchored" ? "primary" : "ghost",
+            onClick: () => setEvidenceFilter("unanchored"),
+          }, `${t("filterUnanchored")} ${excludedCount}`) : null,
         );
+
+        const evidenceBody = evidence.length === 0
+          ? h(Empty, { title: t("evidenceEmpty"), hint: t("evidenceEmptyHint") })
+          : h(React.Fragment, null, filterBar, evidenceList);
+
+        return h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 10 } },
+        h("div", { className: "pt-toolbar" },
+          h("input", {
+            className: "pt-input pt-toolbar-grow",
+            value: collectQuery, placeholder: t("collectPlaceholder"), "aria-label": t("collectPlaceholder"),
+            onChange: (event) => setCollectQuery(event.target.value),
+            onKeyDown: (event) => { if (event.key === "Enter") collectEvidence(); },
+          }),
+          h(Button, { variant: "primary", onClick: collectEvidence, disabled: busy !== null || collectQuery.trim() === "" },
+            t("collect")),
+        ),
+        h("p", { className: "pt-caption", style: { margin: 0 } }, t("collectHint")),
+        evidenceBody,
+
+        h("hr", { className: "pt-divider" }),
+        h("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
+          h("div", { className: "pt-toolbar" },
+            h("span", { className: "pt-h2" }, t("matrix")),
+            h("div", { className: "pt-spacer" }),
+            h(Button, { variant: "ghost", onClick: () => checkMatrix(""), disabled: busy !== null }, t("coverage")),
+          ),
+          h("div", { className: "pt-toolbar" },
+            h("input", {
+              className: "pt-input pt-toolbar-grow",
+              value: matrixClaim, placeholder: t("claimPlaceholder"), "aria-label": t("claimPlaceholder"),
+              onChange: (event) => setMatrixClaim(event.target.value),
+              onKeyDown: (event) => { if (event.key === "Enter") checkMatrix(matrixClaim); },
+            }),
+            h(Button, { variant: "primary", onClick: () => checkMatrix(matrixClaim), disabled: busy !== null },
+              busy === "matrix" ? t("searching") : t("checkStance")),
+          ),
+          matrix ? h("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
+            matrix.text ? h("p", { className: "pt-meta", style: { margin: 0 } }, matrix.text.split("\n").slice(0, 2).join(" ")) : null,
+            (matrix.rows ?? []).length === 0
+              ? h(Empty, { title: t("noResults") })
+              : h("ul", { className: "pt-list" }, matrix.rows.map((row) => {
+                const jumpId = row.evidenceIds?.[0] ?? row.notFoundEvidenceIds?.[0] ?? null;
+                const target = jumpId === null ? null : evidence.find((item) => item.evidenceId === jumpId);
+                return h("li", { key: row.paperId, className: "pt-card" },
+                  h("div", { style: { display: "flex", gap: 6, alignItems: "flex-start" } },
+                    h("span", { className: "pt-body", style: { flex: 1, minWidth: 0, wordBreak: "break-word" } }, row.title),
+                    h(StanceBadge, { stance: row.stance, t }),
+                  ),
+                  h("div", { style: { display: "flex", gap: 8, alignItems: "center", marginTop: 4 } },
+                    h("span", { className: "pt-caption pt-num" },
+                      `+${row.supportCount ?? 0} · −${row.conflictCount ?? 0} · ?${row.notFoundCount ?? 0}`),
+                    h("div", { className: "pt-spacer" }),
+                    target !== undefined ? h(Button, {
+                      variant: "ghost", icon: true, label: t("jumpToPage"),
+                      onClick: () => jumpToEvidence(target),
+                    }, "↗") : null,
+                  ),
+                );
+              })),
+          ) : null,
+        ),
+      );
       };
 
-      const renderReview = () => h("div", { style: styles.group },
-        h("div", { style: styles.row },
-          h("strong", null, t("outline")),
-          h("span", { style: styles.spacer }),
-          h(IconButton, { onClick: buildOutline, disabled: busy !== null }, t("generateOutline")),
-          outline?.text ? h(IconButton, { onClick: sendOutline, disabled: !inputActions }, t("sendToChat")) : null,
+      const renderReview = () => h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 10 } },
+        h("div", { className: "pt-toolbar" },
+          h("span", { className: "pt-h2" }, t("outline")),
+          h("div", { className: "pt-spacer" }),
+          h(Button, { onClick: buildOutline, disabled: busy !== null }, t("generateOutline")),
+          outline?.text ? h(Button, { onClick: sendOutline, disabled: !inputActions, variant: "primary" }, t("sendToChat")) : null,
         ),
         outline
-          ? h("pre", { style: styles.pre }, outline.text)
-          : h("p", { style: styles.muted }, t("selectEvidence")),
-        h("div", { style: { borderTop: "1px solid var(--dsw-alias-border, #8884)", paddingTop: 6 } },
-          h("strong", null, t("citations")),
-          h("div", { style: styles.row },
-            h("span", { style: styles.muted }, t("style")),
+          ? h("pre", { className: "pt-pre" }, outline.text)
+          : h(Empty, { title: t("selectEvidence") }),
+
+        h("hr", { className: "pt-divider" }),
+
+        h("div", { className: "pt-toolbar" },
+          h("span", { className: "pt-h2" }, t("citations")),
+        ),
+        h("div", { className: "pt-toolbar" },
+          h("label", { style: { display: "flex", gap: 4, alignItems: "center" } },
+            h("span", { className: "pt-caption" }, t("style")),
             h("select", {
-              style: { ...styles.input, flex: "0 1 160px" },
-              value: citationStyle,
+              className: "pt-select", style: { width: "auto", minWidth: 110 },
+              value: citationStyle, "aria-label": t("style"),
               onChange: (event) => setCitationStyle(event.target.value),
-            }, (status?.styles ?? ["apa", "ieee", "gb-t-7714", "gb-t-7714-author-date"]).map((style) => h("option", { key: style, value: style }, style))),
-            h("span", { style: styles.muted }, t("locale")),
+            }, (status?.styles ?? ["apa", "ieee", "gb-t-7714"]).map((style) => h("option", { key: style, value: style }, style))),
+          ),
+          h("label", { style: { display: "flex", gap: 4, alignItems: "center" } },
+            h("span", { className: "pt-caption" }, t("locale")),
             h("select", {
-              style: { ...styles.input, flex: "0 1 100px" },
-              value: citationLocale,
+              className: "pt-select", style: { width: "auto", minWidth: 80 },
+              value: citationLocale, "aria-label": t("locale"),
               onChange: (event) => setCitationLocale(event.target.value),
             },
               h("option", { value: "zh-CN" }, "zh-CN"),
               h("option", { value: "en-US" }, "en-US"),
             ),
-            h(IconButton, { primary: true, onClick: renderCitations, disabled: busy !== null }, t("generateCitations")),
           ),
-          h("p", { style: styles.muted }, evidence.length === 0 ? t("noEvidence") : `${evidence.length} ${t("evidenceCount")} · ${t("selectEvidence")}`),
-          citation?.ok
-            ? h("div", { style: styles.group },
-              h("span", { style: styles.muted }, t("inText")),
-              h("pre", { style: styles.pre }, citation.citation),
-              h("span", { style: styles.muted }, t("bibliography")),
-              h("pre", { style: styles.pre }, citation.bibliography),
-            )
-            : citation && citation.ok === false ? h("p", { style: styles.error }, citation.text ?? "citation failed") : null,
-          h("div", { style: styles.row },
-            h(IconButton, { primary: true, onClick: doExport, disabled: busy !== null || evidence.length === 0 }, busy === "export" ? t("exporting") : t("export")),
-            h(IconButton, { onClick: copyMarkdown, disabled: !exported?.markdown && !citation?.bibliography }, t("copy")),
-          ),
-          exported?.ok
-            ? h("div", { style: styles.group },
-              h("p", { style: styles.note }, `${t("exported")}: ${exported.paths?.dir ?? ""}`),
-              exported.warnings?.length > 0
-                ? h("div", null,
-                  h("p", { style: styles.muted }, t("warnings")),
-                  h("ul", { style: styles.list }, exported.warnings.map((warning, index) => h("li", { key: index, style: styles.note }, warning))),
-                )
-                : h("p", { style: styles.note }, t("noWarnings")),
-            )
-            : null,
+          h("div", { className: "pt-spacer" }),
+          h(Button, { variant: "primary", onClick: renderCitations, disabled: busy !== null || locatedEvidence.length === 0 },
+            busy === "citations" ? t("searching") : t("generateCitations")),
         ),
+        h("p", { className: "pt-caption", style: { margin: 0 } },
+          locatedEvidence.length === 0
+            ? t("noEvidence")
+            : `${locatedEvidence.length} ${t("evidenceCount")} · ${t("anchoredCount")}${excludedCount > 0 ? ` · ${t("unlocatedExcluded", { n: excludedCount })}` : ""}`),
+
+        citation?.ok
+          ? h("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
+            h("span", { className: "pt-caption" }, t("inText")),
+            h("pre", { className: "pt-pre", style: { maxHeight: "16vh" } }, citation.citation),
+            h("span", { className: "pt-caption" }, t("bibliography")),
+            h("pre", { className: "pt-pre" }, citation.bibliography),
+            citation.warnings?.length > 0
+              ? h("p", { className: "pt-caption", style: { margin: 0 } }, citation.warnings.join(" · "))
+              : null,
+          )
+          : citation && citation.ok === false
+            ? h(Banner, { tone: "error" }, citation.text ?? "citation failed")
+            : null,
+
+        h("div", { className: "pt-toolbar" },
+          h(Button, {
+            variant: "primary", onClick: doExport,
+            disabled: busy !== null || locatedEvidence.length === 0,
+          }, busy === "export" ? t("exporting") : t("export")),
+          h(Button, { onClick: copyMarkdown, disabled: !exported?.markdown && !citation?.bibliography }, t("copy")),
+        ),
+
+        exported?.ok
+          ? h("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
+            h("p", { className: "pt-meta", style: { margin: 0, wordBreak: "break-all" } },
+              `${t("exported")} · ${exported.paths?.dir ?? ""}`),
+            exported.warnings?.length > 0
+              ? h("div", null,
+                h("p", { className: "pt-caption", style: { margin: "0 0 2px" } }, t("warnings")),
+                h("ul", { className: "pt-list" }, exported.warnings.map((warning, index) => h("li", {
+                  key: index, className: "pt-meta",
+                }, `· ${warning}`))),
+              )
+              : h("p", { className: "pt-caption", style: { margin: 0 } }, t("noWarnings")),
+          )
+          : null,
       );
 
-      return h("div", { style: styles.root, "data-paper-tool": view },
-        h("div", { style: styles.header },
-          h("strong", null, t("title")),
-          status ? h("span", { style: styles.muted }, `${status.library?.papers ?? 0} ${t("papers")} · ${status.library?.pages ?? 0} ${t("pagesLabel")} · ${status.library?.evidence ?? 0} ${t("evidenceCount")}`) : null,
-          h("span", { style: styles.spacer }),
-          h(IconButton, { onClick: refresh, disabled: busy !== null }, t("reload")),
+      const tabs = [
+        ["library", t("library"), counts.library],
+        ["evidence", t("evidenceTab"), counts.evidence],
+        ["review", t("reviewTab"), null],
+      ];
+      return h("div", { className: "pt-root", "data-paper-tool": view },
+        h("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 12px 6px" } },
+          h("span", { className: "pt-h1" }, t("title")),
+          h("span", { className: "pt-caption pt-num", style: { flex: 1, minWidth: 0 } },
+            t("statusLine", {
+              papers: libraryCount,
+              pages: status?.library?.pages ?? 0,
+              evidence: status?.library?.evidence ?? 0,
+            })),
+          h(Button, { variant: "ghost", icon: true, label: t("reload"), onClick: refresh, disabled: busy !== null }, "⟳"),
         ),
-        h("div", { style: styles.nav },
-          h("button", { type: "button", style: { ...styles.navItem, ...(view === "library" ? styles.navActive : null) }, onClick: () => setView("library") }, t("library")),
-          h("button", { type: "button", style: { ...styles.navItem, ...(view === "evidence" ? styles.navActive : null) }, onClick: () => setView("evidence") }, t("evidenceTab")),
-          h("button", { type: "button", style: { ...styles.navItem, ...(view === "review" ? styles.navActive : null) }, onClick: () => setView("review") }, t("reviewTab")),
+        h("div", { className: "pt-tabs", role: "tablist" },
+          tabs.map(([id, label, count]) => h("button", {
+            key: id,
+            type: "button",
+            role: "tab",
+            className: "pt-tab",
+            "aria-selected": view === id ? "true" : "false",
+            onClick: () => setView(id),
+          }, label, count === null || count === undefined
+            ? null
+            : h("span", { className: "pt-tab-count" }, ` ${count}`))),
         ),
-        error ? h("p", { style: styles.error }, error) : null,
-        note ? h("p", { style: styles.note }, note) : null,
-        view === "library" ? renderLibrary() : view === "evidence" ? renderEvidence() : renderReview(),
+        error ? h("div", { style: { padding: "8px 12px 0" } },
+          h(Banner, {
+            tone: "error", title: t("errorTitle"), children: error,
+            onDismiss: () => setError(null), dismissLabel: t("dismiss"),
+          })) : null,
+        note ? h("div", { style: { padding: "8px 12px 0" } },
+          h(Banner, { tone: "note" }, note)) : null,
+        h("div", { style: { flex: "1 1 auto", minHeight: 0, overflow: "auto" } },
+          // Keyed by view so a crash in one tab does not leave the other tabs
+          // showing a stale error, and so switching tabs clears the failure.
+          h(ViewBoundary, { key: view, t },
+            view === "library" ? renderLibrary() : view === "evidence" ? renderEvidence() : renderReview()),
+        ),
       );
     }
 
-    function apply(ctx) {
-      sharedCtx = ctx;
-      ctx.effect(() => ctx.locale.register(NS, DICTS));
+    /**
+     * Isolate the right-column integration behind its own dependency gate.
+     *
+     * Cordis gates activation wholesale: a plugin whose declared `inject`
+     * includes a service the running build does not provide is marked inactive
+     * and never activates (`Fiber._refresh` reports INACTIVE on the first missing
+     * name), and there is no per-service "optional" marker. So `inject` here
+     * lists only what every supported DSH build has, and the right column is
+     * mounted in a child fiber that declares its own dependencies. On a build
+     * that lacks them only this child stays inactive — the dictionaries, the CSS
+     * and the rest of the plugin still load, and the failure is a missing
+     * feature instead of a missing plugin.
+     *
+     * The name list covers both the current shape (`sidebarRightTabs` +
+     * `sidebarRight` + the keyed tab slot's owning services) and the older
+     * details-column builds, because an unused name only gates this child.
+     */
+    const RIGHT_COLUMN_DEPS = ["slots", "sidebarRightTabs", "sidebarRight"];
+
+    /** Register the tab type, its body and the first-run reveal. */
+    function applyRightColumn(ctx) {
+      const t = ctx.locale.bind(NS);
       ctx.effect(() => ctx.sidebarRightTabs.register({
         id: TAB_ID,
         kind: KIND,
-        title: () => "论文",
+        title: () => t("title"),
         keepMounted: true,
-        guide: [{ id: "paper-tool", order: 50, title: () => "论文" }],
+        guide: [{ id: "paper-tool", order: 50, title: () => t("title"), description: () => t("guide.description") }],
       }), "paper-tool: tab type");
       ctx.effect(() => ctx.slots.inject("sidebar.right.pane.tab", () => ctx.slots.register({
         name: "sidebar.right.pane.tab",
         key: TAB_ID,
         locale: NS,
       }, Body)), "paper-tool: tab body");
+      ctx.effect(() => revealLibraryTab(ctx), "paper-tool: reveal the library tab");
+    }
+
+    function apply(ctx) {
+      sharedCtx = ctx;
+      ensureCss();
+      ctx.effect(() => ctx.locale.register(NS, DICTS));
+      // Registering a tab TYPE only makes the type available; it never opens a
+      // tab and never expands the column, and a collapsed column draws no rail
+      // at all — so on a fresh profile the plugin is invisible until the user
+      // finds the corner toggle or the Ctrl+Alt+B shortcut. Opening it once is
+      // part of `applyRightColumn`, which runs only where the column exists.
+      if (typeof ctx.inject === "function") {
+        ctx.inject(RIGHT_COLUMN_DEPS, (scope) => {
+          applyRightColumn(scope);
+        });
+        return;
+      }
+      // No child-fiber support: fall back to probing, so a build with the column
+      // still gets it and a build without it does not throw.
+      if (typeof ctx.sidebarRightTabs?.register === "function") applyRightColumn(ctx);
+    }
+
+    /**
+     * Put the workbench on screen the first time a Session with an empty,
+     * collapsed right column is up.
+     *
+     * `ctx.sidebarRight.openTab` throws unless a Session is on screen *and* its
+     * surface is committed, which is never true while `apply()` runs. The
+     * controller's `mounted` store names the on-screen Session, so the trigger
+     * is its subscription rather than a fixed delay; the surface can still land
+     * one commit later, so a short bounded retry covers that gap.
+     *
+     * Deliberately conservative: a column that already holds tabs, or that the
+     * user has expanded (they have therefore seen the guide card), is left
+     * untouched. Each Session is decided about at most once per page load, so
+     * switching back to a Session whose tab the user closed does not reopen it.
+     */
+    function revealLibraryTab(ctx) {
+      const right = ctx.sidebarRight;
+      const mounted = right?.mounted;
+      if (typeof mounted?.subscribe !== "function") return () => {};
+      const RETRY_MS = 100;
+      const RETRY_LIMIT = 40;
+      // Sessions this page load has already decided about. Per Session rather
+      // than global: the column's layout is per Session, so opening a second
+      // Session must be able to reveal the workbench there too.
+      const settled = new Set();
+      let timer = null;
+
+      const clearTimer = () => {
+        if (timer !== null) clearTimeout(timer);
+        timer = null;
+      };
+
+      /** @returns whether this attempt is final for the on-screen Session. */
+      const tryOnce = () => {
+        let screen;
+        try {
+          screen = right.screen();
+        } catch {
+          return false;
+        }
+        if (screen === undefined) return false;
+        const { sessionId } = screen;
+        if (settled.has(sessionId)) return true;
+        const layout = screen.surface?.layout;
+        const tabs = Object.values(layout?.tabs ?? {});
+        // Someone else's arrangement, or a column the user already expanded:
+        // not ours to change.
+        if (tabs.length > 0 || layout?.expanded === true) {
+          settled.add(sessionId);
+          return true;
+        }
+        try {
+          right.openTab(KIND);
+          settled.add(sessionId);
+          return true;
+        } catch {
+          // Leave the Session unsettled so the next tick retries: `mounted` can
+          // name the Session before its store is adopted. Never let the throw
+          // escape — the type and the body are registered either way, so the
+          // guide card and the corner toggle still open it by hand.
+          return false;
+        }
+      };
+
+      const attempt = () => {
+        clearTimer();
+        let tries = 0;
+        const step = () => {
+          timer = null;
+          const done = tryOnce();
+          tries += 1;
+          if (!done && tries < RETRY_LIMIT) timer = setTimeout(step, RETRY_MS);
+        };
+        step();
+      };
+
+      const unsubscribe = mounted.subscribe(attempt);
+      attempt();
+      return () => {
+        unsubscribe();
+        clearTimer();
+        settled.clear();
+      };
     }
 
     return {
-      inject: ["locale", "slots", "sidebarRightTabs", "connection"],
+      // Declared dependencies gate activation wholesale: cordis marks a plugin
+      // INACTIVE when any injected service is missing (`Fiber._refresh`), and
+      // there is no per-service "optional" marker. So only services every
+      // supported DSH build provides are listed here; the right column is probed
+      // at activation time instead (see `capabilities`). Listing
+      // `sidebarRightTabs`/`sidebarRight` here is what made a build without them
+      // report "1 entry did not activate" and take the whole panel with it.
+      inject: ["locale", "slots", "connection"],
       apply,
+      // Surfaced for test/ui-render.mjs, which renders each view through
+      // react-dom/server. The loader only reads `inject` and `apply`, so this
+      // extra key is inert at runtime; it exists because a render error in a
+      // view the user has not opened yet is otherwise invisible to every test.
+      __test: { Body, PdfReader, PaperCard, MetadataEditor, EvidenceRow, StanceBadge, ViewBoundary, snippetNodes, CSS, DICTS },
     };
   },
 });

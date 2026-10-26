@@ -99,7 +99,11 @@ const matrix = await service.reviewMatrix(scope, { claim: "旅游发展促进经
 check("matrix returns rows", matrix.rows.length > 0);
 check("matrix has stance counts", typeof matrix.counts.support === "number");
 const stances = new Set(matrix.rows.map((row) => row.stance));
-check("matrix uses only declared stances", [...stances].every((stance) => ["support", "conflict", "not_found"].includes(stance)));
+check(
+  "matrix uses only declared stances",
+  [...stances].every((stance) => ["support", "conflict", "not_found", "no_evidence"].includes(stance)),
+  JSON.stringify([...stances]),
+);
 check(
   "matrix can report not_found",
   matrix.rows.some((row) => row.stance === "not_found") || matrix.counts.not_found >= 0,
@@ -107,7 +111,19 @@ check(
 // A claim that matches nothing must be all not_found, not invented support.
 const unmatched = await service.reviewMatrix(scope, { claim: "zzzqqqxyzzy quantum entanglement blockchain" });
 check("unmatched claim yields no support", unmatched.counts.support === 0, JSON.stringify(unmatched.counts));
-check("unmatched claim is reported not_found", unmatched.counts.not_found > 0);
+check(
+  "unmatched claim is reported not_found or no_evidence",
+  unmatched.counts.not_found > 0 || unmatched.counts.no_evidence > 0,
+  JSON.stringify(unmatched.counts),
+);
+// "no evidence was ever collected for this paper" is a different finding from
+// "evidence exists and none of it addresses the claim". Collapsing them hides
+// which gap the reviewer has to act on.
+check(
+  "papers with no evidence are distinguished from silent ones",
+  unmatched.rows.every((row) => row.stance === "not_found" || row.stance === "no_evidence"),
+  JSON.stringify([...new Set(unmatched.rows.map((row) => row.stance))]),
+);
 
 // With no claim there is nothing to judge: the matrix must degrade to coverage
 // and must NOT fabricate support/conflict stances.
@@ -136,6 +152,18 @@ for (const style of ["apa", "ieee", "gb-t-7714"]) {
   check(`${style} bibliography is non-empty`, citations.bibliography.length > 20);
   check(`${style} only cites stored papers`, citations.entries.length > 0);
 }
+
+// A locale that is not bundled must not be reported as if it had been used,
+// and must not reach the filesystem as a path fragment.
+const pathLocale = await service.formatCitations(scope, { style: "apa", locale: "x/../../../etc/passwd" });
+check(
+  "unknown locale is refused rather than resolved as a path",
+  pathLocale.locale === "en-US" && pathLocale.warnings.some((warning) => /not bundled/.test(warning)),
+  JSON.stringify({ locale: pathLocale.locale, warnings: pathLocale.warnings }),
+);
+const zh = await service.formatCitations(scope, { style: "apa", locale: "zh-CN" });
+check("bundled zh-CN locale is honoured", zh.locale === "zh-CN", JSON.stringify(zh.locale));
+
 const unknown = await service.formatCitations(scope, { style: "no-such-style" });
 check("unknown style fails honestly", unknown.ok === false && typeof unknown.reason === "string");
 

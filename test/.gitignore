@@ -1,0 +1,10 @@
+# Gate output and local scratch space. The trailing slash on the old
+# `test/.scratch/` pattern meant it could never match from inside test/, so the
+# directory was silently eligible for commit.
+.scratch/
+.results/
+
+# Temporary bundles a gate writes while it runs, and any probe a developer adds.
+.client-regressed.mjs
+.probe-*.mjs
+probe-*.mjs

@@ -105,8 +105,9 @@ check("unknown paper is a typed error", typed);
 
 // --- importing identical bytes again must reuse the paper, not duplicate it
 const again = await service.importPdf(scope, { files: [files[0]] });
-check("re-import reuses the same paperId", again.imported[0]?.paperId === paperId, JSON.stringify(again.imported[0]));
-check("re-import is flagged as duplicate", again.imported[0]?.duplicate === true);
+check("re-import is reported as a duplicate", again.duplicates.length === 1, JSON.stringify(again.duplicates));
+check("re-import reuses the same paperId", again.duplicates[0]?.paperId === paperId, JSON.stringify(again.duplicates[0]));
+check("re-import adds nothing", again.imported.length === 0);
 check("re-import did not grow the library", again.library.papers === files.length, JSON.stringify(again.library));
 
 // --- an oversized quote is rejected instead of silently stored
@@ -117,6 +118,20 @@ try {
   quoteRejected = error?.code === "paper-tool/quote-too-long";
 }
 check("oversized quote is rejected", quoteRejected);
+
+// --- a quote that is not on the page must be stored as unlocated, not as a
+// zero-width anchor at the start of the page
+const unlocatable = await service.addEvidence(scope, {
+  paperId,
+  pageIndex: 0,
+  quote: "zzzqqqxyzzy no such sentence appears anywhere on this page zzz",
+});
+check("unlocatable quote reports anchored=false", unlocatable.anchored === false);
+check("unlocatable quote stores the -1 sentinel", unlocatable.evidence.charStart === -1 && unlocatable.evidence.charEnd === -1);
+const relisted = (await service.listEvidence(scope, { limit: 100 })).evidence.find(
+  (row) => row.evidenceId === unlocatable.evidenceId,
+);
+check("unlocated state survives a re-read", relisted !== undefined && relisted.charStart === -1);
 
 // --- evidence anchors describe the stored quote exactly
 const anchored = await service.addEvidence(scope, { paperId, pageIndex: 0, quote: pageText.slice(30, 80) });

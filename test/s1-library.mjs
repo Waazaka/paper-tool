@@ -123,6 +123,30 @@ if (englishPages > 0) {
 // Negative control: nonsense must not match anything.
 check("no false positive", store.search("zzzqqqxyzzy").length === 0);
 
+// A shared term must not be monopolised by one paper. Ordering search results
+// by paperId alone is ordering by random UUID, so before this was fixed a
+// single paper with many matching pages filled the whole result set and every
+// other paper was invisible — which the evidence matrix then reported as
+// "not found".
+{
+  const common = "the";
+  const depthLimited = store.search(common, { limit: 8 });
+  const papersInResult = new Set(depthLimited.map((hit) => hit.paperId)).size;
+  const totalPapers = store.stats().papers;
+  if (totalPapers > 1) {
+    check(
+      `search "${common}" spans more than one paper`,
+      papersInResult > 1,
+      `${papersInResult} of ${totalPapers} papers in ${depthLimited.length} rows`,
+    );
+  }
+  check(
+    `search "${common}" respects its limit`,
+    depthLimited.length <= 8,
+    `got ${depthLimited.length}`,
+  );
+}
+
 // Deletion must remove pages from the index too: the deleted paper must not
 // come back from any query (a total-hit count can legitimately stay the same
 // because other papers still match).
