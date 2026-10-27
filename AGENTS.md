@@ -97,9 +97,19 @@ overwrite newer data.
 ## Tests
 
 ```powershell
+node test/all.mjs
+```
+
+Exit `0` means the contract holds; the summary line says how many gates ran and
+the count of failures. Some gates need a directory of real PDFs, and without one
+they are reported as **skipped**, never as passed — a skip is not a pass, and the
+runner says so. To exercise them, pass a directory as the only argument:
+
+```powershell
 node test/all.mjs "$env:USERPROFILE\Zotero\storage"
 ```
 
-Exit `0` and `20 passed, 0 failed` means the contract holds. The corpus argument
-is optional; gates that need real PDFs are reported as skipped, never silently
-passed.
+`$env:USERPROFILE\Zotero\storage` is only an example: it is where Zotero keeps
+attachments, and it will not exist unless Zotero is installed. Any folder
+containing PDFs works. On a machine without one, expect skips and do not report
+the suite as fully verified.
