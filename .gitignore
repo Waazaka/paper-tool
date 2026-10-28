@@ -2,6 +2,12 @@
 node_modules/
 .pnpm-store/
 
+# One-off test transcriptions. `test-results.txt` was a pasted run log that sat
+# tracked at the package root; it recorded a machine-specific node path and a
+# "run from packages/paper-tool" note that is wrong once the package is cloned on
+# its own, so it shipped to readers as a stale and misleading artifact.
+test-results.txt
+
 # Gate scratch space and output. The gate runner writes .results/*.json and
 # prove-s14 writes a temporary regressed bundle while it runs.
 test/.results/
