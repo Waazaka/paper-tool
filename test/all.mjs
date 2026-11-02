@@ -88,6 +88,10 @@ const GATES = [
   // against the real paintHighlights source extracted from client.js, so it cannot
   // drift from what ships.
   { name: "s24-annotation-paint", script: "s24-annotation-paint.mjs", needsCorpus: false, what: "marks painted, cross-line quotes, drifted anchors" },
+  // Needs real PDFs: the abort path is only interesting when there is actual
+  // extraction work to interrupt.
+  { name: "s25-cancel", script: "s25-cancel.mjs", needsCorpus: true, what: "abort keeps finished files, cancelled OCR rolls back" },
+  { name: "s26-cancel-ui", script: "s26-cancel-ui.mjs", needsCorpus: false, what: "cancel button wired, busy stage shown, abort not shown as error" },
 ];
 
 function corpusLooksUsable(dir) {

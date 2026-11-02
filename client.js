@@ -114,6 +114,15 @@ window.__ModuleLoader__.load({
   annotationAnchorMissed: "标注已保存，但这段文字在页面上没找到（锚点可能已失效）",
   annotationDelete: "删除标注",
   annotationPromote: "转为证据",
+  cancel: "取消",
+  cancelBusy: "取消这个操作",
+  cancelledByUser: "已取消（这是你主动停止的，不是出错）",
+  busyStageImport: "正在导入",
+  busyStageSearch: "正在检索",
+  busyStageOcr: "正在识别文字",
+  busyStageDownload: "正在下载",
+  busyStageExport: "正在导出",
+  cancelSkipped: "已取消，剩下 {n} 个未处理",
         askDefault: "请解释这段内容，并说明它与论文主题的关系。",
         delete: "删除",
         confirmDelete: "确认删除？",
@@ -299,6 +308,15 @@ window.__ModuleLoader__.load({
   annotationAnchorMissed: "Saved, but the text was not found on the page (the anchor may have drifted)",
   annotationDelete: "Delete annotation",
   annotationPromote: "Promote to evidence",
+  cancel: "Cancel",
+  cancelBusy: "Cancel this operation",
+  cancelledByUser: "Cancelled — you stopped this, it did not fail",
+  busyStageImport: "Importing",
+  busyStageSearch: "Searching",
+  busyStageOcr: "Recognising text",
+  busyStageDownload: "Downloading",
+  busyStageExport: "Exporting",
+  cancelSkipped: "Cancelled, {n} not processed",
         askDefault: "Explain this passage and its role in the paper.",
         delete: "Delete",
         confirmDelete: "Delete this paper?",
@@ -454,7 +472,20 @@ window.__ModuleLoader__.load({
     }
 
     /** Human-readable, in-language message for a typed transport failure. */
-    function describeError(error, t) {
+    /**
+ * Whether an error is the user cancelling rather than something going wrong.
+ *
+ * Kept separate from `describeError` because the two need different treatment: a
+ * failure belongs in a red banner, a cancellation belongs in a neutral one. Feeding
+ * an AbortError to describeError prints "AbortError: The operation was aborted", which
+ * reads to the user as a crash they did not cause.
+ */
+function isAbortError(error) {
+  if (error === null || typeof error !== "object") return false;
+  return error.name === "AbortError" || error.code === "ABORT_ERR";
+}
+
+function describeError(error, t) {
       if (error === null || error === undefined) return "";
       if (error instanceof RpcError) {
         if (error.code === "paper-tool/paper-not-found") return t("noPdfForPaper");
@@ -1781,6 +1812,13 @@ window.__ModuleLoader__.load({
       // the list stays visible (and refreshable) even when no reader is open.
       const [annotations, setAnnotations] = useState([]);
       const [busy, setBusy] = useState(null);
+      // Cancellation. `abortRef` holds the controller for whichever long job is
+      // running; `busyStage` is what the user reads while it runs (a disabled button
+      // with no label is indistinguishable from a frozen UI). Only one job can be
+      // cancelled at a time because only one runs at a time.
+      const abortRef = useRef(null);
+      const [busyStage, setBusyStage] = useState("");
+      const [cancelMessage, setCancelMessage] = useState("");
       const [note, setNote] = useState("");
       const [error, setError] = useState(null);
       const [evidence, setEvidence] = useState([]);
@@ -1800,6 +1838,37 @@ window.__ModuleLoader__.load({
         setSelection(null);
         setView("library");
       }, []);
+
+      /**
+       * Start a long job the user can stop.
+       *
+       * The controller is created here rather than inside each caller so that every
+       * cancellable operation has exactly one cancellation entry point — the button
+       * in the busy row — which is what makes "cancel" a property of the UI rather
+       * than a per-call-site afterthought.
+       */
+      const runCancellable = useCallback(async (stage, work) => {
+        const controller = new AbortController();
+        abortRef.current = controller;
+        setBusyStage(stage);
+        setCancelMessage("");
+        try {
+          return await work(controller.signal);
+        } finally {
+          if (abortRef.current === controller) abortRef.current = null;
+          setBusyStage("");
+        }
+      }, []);
+
+      const cancelBusy = useCallback(() => {
+        const controller = abortRef.current;
+        if (controller === null) return;
+        // `abort()` makes the far end throw a DOMException named AbortError, which the
+        // host reports as a cancellation rather than as a failed import.
+        controller.abort(new DOMException("cancelled by the user", "AbortError"));
+        abortRef.current = null;
+        setCancelMessage(t("cancelledByUser"));
+      }, [t]);
 
       const loadEvidence = useCallback(async () => {
         if (!sessionId) return [];
@@ -1902,13 +1971,19 @@ window.__ModuleLoader__.load({
         setError(null);
         try {
           if (mode === "external") {
-            const result = await callRemote(sessionId, "searchExternal", { query, limit: 10 });
+            // External search hits the network across several sources, so it is the
+            // search most likely to hang long enough for the user to give up.
+            const result = await runCancellable(t("busyStageSearch"), (signal) =>
+              callRemote(sessionId, "searchExternal", { query, limit: 10 }, signal),
+            );
             setCandidates(result.candidates ?? []);
             setFailures(result.failures ?? []);
             setHits(null);
             setPicked({});
           } else if (mode === "cnki") {
-            const result = await callRemote(sessionId, "cnkiSearch", { query, limit: 20 });
+            const result = await runCancellable(t("busyStageSearch"), (signal) =>
+              callRemote(sessionId, "cnkiSearch", { query, limit: 20 }, signal),
+            );
             if (result.ok !== true) {
               setCandidates([]);
               setFailures([{ source: "cnki", reason: result.reason ?? "unavailable" }]);
@@ -1934,11 +2009,20 @@ window.__ModuleLoader__.load({
             setFailures([]);
           }
         } catch (searchError) {
-          setError(describeError(searchError, t));
+          // A cancelled search must not leave the panel in a loading state: the
+          // candidates array is cleared so the "no results" path renders instead of a
+          // spinner, and the reason is stated in neutral text rather than as an error.
+          if (isAbortError(searchError)) {
+            setCandidates(null);
+            setHits(null);
+            setFailures([]);
+          } else {
+            setError(describeError(searchError, t));
+          }
         } finally {
           setBusy(null);
         }
-      }, [sessionId, query, mode, t]);
+      }, [sessionId, query, mode, t, runCancellable]);
 
       const addPicked = useCallback(async () => {
         if (!sessionId || !candidates) return;
@@ -2015,7 +2099,9 @@ window.__ModuleLoader__.load({
             // would serialize as an object and fail the Host's byte parser).
             files.push({ name: file.name, data: Array.from(new Uint8Array(buffer)) });
           }
-          const result = await callRemote(sessionId, "importPdf", { files });
+          const result = await runCancellable(t("busyStageImport"), (signal) =>
+            callRemote(sessionId, "importPdf", { files }, signal),
+          );
           const okCount = result.imported?.length ?? 0;
           const dupCount = result.duplicates?.length ?? 0;
           const failCount = result.failed?.length ?? 0;
@@ -2024,16 +2110,26 @@ window.__ModuleLoader__.load({
             okCount > 0 ? `✓ ${okCount}` : "",
             dupCount > 0 ? `= ${dupCount}` : "",
             failCount > 0 ? `✕ ${failCount}` : "",
+            // A cancelled import keeps what finished and says how much was dropped;
+            // reporting only the successes would make a half-done import look done.
+            result.aborted === true ? t("cancelSkipped", { n: result.skipped ?? 0 }) : "",
           ].filter(Boolean).join(" · "));
           setHits(null);
           setError(failCount > 0 ? result.failed.map((item) => `${item.filename}: ${item.reason}`).join("; ") : null);
         } catch (importError) {
-          setError(describeError(importError, t));
+          // A cancellation is not an error: describeError would print "AbortError" in
+          // red, which reads as a crash. The cancel banner already said what happened,
+          // so refresh and let that stand.
+          if (isAbortError(importError)) {
+            await refresh();
+          } else {
+            setError(describeError(importError, t));
+          }
         } finally {
           setBusy(null);
           if (fileInputRef.current) fileInputRef.current.value = "";
         }
-      }, [sessionId, t, refresh]);
+      }, [sessionId, t, refresh, runCancellable]);
 
       const saveMetadata = useCallback(async (form) => {
         if (!sessionId || !editing) return;
@@ -2837,6 +2933,28 @@ window.__ModuleLoader__.load({
           })) : null,
         note ? h("div", { style: { padding: "8px 12px 0" } },
           h(Banner, { tone: "note" }, note)) : null,
+        // The busy row exists so a long job is distinguishable from a frozen UI: it
+        // names the stage and offers the one control that matters while waiting.
+        // Before this, `busy` only disabled buttons — a user watching a 40-page OCR
+        // run had no text and no way out.
+        busy !== null ? h("div", { style: { padding: "8px 12px 0" } },
+          h("div", {
+            className: "pt-well",
+            style: { padding: "6px 10px", display: "flex", alignItems: "center", gap: 8 },
+            role: "status",
+            "aria-live": "polite",
+          },
+            h("span", { className: "pt-meta pt-num" }, `${busyStage !== "" ? busyStage : busy}…`),
+            h("div", { className: "pt-spacer" }),
+            abortRef.current !== null
+              ? h(Button, { onClick: cancelBusy, label: t("cancelBusy") }, t("cancel"))
+              : null,
+          )) : null,
+        cancelMessage !== "" ? h("div", { style: { padding: "8px 12px 0" } },
+          h(Banner, {
+            tone: "note", children: cancelMessage,
+            onDismiss: () => setCancelMessage(""), dismissLabel: t("dismiss"),
+          })) : null,
         h("div", { style: { flex: "1 1 auto", minHeight: 0, overflow: "auto" } },
           // Keyed by view so a crash in one tab does not leave the other tabs
           // showing a stale error, and so switching tabs clears the failure.
