@@ -36,9 +36,14 @@ plugin appear; missing any one of them produces a different confusing symptom.
 
 `install.mjs` detects it and prints every candidate it checked. Do not guess:
 
-- `%DSH_PROFILE%` — if set, it wins and **must** be a real profile. The script
-  refuses to fall back to another one, because deploying into a profile the
-  caller did not name is worse than failing.
+- `%DSH_PROFILE_DIR%` — the profile **directory** itself, set by DSH. Highest
+  priority: it is the answer, not a hint. If set but unusable, the script fails
+  rather than quietly deploying somewhere else.
+- `%DSH_PROFILE%` — a profile **name** (`desktop`), not a path. DSH exports this
+  to child processes. A bare name is looked up under the known profile roots; an
+  absolute path is used as-is. If set, it wins and **must** resolve to a real
+  profile — the script refuses to fall back to another one, because deploying into
+  a profile the caller did not name is worse than failing.
 - `%DSH_HOME%\profiles\desktop`
 - `%USERPROFILE%\.dsh-desktop\profiles\desktop` — the desktop app's profile on
   Windows. This is the live one in a desktop install.
@@ -47,6 +52,11 @@ plugin appear; missing any one of them produces a different confusing symptom.
 
 A machine can have both `.dsh` and `.dsh-desktop` with different contents.
 Deploying into the unused one installs the plugin where nothing reads it.
+
+> Earlier versions treated `DSH_PROFILE=desktop` as a filesystem path, so running
+> the installer from inside DSH failed every time with a complaint about
+> `<package>/desktop`. Fixed in PT-003: a bare name is now expanded under the
+> profile roots.
 
 ## Verifying it worked
 

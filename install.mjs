@@ -68,27 +68,86 @@ function fail(message, code = 1) {
 step("Locating the DSH profile");
 const home = homedir();
 
+// Resolve one env var into the profile directory it names.
+//
+// `DSH_PROFILE` is a *name*, not a path: DSH itself exports `DSH_PROFILE=desktop`
+// to child processes. Treating that as a path made `resolve("desktop")` resolve
+// against the cwd, i.e. `<package>/desktop`, which never exists — so running the
+// installer from inside DSH failed 100% of the time with a message about a
+// directory the user never asked for. That is the bug this function fixes.
+//
+// Order of interpretation:
+//   1. an existing directory -> use it as-is (an explicit absolute path still wins)
+//   2. a bare profile *name* -> look it up under the known profile roots
+//   3. anything else -> report it as unresolved so the caller can decide
+function resolveProfileValue(varName, value) {
+  if (!value) return null;
+  const dir = resolve(value);
+  if (existsSync(dir)) return { path: dir, why: varName, resolved: true };
+
+  // Bare name: `desktop`, `work`, … Look under the same roots the candidate list
+  // uses, so a name and its directory are interchangeable.
+  if (!/[\\/]/.test(value) && value !== "." && value !== "..") {
+    const roots = [];
+    if (process.env.DSH_HOME) roots.push(join(process.env.DSH_HOME, "profiles"));
+    roots.push(join(home, ".dsh-desktop", "profiles"));
+    roots.push(join(home, ".dsh", "profiles"));
+    for (const root of roots) {
+      const named = join(root, value);
+      if (existsSync(join(named, "package.json"))) {
+        return { path: named, why: `${varName}=${value} (name)`, resolved: true };
+      }
+    }
+  }
+  return { path: dir, why: varName, resolved: false };
+}
+
+// `DSH_PROFILE_DIR` is DSH telling us the answer directly — it is the profile
+// directory itself, not a name to be expanded. It beats every other hint, so it
+// is checked first and never "falls back": if it is set but unusable, that is a
+// bug in the caller's environment worth surfacing, not something to paper over.
+const profileDirHint = process.env.DSH_PROFILE_DIR
+  ? { path: resolve(process.env.DSH_PROFILE_DIR), why: "DSH_PROFILE_DIR" }
+  : null;
+
 // An explicitly named profile that does not exist is an error, never a hint to
 // try somewhere else. Falling back would deploy into a profile the caller did not
 // name while still reporting success — the link and the bundle registration would
 // land in the wrong place. This is not hypothetical: an earlier version of this
 // script was pointed at a non-existent profile during testing, silently deployed
 // into the real one, and repointed the user's own development checkout.
+if (profileDirHint && !existsSync(join(profileDirHint.path, "package.json"))) {
+  fail(
+    `DSH_PROFILE_DIR is set to ${process.env.DSH_PROFILE_DIR}, but ${profileDirHint.path} ` +
+      "is not an initialised DSH profile (no package.json). Refusing to deploy into a different profile. " +
+      "Point it at one, or unset it to auto-detect.",
+  );
+}
 for (const explicit of ["DSH_PROFILE", "DSH_HOME"]) {
   const value = process.env[explicit];
   if (!value) continue;
-  const asProfile = explicit === "DSH_PROFILE" ? resolve(value) : join(value, "profiles", "desktop");
-  if (!existsSync(join(asProfile, "package.json"))) {
-    fail(
-      `${explicit} is set to ${value}, but ${asProfile} is not an initialised DSH profile ` +
-        "(no package.json). Refusing to deploy into a different profile. " +
-        "Point it at one, or unset it to auto-detect.",
-    );
-  }
+  if (explicit === "DSH_PROFILE" && profileDirHint) continue; // the dir hint is strictly better
+  const asProfile = explicit === "DSH_PROFILE"
+    ? resolveProfileValue(explicit, value)
+    : { path: join(value, "profiles", "desktop"), why: explicit, resolved: existsSync(join(value, "profiles", "desktop")) };
+  // A successful resolution (absolute path or expanded bare name) is enough.
+  if (asProfile.resolved && existsSync(join(asProfile.path, "package.json"))) continue;
+  fail(
+    `${explicit} is set to ${value}, but ${asProfile.path} is not an initialised DSH profile ` +
+      "(no package.json). Refusing to deploy into a different profile. " +
+      (asProfile.why.includes("(name)")
+        ? `Tried it as a profile name under the known profile roots; none had it. `
+        : "") +
+      "Point it at one, or unset it to auto-detect.",
+  );
 }
 
 const candidates = [];
-if (process.env.DSH_PROFILE) candidates.push({ path: resolve(process.env.DSH_PROFILE), why: "DSH_PROFILE" });
+if (profileDirHint) candidates.push(profileDirHint);
+if (process.env.DSH_PROFILE) {
+  const r = resolveProfileValue("DSH_PROFILE", process.env.DSH_PROFILE);
+  if (r) candidates.push(r);
+}
 if (process.env.DSH_HOME) candidates.push({ path: join(process.env.DSH_HOME, "profiles", "desktop"), why: "DSH_HOME" });
 candidates.push({ path: join(home, ".dsh-desktop", "profiles", "desktop"), why: "~/.dsh-desktop" });
 candidates.push({ path: join(home, ".dsh", "profiles", "desktop"), why: "~/.dsh (legacy)" });
