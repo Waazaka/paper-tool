@@ -141,6 +141,17 @@ class Node {
     // parser-set attribute behaves before the user types anything.
     if (name === "value") this._value = String(value);
     if (name === "checked") this.checked = value !== null && value !== false && value !== "false";
+    // Reflect `on*` content attributes as handler properties, like a real DOM does.
+    //
+    // This is not cosmetic — it is the root cause of "typing never reaches React".
+    // React's `isEventSupported()` probes for a feature by doing exactly
+    // `div.setAttribute("oninput", "return;")` and then testing
+    // `typeof div.oninput === "function"`. When `setAttribute` did not reflect the
+    // attribute, that probe answered false, so React concluded the environment has
+    // no `input` event and took the IE9 fallback path (selectionchange +
+    // propertychange), which can never fire here. Every controlled input silently
+    // ignored typing as a result — for the whole life of this stub.
+    if (/^on[a-z]+$/.test(name)) this[name] = function () {};
   }
   getAttribute(name) {
     return this.attributes.has(name) ? this.attributes.get(name) : null;
@@ -472,13 +483,20 @@ export function clickText(root, text) {
 /**
  * Type into an input the way a browser does.
  *
- * The subtlety that made every typing test in this repo silently vacuous: React
- * detects a change by comparing the node's current value against the value its
- * tracker captured earlier. Setting `tracker.setValue(newValue)` before
- * dispatching tells React "nothing changed", so onChange never fires. The step
- * that is actually required is the opposite — leave the tracker holding the OLD
- * value, change the node, then dispatch; React compares, sees a difference, calls
- * onChange, and updates the tracker itself.
+ * Two things have to be right for React to see a keystroke, and the repo got both
+ * wrong for a long time. The first was fixed in `setAttribute` (React's
+ * `isEventSupported` probe). The second is here:
+ *
+ * React detects a change by comparing the node's current value against the value its
+ * tracker captured earlier (`updateValueIfChanged`). So the tracker must still hold
+ * the OLD value when the event is dispatched. Writing through React's *own* setter
+ * (the instrumented one `trackValueOnNode` installs on the instance) updates the
+ * tracker as a side effect, which tells React "nothing changed" and suppresses
+ * onChange. Writing through the *prototype* setter goes around the tracker, leaving
+ * it stale — which is exactly the state a real keystroke produces, because the
+ * browser updates `.value` directly and React's setter only runs on re-render.
+ *
+ * So: resolve the prototype descriptor deliberately, not the own one.
  */
 export function typeInto(element, value, EventCtor) {
   const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element), "value")

@@ -66,6 +66,12 @@ const GATES = [
   // gate pins the producer, the many-to-many links, the refusal of invented
   // evidence ids, and idempotency.
   { name: "s19-claims", script: "s19-claims.mjs", needsCorpus: false, what: "claims written, linked, never invented" },
+  // Typing. Long excluded on purpose because it failed: the stub could not deliver
+  // a keystroke to React's onChange. The root cause turned out to be that
+  // `setAttribute` did not reflect `on*` attributes, so React's `isEventSupported`
+  // probe answered false and it took the IE9 fallback path. Fixed in dom-stub;
+  // this gate is the proof that a controlled input actually receives typing.
+  { name: "s16-typing", script: "s16-typing.mjs", needsCorpus: false, what: "typing reaches React onChange" },
 ];
 
 function corpusLooksUsable(dir) {

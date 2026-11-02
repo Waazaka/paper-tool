@@ -301,12 +301,21 @@ node test\all.mjs "$env:USERPROFILE\Zotero\storage"
 
 把这一点说清楚，比门禁数量更重要：
 
-- **打字。** DOM 桩送不进按键到 React 的 `onChange`。一次专门排查找出三个桩缺陷、
-  修好了其中两个，然后确认了 React 的 change 插件**根本没查值追踪器**（实测调用次数为 0）。
-  `test/s16-typing.mjs` 就是那次排查，留成一个可运行的脚本。它在失败期间
-  **刻意不注册进 `test/all.mjs`**，好让整套测试只为它能真正辩护的理由变绿——
-  但这也意味着套件没有覆盖打字。在它通过之前，请把「搜索框能用」视为
-  **本套件未验证**。
+- **打字。（已解决，PT-007）** 曾经 DOM 桩送不进按键到 React 的 `onChange`，
+  `test/s16-typing.mjs` 因此被刻意排除在套件外。根因查明后**已修复并注册**，
+  套件现在覆盖打字（`s16-typing`，20 条断言）。
+  两处独立的坑，只修一个都不够：
+  1. 桩的 `setAttribute` 不把 `on*` 内容属性反射成事件处理属性。
+     React 的 `isEventSupported` 用 `div.setAttribute("oninput", "return;")` 再读
+     `typeof div.oninput` 来探测特性——探测答 false，React 就认为环境不支持 `input`
+     事件，走 IE9 的 `selectionchange`/`propertychange` 降级路径，那条路径永远不触发。
+     **所有受控输入框都静默忽略打字，且不报错。**
+  2. 打字时必须用 **prototype** setter 改值，不能用 React 装在实例上的 own setter。
+     React 靠 `updateValueIfChanged` 比较「tracker 记的旧值」和「节点当前值」；
+     own setter 会同步更新 tracker，React 反而认为没变。真实浏览器敲键时浏览器直接
+     改 `.value`，不走 React 的 setter，所以 tracker 保持旧值——桩要复现的是这个状态。
+  > 之前这里写的「React 的 change 插件根本没查值追踪器」是**错的**：它查了，
+  > 只是事件根本没送到那一步。
 - **渲染出的像素。** 门禁能证明渲染路径被执行且不抛异常，无法证明画面是对的。
 - **真实浏览器。** 开发沙箱禁止无头 Chrome（crashpad 访问被拒），
   所以这里每一条 UI 断言跑的都是手写 DOM，不是 Chromium。
