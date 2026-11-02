@@ -72,6 +72,14 @@ const GATES = [
   // probe answered false and it took the IE9 fallback path. Fixed in dom-stub;
   // this gate is the proof that a controlled input actually receives typing.
   { name: "s16-typing", script: "s16-typing.mjs", needsCorpus: false, what: "typing reaches React onChange" },
+  // Review body generation: the plugin has no model channel, so it supplies a
+  // skeleton whose sentence slots are bound to evidence *before* any words exist,
+  // and refuses to render a sentence whose anchor does not resolve to a slot's own
+  // evidence. The refusal paths are what this gate defends.
+  { name: "s20-review-body", script: "s20-review-body.mjs", needsCorpus: false, what: "body slots bound to evidence, bad anchors refused" },
+  // The body has to reach the exported document, in the right order, without
+  // duplicating a heading whose text collides with the claim layer's.
+  { name: "s21-export-body", script: "s21-export-body.mjs", needsCorpus: false, what: "review.md body section, no heading collision" },
 ];
 
 function corpusLooksUsable(dir) {
