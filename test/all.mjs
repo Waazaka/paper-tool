@@ -61,6 +61,11 @@ const GATES = [
   // or in practice — coverage that looks real and is not. Needs neither corpus nor
   // network: every case is a pure function or an aborted request.
   { name: "s18-enrich-metadata", script: "s18-enrich-metadata.mjs", needsCorpus: false, what: "Crossref enrichment, user edits preserved" },
+  // Claims layer. The tables existed from schema v5 but had no writer, so the
+  // tool's headline feature — claim-level attribution — was never produced. This
+  // gate pins the producer, the many-to-many links, the refusal of invented
+  // evidence ids, and idempotency.
+  { name: "s19-claims", script: "s19-claims.mjs", needsCorpus: false, what: "claims written, linked, never invented" },
 ];
 
 function corpusLooksUsable(dir) {
