@@ -123,6 +123,20 @@ window.__ModuleLoader__.load({
   busyStageDownload: "正在下载",
   busyStageExport: "正在导出",
   cancelSkipped: "已取消，剩下 {n} 个未处理",
+  askAnchor: "位置",
+  askPage: "第",
+  askChars: "字符",
+  askSelection: "选段",
+  askQuestion: "问题",
+  askAnchorMissing: "未能在原文中定位",
+  askAnchorMissingHint: "选段未能在该页原文中逐字找到，回答时不要声称确切位置。",
+  answerEmpty: "请先粘贴或输入回答内容",
+  answerSavedNote: "回答已存为笔记",
+  answerSavedEvidence: "回答已存为证据",
+  saveAnswerNote: "存为笔记",
+  saveAnswerEvidence: "存为证据",
+  answerPanelTitle: "回答回写",
+  answerPlaceholder: "把回答粘贴到这里，再选择存为笔记或证据",
         askDefault: "请解释这段内容，并说明它与论文主题的关系。",
         delete: "删除",
         confirmDelete: "确认删除？",
@@ -317,6 +331,20 @@ window.__ModuleLoader__.load({
   busyStageDownload: "Downloading",
   busyStageExport: "Exporting",
   cancelSkipped: "Cancelled, {n} not processed",
+  askAnchor: "anchor",
+  askPage: "page",
+  askChars: "chars",
+  askSelection: "selection",
+  askQuestion: "question",
+  askAnchorMissing: "NOT located in the source",
+  askAnchorMissingHint: "The selection was not found verbatim on that page. Do not claim an exact location for it.",
+  answerEmpty: "Paste or type the answer first",
+  answerSavedNote: "Answer saved as a note",
+  answerSavedEvidence: "Answer saved as evidence",
+  saveAnswerNote: "Save as note",
+  saveAnswerEvidence: "Save as evidence",
+  answerPanelTitle: "Write the answer back",
+  answerPlaceholder: "Paste the answer here, then choose note or evidence",
         askDefault: "Explain this passage and its role in the paper.",
         delete: "Delete",
         confirmDelete: "Delete this paper?",
@@ -436,6 +464,9 @@ window.__ModuleLoader__.load({
       "reviewOutline", "formatCitations", "exportReview", "searchExternal",
       "addCandidates", "cnkiSearch", "cnkiDownload",
       "reextractMetadata", "enrichMetadata",
+      // askContext and saveAnswer take an `input` object like the rest, so they must be
+      // listed here; the wiring gate checks both sides agree.
+      "askContext", "saveAnswer",
     ]);
 
     /** Typed transport failure. `code` drives the recovery the UI offers. */
@@ -1819,6 +1850,11 @@ function describeError(error, t) {
       const abortRef = useRef(null);
       const [busyStage, setBusyStage] = useState("");
       const [cancelMessage, setCancelMessage] = useState("");
+      // The packet returned by askContext for the most recent question, kept so the
+      // answer can be written back to the same page/character anchor without asking
+      // the Host to locate it again.
+      const [lastAsk, setLastAsk] = useState(null);
+      const [answerText, setAnswerText] = useState("");
       const [note, setNote] = useState("");
       const [error, setError] = useState(null);
       const [evidence, setEvidence] = useState([]);
@@ -2252,17 +2288,102 @@ function describeError(error, t) {
         }
       }, [inputActions, t]);
 
-      const askSelection = useCallback(() => {
-        if (!selection || !reader) return;
+      /**
+       * Ask about the selected passage.
+       *
+       * The packet is built by the Host (`askContext`), not here. Two reasons, both
+       * about traceability:
+       *
+       *  - The page and character anchor must be computed from the stored page text.
+       *    Building a "page 3" header in the browser takes the page from whatever the
+       *    sidebar is displaying, which is not necessarily the page the passage lives
+       *    on — and once the text is in the composer, nothing can tell them apart.
+       *  - A string built here cannot be validated. A packet with `anchored: false`
+       *    is a packet whose passage was never found on the page, and the model needs
+       *    to know that before it cites a location.
+       *
+       * The plugin still does not call a model (D-014): the packet goes through the
+       * same "insert into composer" path, and the Agent answers in the conversation.
+       */
+      const askSelection = useCallback(async () => {
+        if (!selection || !reader || !sessionId) return;
         const text = question.trim() === "" ? t("askDefault") : question.trim();
-        const composed = [
-          `【论文】${reader.title || reader.paperId}`,
-          `【页码】第 ${selection.pageIndex + 1} 页`,
-          `【引文】"${selection.text}"`,
-          `【问题】${text}`,
-        ].join("\n");
-        if (insertToChat(composed)) setQuestion("");
-      }, [selection, reader, question, insertToChat, t]);
+        setBusy("ask");
+        setError(null);
+        try {
+          const packet = await callRemote(sessionId, "askContext", {
+            paperId: reader.paperId,
+            question: text,
+            selectionText: selection.text,
+            pageIndex: selection.pageIndex,
+          });
+          // The prompt line names the anchor only when the passage was actually found,
+          // so a failed anchor search cannot be read as a successful one.
+          const where = packet.selection.anchored
+            ? `${t("askPage")} ${packet.selection.pageIndex + 1} · ${t("askChars")} ${packet.selection.charStart}-${packet.selection.charEnd}`
+            : `${t("askPage")} ${packet.selection.pageIndex + 1} · ${t("askAnchorMissing")}`;
+          const composed = [
+            `[paper] ${packet.title} (${packet.paperId})`,
+            `[${t("askAnchor")}] ${where}`,
+            `[${t("askSelection")}] ${packet.selection.text}`,
+            `[${t("askQuestion")}] ${packet.question}`,
+            packet.selection.anchored
+              ? ""
+              : `[!] ${t("askAnchorMissingHint")}`,
+          ].filter((line) => line !== "").join("\n");
+          if (insertToChat(composed)) {
+            setQuestion("");
+            // Remember the packet so the answer can be written back to the same anchor
+            // without asking the Host to re-locate it.
+            setLastAsk(packet);
+          }
+        } catch (askError) {
+          setError(describeError(askError, t));
+        } finally {
+          setBusy(null);
+        }
+      }, [selection, reader, question, insertToChat, sessionId, t]);
+
+      /**
+       * Write the answer back to the anchor it came from.
+       *
+       * A deliberate second action rather than part of asking: the answer does not
+       * exist yet when the question is inserted, and not every answer is worth
+       * keeping. The user decides.
+       */
+      const saveAnswer = useCallback(async (kind) => {
+        if (!lastAsk) return;
+        const answer = answerText.trim();
+        if (answer === "") {
+          setError(t("answerEmpty"));
+          return;
+        }
+        if (!sessionId) return;
+        setBusy("answer");
+        setError(null);
+        try {
+          const saved = await callRemote(sessionId, "saveAnswer", {
+            paperId: lastAsk.paperId,
+            pageIndex: lastAsk.selection.pageIndex,
+            charStart: lastAsk.selection.charStart,
+            charEnd: lastAsk.selection.charEnd,
+            question: lastAsk.question,
+            answer,
+            // Evidence needs the paper's own words; the note path does not.
+            sourceQuote: lastAsk.selection.text,
+            kind,
+          });
+          setNote(kind === "note" ? t("answerSavedNote") : t("answerSavedEvidence"));
+          setAnswerText("");
+          setLastAsk(null);
+          await refresh();
+          void saved;
+        } catch (saveError) {
+          setError(describeError(saveError, t));
+        } finally {
+          setBusy(null);
+        }
+      }, [lastAsk, answerText, sessionId, t, refresh]);
 
       const saveEvidence = useCallback(async () => {
         if (!selection || !reader || !sessionId) return;
@@ -2558,11 +2679,41 @@ function describeError(error, t) {
                 className: "pt-input pt-toolbar-grow",
                 value: question, placeholder: t("askPlaceholder"), "aria-label": t("askPlaceholder"),
                 onChange: (event) => setQuestion(event.target.value),
-                onKeyDown: (event) => { if (event.key === "Enter") askSelection(); },
+                onKeyDown: (event) => {
+                  if (event.key === "Enter") {
+                    // askSelection is async now (it fetches the anchored packet from the
+                    // Host); swallowing the promise keeps an unhandled rejection out of
+                    // the console without hiding errors, which the callback reports.
+                    void askSelection();
+                  }
+                },
               }),
-              h(Button, { variant: "primary", onClick: askSelection, disabled: !inputActions }, t("ask")),
+              h(Button, { variant: "primary", onClick: () => { void askSelection(); }, disabled: !inputActions || busy !== null }, t("ask")),
               h(Button, { onClick: saveEvidence, disabled: busy !== null }, t("evidence")),
             ),
+            // Write-back panel: appears once a question was actually inserted, because
+            // writing an answer back needs a packet — a page and character anchor — to
+            // attach to. Without one this would be a text box with nowhere to put the
+            // result, which is how "answers never come back" happened before.
+            lastAsk !== null ? h("div", { style: { display: "flex", flexDirection: "column", gap: 6, paddingTop: 4 } },
+              h("div", { className: "pt-caption" }, `${t("answerPanelTitle")} · ${t("page")} ${lastAsk.selection.pageIndex + 1}${lastAsk.selection.anchored ? ` · ${lastAsk.selection.charStart}-${lastAsk.selection.charEnd}` : ` · ${t("askAnchorMissing")}`}`),
+              h("textarea", {
+                className: "pt-input",
+                value: answerText,
+                placeholder: t("answerPlaceholder"),
+                "aria-label": t("answerPlaceholder"),
+                rows: 3,
+                style: { resize: "vertical", width: "100%", boxSizing: "border-box" },
+                onChange: (event) => setAnswerText(event.target.value),
+              }),
+              h("div", { className: "pt-toolbar" },
+                // A note always works; evidence additionally needs the source quote,
+                // which the packet carries — so the button is enabled either way and
+                // the Host refuses with a named reason if the quote is missing.
+                h(Button, { onClick: () => { void saveAnswer("note"); }, disabled: busy !== null }, t("saveAnswerNote")),
+                h(Button, { variant: "primary", onClick: () => { void saveAnswer("evidence"); }, disabled: busy !== null || !lastAsk.selection.anchored }, t("saveAnswerEvidence")),
+                h(Button, { onClick: () => { setLastAsk(null); setAnswerText(""); }, disabled: busy !== null }, t("dismiss")),
+              )) : null,
             // Annotation controls, kept below the evidence/ask row on purpose: saving a
             // highlight is the low-commitment action, and putting it beside "evidence"
             // is exactly how the two concepts got confused in the first place.

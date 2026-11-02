@@ -92,6 +92,7 @@ const GATES = [
   // extraction work to interrupt.
   { name: "s25-cancel", script: "s25-cancel.mjs", needsCorpus: true, what: "abort keeps finished files, cancelled OCR rolls back" },
   { name: "s26-cancel-ui", script: "s26-cancel-ui.mjs", needsCorpus: false, what: "cancel button wired, busy stage shown, abort not shown as error" },
+  { name: "s27-inline-ask", script: "s27-inline-ask.mjs", needsCorpus: false, what: "anchored question packet, answer write-back, no model channel" },
 ];
 
 function corpusLooksUsable(dir) {
