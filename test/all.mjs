@@ -56,6 +56,11 @@ const GATES = [
   // than the import (the file-name channel was dropped, and a legacy wrong year
   // could never be repaired because it looked user-confirmed).
   { name: "s17-shared-reextract", script: "s17-shared-and-reextract.mjs", needsCorpus: true, what: "shared library + honest re-extract" },
+  // DOI enrichment. The unit tests live in a node:test file, which this runner
+  // does not execute directly, so without a gate here they would never run in CI
+  // or in practice — coverage that looks real and is not. Needs neither corpus nor
+  // network: every case is a pure function or an aborted request.
+  { name: "s18-enrich-metadata", script: "s18-enrich-metadata.mjs", needsCorpus: false, what: "Crossref enrichment, user edits preserved" },
 ];
 
 function corpusLooksUsable(dir) {

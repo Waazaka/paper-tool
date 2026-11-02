@@ -63,6 +63,14 @@ window.__ModuleLoader__.load({
         reextractDone: "已更新 {count} 个字段：{fields}",
         reextractNoChange: "重新识别完成，没有发现可更新的字段。",
         reextractDisagreed: "PDF 里的信息与已保存的 {fields} 不一致，但你没有标记为猜测，因此保留了原值。",
+        enrich: "用 DOI 补全",
+        enrichHint: "拿这篇的 DOI 去 Crossref 查权威元数据，补上缺失的作者和期刊。你手动改过的字段不会被覆盖；需要联网。",
+        enrichDone: "已从 Crossref 补全 {count} 个字段：{fields}",
+        enrichNoChange: "Crossref 没有带来新的字段。",
+        enrichNoDoi: "这篇没有 DOI，无法反查。",
+        enrichFailed: "查询失败：{reason}",
+        crossrefBadge: "已核对 {fields}",
+        crossrefHint: "这些字段是用 DOI 到 Crossref 查到的权威记录，不是从 PDF 版面猜的。",
         working: "处理中…",
         viewCrashed: "这个视图出错了",
         retry: "重试",
@@ -231,6 +239,14 @@ window.__ModuleLoader__.load({
         reextractDone: "Updated {count} field(s): {fields}",
         reextractNoChange: "Re-extraction finished; nothing new to update.",
         reextractDisagreed: "The PDF disagrees with the saved {fields}, but you confirmed them, so the stored values were kept.",
+        enrich: "Fill from DOI",
+        enrichHint: "Look this paper's DOI up in Crossref to fill in missing authors and journal. Fields you edited by hand are never overwritten. Needs network.",
+        enrichDone: "Filled {count} field(s) from Crossref: {fields}",
+        enrichNoChange: "Crossref had nothing new for this paper.",
+        enrichNoDoi: "This paper has no DOI, so there is nothing to look up.",
+        enrichFailed: "Lookup failed: {reason}",
+        crossrefBadge: "Verified {fields}",
+        crossrefHint: "These fields were looked up in Crossref by DOI, not guessed from the PDF layout.",
         working: "Working…",
         viewCrashed: "This view hit an error",
         retry: "Try again",
@@ -383,6 +399,7 @@ window.__ModuleLoader__.load({
       "deleteEvidence", "collectEvidence", "listEvidence", "reviewMatrix",
       "reviewOutline", "formatCitations", "exportReview", "searchExternal",
       "addCandidates", "cnkiSearch", "cnkiDownload",
+      "reextractMetadata", "enrichMetadata",
     ]);
 
     /** Typed transport failure. `code` drives the recovery the UI offers. */
@@ -718,6 +735,31 @@ window.__ModuleLoader__.load({
       });
     }
 
+    /**
+     * Fields whose value came from Crossref: confirmed, not guessed.
+     *
+     * Kept separate from `guessedFields` rather than folded into it because the two
+     * badges answer different questions — "this might be wrong" versus "this was
+     * checked against the authoritative record". A value can only be one of them.
+     */
+    function crossrefFields(paper) {
+      const known = ["title", "authors", "year", "venue", "doi"];
+      const raw = paper?.metadataSource;
+      if (typeof raw !== "string" || raw.trim() === "") return [];
+      let parsed = null;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        return [];
+      }
+      if (parsed === null || typeof parsed !== "object") return [];
+      return known.filter((field) => {
+        if (parsed[field] !== "crossref") return false;
+        const value = typeof paper[field] === "string" ? paper[field].trim() : "";
+        return value !== "";
+      });
+    }
+
     /** Dictionary key for a field name, used in the "guessed" badge. */
     function fieldLabelKey(field) {
       switch (field) {
@@ -973,7 +1015,7 @@ window.__ModuleLoader__.load({
 
     // --- library ----------------------------------------------------------
 
-    function PaperCard({ paper, t, onOpen, onEdit, onReextract, onDelete, busy }) {
+    function PaperCard({ paper, t, onOpen, onEdit, onReextract, onEnrich, onDelete, busy }) {
       // Three states, three different claims. Folding OCR into "full text"
       // would present guessed characters as if they were the PDF's own text,
       // and folding it into "metadata only" would deny that the paper is
@@ -982,17 +1024,23 @@ window.__ModuleLoader__.load({
       const isOcr = paper.material === "ocr";
       const materialLabel = isFulltext ? t("fulltext") : isOcr ? t("ocrText") : t("metaOnly");
       const hasPdf = typeof paper.pdfPath === "string" && paper.pdfPath !== "";
+      const hasDoi = typeof paper.doi === "string" && paper.doi.trim() !== "";
       const [confirming, setConfirming] = useState(false);
       // Outcome of the last re-extraction, shown next to the buttons that caused
       // it. A silent success would leave the user unsure whether the repaired
       // fields are actually new.
       const [reextractResult, setReextractResult] = useState(null);
+      // Same "tell me what actually moved" contract as re-extraction: the user
+      // pressed a button to repair citations, so silence would leave them unsure
+      // whether the bibliographic fields are now trustworthy.
+      const [enrichResult, setEnrichResult] = useState(null);
       const meta = [paper.authors, paper.year, paper.venue].filter(Boolean).join(" · ");
       // Which fields are still guesses. `metadataSource` records where each value
       // came from; a user correction removes its entry, so this list shrinks as
       // the bibliography is checked. Showing it on the card is the difference
       // between "the app claims this is the journal" and "the app is asking".
       const guessed = guessedFields(paper);
+      const fromCrossref = crossrefFields(paper);
       return h("li", { className: "pt-card" },
         h("div", { className: "pt-row" },
           h("div", { className: "pt-row-main" },
@@ -1008,6 +1056,13 @@ window.__ModuleLoader__.load({
               hasPdf ? null : h(Badge, { tone: "quiet" }, t("noPdf")),
               guessed.length > 0
                 ? h(Badge, { tone: "warn", title: t("guessHint") }, t("guessBadge", { fields: guessed.map((field) => t(fieldLabelKey(field))).join(t("listSep")) }))
+                : null,
+              // A field filled from Crossref is not a guess — it was confirmed
+              // against the publisher's own record for that DOI. Saying so is the
+              // point of keeping per-field provenance: the user can trust those
+              // values without re-checking them by hand.
+              fromCrossref.length > 0
+                ? h(Badge, { tone: "info", title: t("crossrefHint") }, t("crossrefBadge", { fields: fromCrossref.map((field) => t(fieldLabelKey(field))).join(t("listSep")) }))
                 : null,
               h("span", { className: "pt-caption pt-num" },
                 `${paper.numPages || 0} ${t("pages")}${paper.hitCount > 1 ? ` · ${paper.hitCount} ${t("total")}` : ""}`),
@@ -1042,6 +1097,22 @@ window.__ModuleLoader__.load({
             }),
           }, t("open")),
           h(Button, { onClick: () => onEdit(paper), disabled: busy !== null }, t("editMeta")),
+          // Offered only when a DOI exists: without one there is nothing to look
+          // up, and a button that must refuse is worse than no button. Independent
+          // of `hasPdf` because a metadata-only entry (added from a search result)
+          // can still have a DOI and benefit from enrichment.
+          hasDoi
+            ? h(Button, {
+              variant: "ghost",
+              disabled: busy !== null,
+              title: t("enrichHint"),
+              onClick: async () => {
+                const result = await onEnrich(paper);
+                if (result === null) return;
+                setEnrichResult(result);
+              },
+            }, busy === "enrich" ? t("working") : t("enrich"))
+            : null,
           // Only offered when there is a PDF to re-read. Showing it on a
           // metadata-only entry would promise an action that must fail.
           hasPdf
@@ -1086,6 +1157,19 @@ window.__ModuleLoader__.load({
                     fields: reextractResult.disagreed.map((field) => t(fieldLabelKey(field))).join(t("listSep")),
                   }),
               ].filter((line) => line !== null).join(" — "))
+          : null,
+        enrichResult !== null
+          ? h("p", { className: "pt-caption", role: "status", style: { margin: "6px 0 0" } },
+            enrichResult.changed.length > 0
+              ? t("enrichDone", {
+                count: enrichResult.changed.length,
+                fields: enrichResult.changed.map((field) => t(fieldLabelKey(field))).join(t("listSep")),
+              })
+              : enrichResult.reason === "no-doi"
+                ? t("enrichNoDoi")
+                : enrichResult.reason !== undefined
+                  ? t("enrichFailed", { reason: enrichResult.reason })
+                  : t("enrichNoChange"))
           : null,
       );
     }
@@ -1776,6 +1860,44 @@ window.__ModuleLoader__.load({
         }
       }, [sessionId, refresh, t]);
 
+      /**
+       * Fill this paper's metadata from Crossref via its DOI.
+       *
+       * Needed because the extractor cannot read authors off a typeset page, so
+       * many imported papers have a title and year but no authors or venue — and a
+       * bibliography built from those is wrong in a way that looks legitimate. The
+       * DOI is an exact identifier, so this is a lookup rather than a guess.
+       *
+       * The outcome is returned rather than swallowed: the user asked to fix
+       * something and needs to know whether it worked, and if not, why.
+       */
+      const enrichOne = useCallback(async (paper) => {
+        if (!sessionId) return null;
+        if (typeof paper?.doi !== "string" || paper.doi.trim() === "") {
+          return { changed: [], reason: "no-doi" };
+        }
+        setBusy("enrich");
+        setError("");
+        try {
+          const result = await callRemote(sessionId, "enrichMetadata", { paperId: paper.paperId });
+          await refresh();
+          const entry = (result?.enriched ?? []).find((row) => row.paperId === paper.paperId);
+          const changed = Array.isArray(entry?.changed) ? entry.changed : [];
+          const failure = (result?.failures ?? []).find((row) => row.paperId === paper.paperId);
+          if (failure !== undefined) return { changed: [], reason: failure.reason };
+          if (changed.length === 0) {
+            const skipped = (result?.skipped ?? []).find((row) => row.paperId === paper.paperId);
+            return { changed: [], reason: skipped?.reason };
+          }
+          return { changed };
+        } catch (enrichError) {
+          setError(describeError(enrichError, t));
+          return null;
+        } finally {
+          setBusy(null);
+        }
+      }, [sessionId, refresh, t]);
+
       const insertToChat = useCallback((text) => {
         const actions = inputActions;
         if (!actions) {
@@ -2172,6 +2294,7 @@ window.__ModuleLoader__.load({
               onOpen: openReader,
               onEdit: setEditing,
               onReextract: reextractOne,
+              onEnrich: enrichOne,
               onDelete: deletePaper,
             }))),
         ),
