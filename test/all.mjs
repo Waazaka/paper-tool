@@ -80,6 +80,14 @@ const GATES = [
   // The body has to reach the exported document, in the right order, without
   // duplicating a heading whose text collides with the claim layer's.
   { name: "s21-export-body", script: "s21-export-body.mjs", needsCorpus: false, what: "review.md body section, no heading collision" },
+  // Reader annotations are a separate table from evidence on purpose: a highlight
+  // must survive a restart without ever counting as support for a claim.
+  { name: "s22-annotations", script: "s22-annotations.mjs", needsCorpus: false, what: "annotation persistence, cascade, never counted as evidence" },
+  { name: "s23-annotations-rpc", script: "s23-annotations-rpc.mjs", needsCorpus: false, what: "annotation RPCs, refusals, promote-to-evidence" },
+  // The painter is the half of the annotation feature the user actually sees. It runs
+  // against the real paintHighlights source extracted from client.js, so it cannot
+  // drift from what ships.
+  { name: "s24-annotation-paint", script: "s24-annotation-paint.mjs", needsCorpus: false, what: "marks painted, cross-line quotes, drifted anchors" },
 ];
 
 function corpusLooksUsable(dir) {

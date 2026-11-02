@@ -105,6 +105,15 @@ window.__ModuleLoader__.load({
         selected: "已选中",
         noSelection: "在 PDF 里选中文字后，可以提问或存为证据",
         askHint: "提问会带上论文、页码与引文",
+  annotate: "划线",
+  annotateNote: "笔记（可选）",
+  annotationSaved: "已划线",
+  annotationList: "标注",
+  annotationNone: "这篇还没有标注",
+  annotationNoQuote: "该标注没有选中原文，无法作为证据",
+  annotationAnchorMissed: "标注已保存，但这段文字在页面上没找到（锚点可能已失效）",
+  annotationDelete: "删除标注",
+  annotationPromote: "转为证据",
         askDefault: "请解释这段内容，并说明它与论文主题的关系。",
         delete: "删除",
         confirmDelete: "确认删除？",
@@ -281,6 +290,15 @@ window.__ModuleLoader__.load({
         selected: "Selected",
         noSelection: "Select text in the PDF to ask or save evidence",
         askHint: "The question carries paper, page and quote",
+  annotate: "Highlight",
+  annotateNote: "Note (optional)",
+  annotationSaved: "Highlighted",
+  annotationList: "Annotations",
+  annotationNone: "No annotations for this paper yet",
+  annotationNoQuote: "This annotation has no selected text, so it cannot become evidence",
+  annotationAnchorMissed: "Saved, but the text was not found on the page (the anchor may have drifted)",
+  annotationDelete: "Delete annotation",
+  annotationPromote: "Promote to evidence",
         askDefault: "Explain this passage and its role in the paper.",
         delete: "Delete",
         confirmDelete: "Delete this paper?",
@@ -510,6 +528,30 @@ window.__ModuleLoader__.load({
         color: var(--dsw-alias-label-primary);
         border: 1px solid var(--dsw-alias-border-l1);
         border-radius: var(--dsw-radius-md);
+      }
+
+      /* Reader annotations, painted as <mark> over the PDF text layer.
+         Colours are deliberately low-alpha: the text layer sits on top of the
+         rendered page, so an opaque background would hide the very glyphs the
+         highlight is meant to point at. */
+      .pt-annotation {
+        background: rgba(250, 204, 21, 0.42);
+        color: inherit;
+        border-radius: 2px;
+        box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.55);
+        cursor: help;
+      }
+      .pt-annotation[data-color="green"] {
+        background: rgba(74, 222, 128, 0.38);
+        box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.55);
+      }
+      .pt-annotation[data-color="blue"] {
+        background: rgba(96, 165, 250, 0.38);
+        box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.55);
+      }
+      .pt-annotation[data-color="pink"] {
+        background: rgba(244, 114, 182, 0.38);
+        box-shadow: 0 0 0 1px rgba(244, 114, 182, 0.55);
       }
 
       /* Buttons: every one is a real <button> with a visible focus ring. */
@@ -837,6 +879,110 @@ window.__ModuleLoader__.load({
       selection.removeAllRanges();
       selection.addRange(range);
       return true;
+    }
+
+    /**
+     * Paint persisted annotations onto a freshly rendered text layer.
+     *
+     * Unlike `highlightInLayer`, this does NOT use a DOM selection: a selection is
+     * one global range, it is wiped by the next click or page turn, and it cannot
+     * show more than one highlight at a time. Annotations are permanent marks, so
+     * they are rendered as `<mark>` elements wrapping the matched text runs.
+     *
+     * Mutating the text layer's nodes is safe here only because this runs after
+     * `textLayer.render()` has finished and the layer is discarded on the next
+     * page/zoom change — the wrapper never has to survive a PDF.js re-render. That
+     * is also why the painter is called from the same place that renders, and not
+     * from an effect that could fire while PDF.js is mid-build.
+     *
+     * @returns {number} how many of the given annotations were located on this page
+     */
+    function paintHighlights(container, annotations) {
+      if (!Array.isArray(annotations) || annotations.length === 0) return 0;
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+      // Same whitespace-insensitive mapping as highlightInLayer: the text layer
+      // splits lines and CJK glyphs into separate spans, so a stored quote and the
+      // concatenated text nodes rarely match character for character.
+      const map = [];
+      const compact = [];
+      let node = walker.nextNode();
+      while (node !== null) {
+        const text = node.nodeValue ?? "";
+        for (let offset = 0; offset < text.length; offset += 1) {
+          const char = text[offset];
+          if (!/\s/.test(char)) {
+            compact.push(char);
+            map.push({ node, offset });
+          }
+        }
+        node = walker.nextNode();
+      }
+      const haystack = compact.join("");
+      if (haystack === "") return 0;
+
+      // Collect non-overlapping ranges first, then paint in reverse document order:
+      // wrapping a later range does not disturb the offsets of an earlier one, while
+      // painting forward would invalidate every already-computed node reference.
+      const ranges = [];
+      for (const annotation of annotations) {
+        const needle = String(annotation?.quote ?? "").replace(/\s+/g, "");
+        // Keep this even though removing it changes nothing observable: an empty
+        // needle makes `indexOf("")` return 0 and the resulting zero-length range
+        // paints no mark anyway (proved with a mutation test, which could not detect
+        // its removal). It stays because the intent — "a note-only annotation is not
+        // a highlight" — should not have to be re-derived from range arithmetic by
+        // the next reader, and because a future change to the zero-length case would
+        // otherwise silently turn every note into a mark at the page start.
+        if (needle === "") continue;
+        const at = haystack.indexOf(needle.slice(0, 160));
+        if (at < 0) continue;
+        if (ranges.some((r) => at < r.end && at + needle.length > r.start)) continue;
+        ranges.push({ start: at, end: at + Math.min(needle.length, 160), annotation });
+      }
+      if (ranges.length === 0) return 0;
+      ranges.sort((a, b) => b.start - a.start);
+      let painted = 0;
+      for (const range of ranges) {
+        // A quote routinely spans more than one PDF.js text node: the layer emits one
+        // node per line, and a highlighted sentence crosses lines. `surroundContents`
+        // cannot wrap a cross-node range at all (it throws), so the range is split
+        // into one mark per text node it covers. The result is several adjacent marks
+        // that read as one continuous highlight, which is what the reader sees.
+        const touched = [];
+        for (let index = range.start; index < range.end; index += 1) {
+          const point = map[index];
+          if (point === undefined) continue;
+          const last = touched[touched.length - 1];
+          if (last !== undefined && last.node === point.node) {
+            last.end = point.offset;
+          } else {
+            touched.push({ node: point.node, start: point.offset, end: point.offset });
+          }
+        }
+        let wrappedAny = false;
+        for (const piece of touched) {
+          try {
+            const domRange = document.createRange();
+            domRange.setStart(piece.node, piece.start);
+            domRange.setEnd(piece.node, piece.end + 1);
+            const mark = document.createElement("mark");
+            mark.className = "pt-annotation";
+            mark.dataset.annotationId = String(range.annotation.annotationId ?? "");
+            mark.dataset.color = String(range.annotation.color ?? "yellow");
+            if (typeof range.annotation.note === "string" && range.annotation.note !== "") {
+              mark.title = range.annotation.note;
+            }
+            domRange.surroundContents(mark);
+            wrappedAny = true;
+          } catch {
+            // A node that cannot be wrapped is skipped rather than aborting the
+            // annotation: a quote spanning a page break should still highlight the
+            // part that is on this page.
+          }
+        }
+        if (wrappedAny) painted += 1;
+      }
+      return painted;
     }
 
     /**
@@ -1209,7 +1355,7 @@ window.__ModuleLoader__.load({
 
     // --- reader -----------------------------------------------------------
 
-    function PdfReader({ sessionId, paper, initialPage, highlight, t, onSelectionChange, onClose }) {
+    function PdfReader({ sessionId, paper, initialPage, highlight, annotations, t, onSelectionChange, onClose }) {
       const canvasRef = useRef(null);
       const textLayerRef = useRef(null);
       const pageWrapRef = useRef(null);
@@ -1227,6 +1373,19 @@ window.__ModuleLoader__.load({
       const [textFallback, setTextFallback] = useState(null);
       const [selected, setSelected] = useState(null);
       const [highlightMissed, setHighlightMissed] = useState(false);
+      // `annotations` arrives as a prop (the Body component owns the fetch, since the
+      // list is also shown outside the reader). Only the per-page painted count lives
+      // here.
+      const [annotationsPainted, setAnnotationsPainted] = useState(0);
+      // How many of this paper's annotations claim to sit on the page being shown.
+      // Kept separate from the painted count so a shortfall is detectable.
+      const annotationsOnPage = (annotations ?? []).filter((a) => a.pageIndex === pageNumber - 1).length;
+      // The render callback is async and outlives prop updates; a ref keeps it reading
+      // the latest list without re-rendering the page on every change.
+      const annotationsRef = useRef(annotations ?? []);
+      useEffect(() => {
+        annotationsRef.current = annotations ?? [];
+      }, [annotations]);
       // The loading task owns the worker; the document proxy does not. Keeping it
       // is what makes a clean teardown possible (see releasePdfDocument).
       const loadingTaskRef = useRef(null);
@@ -1398,6 +1557,15 @@ window.__ModuleLoader__.load({
               await textLayer.render();
               if (!cancelled && token === tokenRef.current) {
                 setTextFallback(null);
+                // Persisted annotations paint first, then the evidence jump-target.
+                // Order matters: the jump target uses a DOM selection, and painting
+                // marks afterwards would leave the selection pointing at nodes that
+                // no longer exist where the browser thinks they are.
+                const pageAnnotations = (annotationsRef.current ?? []).filter(
+                  (annotation) => annotation.pageIndex === pageNumber - 1,
+                );
+                const painted = paintHighlights(textLayerDiv, pageAnnotations);
+                setAnnotationsPainted(painted);
                 const wanted = highlight && highlight.pageIndex === pageNumber - 1 ? highlight.quote : "";
                 const found = wanted !== "" && highlightInLayer(textLayerDiv, wanted);
                 setHighlightMissed(wanted !== "" && !found);
@@ -1499,6 +1667,13 @@ window.__ModuleLoader__.load({
         h("div", { className: "pt-caption", style: { wordBreak: "break-word" } },
           paper.title || paper.paperId),
         highlightMissed ? h("p", { className: "pt-meta", style: { margin: 0 } }, t("highlightMissed")) : null,
+        // Annotations exist for this page but the text was not found where the stored
+        // quote says it should be. That is a drifted anchor, not an empty page, and
+        // silently showing nothing would make the user think their highlight was lost.
+        annotationsOnPage > annotationsPainted
+          ? h("p", { className: "pt-meta", style: { margin: 0 } },
+            `${t("annotationAnchorMissed")} (${annotationsPainted}/${annotationsOnPage})`)
+          : null,
         loading ? h("p", { className: "pt-meta", style: { margin: 0 } }, t("readerLoading")) : null,
         error ? h(Banner, { tone: "error" }, error) : null,
         h("div", { className: "pt-canvas-wrap" },
@@ -1597,6 +1772,14 @@ window.__ModuleLoader__.load({
       const [editing, setEditing] = useState(null);
       const [selection, setSelection] = useState(null);
       const [question, setQuestion] = useState("");
+      // Held separately from `note` (which belongs to the evidence editor): the two
+      // are different annotations on different things and sharing one field would
+      // leak a note typed for a highlight into the evidence form.
+      const [annotationNote, setAnnotationNote] = useState("");
+      const [annotationMessage, setAnnotationMessage] = useState("");
+      // Annotation rows for the open paper. Fetched here rather than in PdfReader so
+      // the list stays visible (and refreshable) even when no reader is open.
+      const [annotations, setAnnotations] = useState([]);
       const [busy, setBusy] = useState(null);
       const [note, setNote] = useState("");
       const [error, setError] = useState(null);
@@ -1626,6 +1809,56 @@ window.__ModuleLoader__.load({
         return rows;
       }, [sessionId]);
 
+      /**
+       * Load this paper's annotations from the host.
+       *
+       * Separate from evidence on purpose: they are different tables with different
+       * meanings (a highlight is "I marked this", evidence is "this supports a
+       * claim"), and merging the two fetches would invite the same confusion the
+       * storage layer is careful to avoid.
+       *
+       * `reader` is the currently open paper; with none open there is nothing to
+       * annotate, so the fetch is skipped rather than querying the whole library.
+       */
+      const loadAnnotations = useCallback(async () => {
+        if (!sessionId || !reader?.paperId) return [];
+        const result = await callRemote(sessionId, "listAnnotations", { paperId: reader.paperId, limit: 1000 }).catch(() => null);
+        const rows = result?.annotations ?? [];
+        setAnnotations(rows);
+        return rows;
+      }, [sessionId, reader?.paperId]);
+
+      /** Save the current selection as an annotation, or update one by id. */
+      const saveAnnotation = useCallback(
+        async ({ quote, note, tags, color, annotationId, pageIndex, charStart, charEnd }) => {
+          if (!sessionId || !reader?.paperId) return null;
+          const result = await callRemote(sessionId, "saveAnnotation", {
+            paperId: reader.paperId,
+            annotationId,
+            pageIndex: pageIndex ?? (selection?.pageIndex ?? 0),
+            charStart: charStart ?? -1,
+            charEnd: charEnd ?? -1,
+            quote: quote ?? "",
+            note: note ?? "",
+            tags: tags ?? [],
+            color: color ?? "yellow",
+          }).catch((saveError) => ({ ok: false, reason: saveError?.message ?? String(saveError) }));
+          if (result?.ok) await loadAnnotations();
+          return result;
+        },
+        [sessionId, reader?.paperId, selection, loadAnnotations],
+      );
+
+      const removeAnnotation = useCallback(
+        async (annotationId) => {
+          if (!sessionId) return null;
+          const result = await callRemote(sessionId, "deleteAnnotation", { annotationId }).catch(() => null);
+          if (result?.ok) await loadAnnotations();
+          return result;
+        },
+        [sessionId, loadAnnotations],
+      );
+
       const refresh = useCallback(async () => {
         if (!sessionId) return;
         try {
@@ -1637,10 +1870,14 @@ window.__ModuleLoader__.load({
           setPapers(listed.papers ?? []);
           setError(null);
           await loadEvidence();
+          // Annotations load alongside evidence but from their own endpoint: they are
+          // a different table with a different meaning, and a failure here must not
+          // take down the evidence list.
+          await loadAnnotations();
         } catch (statusError) {
           setError(describeError(statusError, t));
         }
-      }, [sessionId, loadEvidence, t]);
+      }, [sessionId, loadEvidence, loadAnnotations, t]);
 
       useEffect(() => { refresh(); }, [refresh]);
 
@@ -2205,6 +2442,9 @@ window.__ModuleLoader__.load({
           h(PdfReader, {
             sessionId, paper: reader, initialPage: reader.pageIndex,
             highlight: readerHighlight,
+            // Persisted annotations, so the reader can paint its own marks on every
+            // page it renders rather than only showing evidence jump-targets.
+            annotations,
             t,
             onSelectionChange: setSelection,
             onClose: () => { setReader(null); setSelection(null); },
@@ -2227,8 +2467,86 @@ window.__ModuleLoader__.load({
               h(Button, { variant: "primary", onClick: askSelection, disabled: !inputActions }, t("ask")),
               h(Button, { onClick: saveEvidence, disabled: busy !== null }, t("evidence")),
             ),
+            // Annotation controls, kept below the evidence/ask row on purpose: saving a
+            // highlight is the low-commitment action, and putting it beside "evidence"
+            // is exactly how the two concepts got confused in the first place.
+            h("div", { className: "pt-toolbar" },
+              h("input", {
+                className: "pt-input pt-toolbar-grow",
+                value: annotationNote,
+                placeholder: t("annotateNote"),
+                "aria-label": t("annotateNote"),
+                onChange: (event) => setAnnotationNote(event.target.value),
+              }),
+              h(Button, {
+                onClick: async () => {
+                  const result = await saveAnnotation({
+                    quote: selection.text,
+                    note: annotationNote,
+                    pageIndex: selection.pageIndex,
+                  });
+                  if (result?.ok) {
+                    setAnnotationNote("");
+                    setAnnotationMessage(t("annotationSaved"));
+                  } else {
+                    setAnnotationMessage(result?.reason ?? t("annotationSaved"));
+                  }
+                },
+                disabled: busy !== null,
+              }, t("annotate")),
+            ),
+            annotationMessage !== "" ? h("p", { className: "pt-caption", style: { margin: 0 } }, annotationMessage) : null,
             h("p", { className: "pt-caption", style: { margin: 0 } }, t("askHint")),
           ),
+        ) : null,
+
+        // The annotation list is rendered whenever a paper is open, not only when a
+        // selection exists: its purpose is to show what the reader has already marked,
+        // which is exactly the moment there is no selection.
+        reader ? h("div", { style: { padding: "8px 12px 0", display: "flex", flexDirection: "column", gap: 6 } },
+          h("div", { className: "pt-toolbar" },
+            h("span", { className: "pt-h2" }, `${t("annotationList")} · ${annotations.length}`),
+            h("div", { className: "pt-spacer" }),
+            h(Button, { onClick: loadAnnotations, disabled: busy !== null }, "↻"),
+          ),
+          annotations.length === 0
+            ? h("p", { className: "pt-caption", style: { margin: 0 } }, t("annotationNone"))
+            : h("ul", { className: "pt-list" }, annotations.map((annotation) => h("li", {
+              key: annotation.annotationId,
+              className: "pt-card",
+              style: { display: "flex", flexDirection: "column", gap: 4 },
+            },
+              h("div", { className: "pt-caption" },
+                `${t("page")} ${annotation.pageIndex + 1}` +
+                  (annotation.tags.length > 0 ? ` · ${annotation.tags.join(" / ")}` : "")),
+              annotation.quote !== ""
+                ? h("p", { className: "pt-body", style: { margin: 0, wordBreak: "break-word" } }, annotation.quote)
+                : null,
+              annotation.note !== ""
+                ? h("p", { className: "pt-caption", style: { margin: 0, wordBreak: "break-word" } }, annotation.note)
+                : null,
+              h("div", { className: "pt-toolbar" },
+                // Promoting is offered but only works for an annotation that actually
+                // quotes something; the host refuses the rest and explains why.
+                h(Button, {
+                  disabled: busy !== null,
+                  onClick: async () => {
+                    const result = await callRemote(sessionId, "promoteAnnotation", {
+                      annotationId: annotation.annotationId,
+                    }).catch((promoteError) => ({ ok: false, reason: promoteError?.message ?? "" }));
+                    setAnnotationMessage(result?.ok ? t("annotationSaved") : (result?.reason ?? ""));
+                    if (result?.ok) await loadEvidence();
+                  },
+                }, t("annotationPromote")),
+                h("div", { className: "pt-spacer" }),
+                h(Button, {
+                  disabled: busy !== null,
+                  onClick: async () => {
+                    await removeAnnotation(annotation.annotationId);
+                  },
+                }, t("annotationDelete")),
+              ),
+            ))),
         ) : null,
 
         candidates !== null ? h("div", { style: { padding: "10px 12px 0", display: "flex", flexDirection: "column", gap: 8 } },

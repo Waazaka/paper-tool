@@ -189,10 +189,106 @@ class Text extends Node {
   }
 }
 
+/**
+ * Depth-first text walker, enough for `paintHighlights` to collect the text nodes
+ * of a rendered PDF text layer.
+ *
+ * A stub and proud of it: it implements exactly the surface the painter uses
+ * (`nextNode()` filtered to text nodes), not the full DOM NodeFilter protocol. A
+ * fuller imitation would look more authoritative while testing less, because the
+ * real browser is the only thing that can validate the rest.
+ */
+class TreeWalker {
+  constructor(root, whatToShow) {
+    this.root = root;
+    this.whatToShow = whatToShow;
+    this._stack = [...root.childNodes].reverse();
+    this.currentNode = root;
+  }
+  nextNode() {
+    while (this._stack.length > 0) {
+      const node = this._stack.pop();
+      // Push children so the next pop returns the leftmost one (document order).
+      for (let i = node.childNodes.length - 1; i >= 0; i -= 1) this._stack.push(node.childNodes[i]);
+      const isText = node.nodeType === 3;
+      if (this.whatToShow === 4 /* SHOW_TEXT */ ? isText : true) {
+        this.currentNode = node;
+        return node;
+      }
+    }
+    return null;
+  }
+}
+
+/**
+ * A Range with the one mutating operation the highlighter needs.
+ *
+ * `surroundContents` is reimplemented rather than delegated because there is no
+ * real DOM here. It follows the spec closely enough for the failure mode that
+ * matters: throwing when the range crosses element boundaries. That throw is what
+ * `paintHighlights` catches, so a stub that silently "succeeded" across boundaries
+ * would hide the behaviour the catch block exists for.
+ */
+class Range {
+  constructor(document) {
+    this.ownerDocument = document;
+    this.startContainer = null;
+    this.startOffset = 0;
+    this.endContainer = null;
+    this.endOffset = 0;
+    // Marks that at least one member of the DOM Range interface exists, so code
+    // probing for support takes the supported branch.
+    this._isDomRange = true;
+    this.collapsed = true;
+  }
+  setStart(node, offset) {
+    this.startContainer = node;
+    this.startOffset = offset;
+    this.collapsed = this.startContainer === this.endContainer && this.startOffset === this.endOffset;
+  }
+  setEnd(node, offset) {
+    this.endContainer = node;
+    this.endOffset = offset;
+    this.collapsed = this.startContainer === this.endContainer && this.startOffset === this.endOffset;
+  }
+  surroundContents(newParent) {
+    if (this.startContainer === null || this.endContainer === null) {
+      throw new Error("surroundContents: range is not set");
+    }
+    if (this.startContainer !== this.endContainer) {
+      // The real DOM rejects a range that spans nodes, which is the case this test
+      // cares about: a quote crossing two PDF.js spans cannot be wrapped directly.
+      throw new Error("surroundContents: range crosses element boundaries");
+    }
+    const node = this.startContainer;
+    const text = node.data ?? "";
+    const start = Math.min(this.startOffset, this.endOffset);
+    const end = Math.max(this.startOffset, this.endOffset);
+    const parent = node.parentNode;
+    if (parent === null) throw new Error("surroundContents: node has no parent");
+
+    newParent.appendChild(new Text(this.ownerDocument, text.slice(start, end)));
+    // Replace the original text node with [before?] wrapper [after?] in one pass, so
+    // the parent's child list is rebuilt rather than patched. Patching by index is
+    // where hand-written DOM stubs usually go wrong.
+    const replacement = [];
+    if (start > 0) replacement.push(new Text(this.ownerDocument, text.slice(0, start)));
+    replacement.push(newParent);
+    if (end < text.length) replacement.push(new Text(this.ownerDocument, text.slice(end)));
+
+    const index = parent.childNodes.indexOf(node);
+    for (const child of parent.childNodes) {
+      if (child === node) child.parentNode = null;
+    }
+    parent.childNodes.splice(index, 1, ...replacement);
+    for (const child of replacement) child.parentNode = parent;
+    return this;
+  }
+}
+
 class Style {
   constructor() {
-    this._props = new Map();
-  }
+    this._props = new Map();  }
   setProperty(name, value) {
     this._props.set(name, value);
   }
@@ -371,6 +467,12 @@ class Document extends Node {
   createTextNode(data) {
     return new Text(this, data);
   }
+  createTreeWalker(root, whatToShow) {
+    return new TreeWalker(root, whatToShow);
+  }
+  createRange() {
+    return new Range(this);
+  }
   createDocumentFragment() {
     const fragment = new Element(this, "#fragment");
     fragment.nodeType = 11;
@@ -457,6 +559,9 @@ export function installDom({ width = 360, height = 640 } = {}) {
 
   globalThis.document = document;
   globalThis.window = window;
+  // The four NodeFilter constants a browser defines. Only SHOW_TEXT is used by the
+  // highlighter, but defining the documented set keeps code that probes them honest.
+  globalThis.NodeFilter = { SHOW_ALL: 0xffffffff, SHOW_ELEMENT: 1, SHOW_TEXT: 4, SHOW_COMMENT: 128 };
   globalThis.HTMLElement = Element;
   globalThis.Element = Element;
   globalThis.Node = Node;
@@ -468,7 +573,7 @@ export function installDom({ width = 360, height = 640 } = {}) {
     "HTMLAnchorElement", "HTMLImageElement", "SVGElement", "SVGSVGElement",
   ]) globalThis[name] = Element;
 
-  return { document, window, Event: DomEvent, Element };
+  return { document, window, Event: DomEvent, Element, NodeFilter: globalThis.NodeFilter };
 }
 
 /** Fire a real click on the first element whose text matches. */
