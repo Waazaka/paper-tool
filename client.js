@@ -137,6 +137,10 @@ window.__ModuleLoader__.load({
   saveAnswerEvidence: "存为证据",
   answerPanelTitle: "回答回写",
   answerPlaceholder: "把回答粘贴到这里，再选择存为笔记或证据",
+  reocr: "重跑 OCR",
+  reocrHint: "这篇还没有可搜索的文本。重新识别会把扫描页转成可搜索文本。",
+  reocrDone: "已识别 {pages} 页（{failed} 页失败）· 证据重新锚定 {moved} 条，失效 {lost} 条",
+  reocrSkipped: "未执行：{reason}",
         askDefault: "请解释这段内容，并说明它与论文主题的关系。",
         delete: "删除",
         confirmDelete: "确认删除？",
@@ -345,6 +349,10 @@ window.__ModuleLoader__.load({
   saveAnswerEvidence: "Save as evidence",
   answerPanelTitle: "Write the answer back",
   answerPlaceholder: "Paste the answer here, then choose note or evidence",
+  reocr: "Re-run OCR",
+  reocrHint: "This paper has no searchable text yet. Re-running recognition turns the scanned pages into searchable text.",
+  reocrDone: "Recognised {pages} page(s) ({failed} failed) · {moved} evidence row(s) re-anchored, {lost} no longer locatable",
+  reocrSkipped: "Not run: {reason}",
         askDefault: "Explain this passage and its role in the paper.",
         delete: "Delete",
         confirmDelete: "Delete this paper?",
@@ -464,6 +472,7 @@ window.__ModuleLoader__.load({
       "reviewOutline", "formatCitations", "exportReview", "searchExternal",
       "addCandidates", "cnkiSearch", "cnkiDownload",
       "reextractMetadata", "enrichMetadata",
+      "ocrPaper",
       // askContext and saveAnswer take an `input` object like the rest, so they must be
       // listed here; the wiring gate checks both sides agree.
       "askContext", "saveAnswer",
@@ -1223,7 +1232,7 @@ function describeError(error, t) {
 
     // --- library ----------------------------------------------------------
 
-    function PaperCard({ paper, t, onOpen, onEdit, onReextract, onEnrich, onDelete, busy }) {
+    function PaperCard({ paper, t, onOpen, onEdit, onReextract, onEnrich, onReocr, onDelete, busy }) {
       // Three states, three different claims. Folding OCR into "full text"
       // would present guessed characters as if they were the PDF's own text,
       // and folding it into "metadata only" would deny that the paper is
@@ -1242,6 +1251,10 @@ function describeError(error, t) {
       // pressed a button to repair citations, so silence would leave them unsure
       // whether the bibliographic fields are now trustworthy.
       const [enrichResult, setEnrichResult] = useState(null);
+      // A re-run of OCR changes the paper's material and can move existing anchors, so it
+      // reports numbers rather than just "done" — especially the anchors it lost track of,
+      // which the user would otherwise only notice when a quote stopped highlighting.
+      const [reocrResult, setReocrResult] = useState(null);
       const meta = [paper.authors, paper.year, paper.venue].filter(Boolean).join(" · ");
       // Which fields are still guesses. `metadataSource` records where each value
       // came from; a user correction removes its entry, so this list shrinks as
@@ -1305,6 +1318,22 @@ function describeError(error, t) {
             }),
           }, t("open")),
           h(Button, { onClick: () => onEdit(paper), disabled: busy !== null }, t("editMeta")),
+          // Only for a paper with no usable text. On a `fulltext` paper OCR would replace
+          // correct text with guesses (the Host refuses it too); on an `ocr` paper there is
+          // nothing new to recognise. Showing it everywhere would invite a click that can
+          // only be refused, which reads as a bug.
+          paper.material === "metadata" && hasPdf
+            ? h(Button, {
+              variant: "ghost",
+              disabled: busy !== null,
+              title: t("reocrHint"),
+              onClick: async () => {
+                const result = await onReocr(paper);
+                if (result === null) return;
+                setReocrResult(result);
+              },
+            }, busy === "reocr" ? t("working") : t("reocr"))
+            : null,
           // Offered only when a DOI exists: without one there is nothing to look
           // up, and a button that must refuse is worse than no button. Independent
           // of `hasPdf` because a metadata-only entry (added from a search result)
@@ -1378,6 +1407,17 @@ function describeError(error, t) {
                 : enrichResult.reason !== undefined
                   ? t("enrichFailed", { reason: enrichResult.reason })
                   : t("enrichNoChange"))
+          : null,
+        reocrResult !== null
+          ? h("p", { className: "pt-caption", role: "status", style: { margin: "6px 0 0" } },
+            reocrResult.skipped === true
+              ? t("reocrSkipped", { reason: reocrResult.reason })
+              : t("reocrDone", {
+                pages: reocrResult.pagesRecognised ?? 0,
+                failed: reocrResult.pagesFailed ?? 0,
+                moved: reocrResult.reanchored?.evidence?.relocated ?? 0,
+                lost: reocrResult.reanchored?.evidence?.lost ?? 0,
+              }))
           : null,
       );
     }
@@ -2230,6 +2270,37 @@ function describeError(error, t) {
       }, [sessionId, refresh, t]);
 
       /**
+       * Re-run OCR for one paper.
+       *
+       * Wrapped in runCancellable because recognition is roughly a second per page: a
+       * 200-page scan is minutes of waiting, and a run the user cannot stop is the same
+       * as a hang. The Host honours the same signal, so a cancelled run leaves the paper
+       * exactly as it was rather than half-recognised.
+       */
+      const reocrOne = useCallback(async (paper) => {
+        if (!sessionId) return null;
+        setBusy("reocr");
+        setError("");
+        try {
+          return await runCancellable(t("busyStageOcr"), async (signal) => {
+            const result = await callRemote(sessionId, "ocrPaper", { paperId: paper.paperId }, signal);
+            await refresh();
+            return result;
+          });
+        } catch (reocrError) {
+          // A cancellation is not a failure: say it was stopped, don't report an error.
+          if (isAbortError(reocrError)) {
+            setCancelMessage(t("cancelledByUser"));
+            return null;
+          }
+          setError(describeError(reocrError, t));
+          return null;
+        } finally {
+          setBusy(null);
+        }
+      }, [sessionId, refresh, runCancellable, t]);
+
+      /**
        * Fill this paper's metadata from Crossref via its DOI.
        *
        * Needed because the extractor cannot read authors off a typeset page, so
@@ -2860,6 +2931,7 @@ function describeError(error, t) {
               onEdit: setEditing,
               onReextract: reextractOne,
               onEnrich: enrichOne,
+              onReocr: reocrOne,
               onDelete: deletePaper,
             }))),
         ),
