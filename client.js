@@ -31,6 +31,12 @@ window.__ModuleLoader__.load({
     const MAX_QUOTE_CHARS = 500;
     const MAX_IMPORT_FILES = 32;
 
+    // One page of the sidebar list. The Host accepts up to 500, which is why the
+    // old client asked for all 500 and could never see row 501; a page this small
+    // keeps the first paint cheap, and "load more" grows it on demand.
+    const PAPER_PAGE_SIZE = 50;
+    const EVIDENCE_PAGE_SIZE = 50;
+
     const DICTS = {
       zh: {
         title: "论文",
@@ -146,6 +152,10 @@ window.__ModuleLoader__.load({
   sortRelevance: "相关度",
   sortCitations: "被引最多",
   sortYear: "最新",
+  loadMore: "加载更多（已显示 {shown} / {total}）",
+  loadedOf: "已显示 {shown} / {total} 篇",
+  loadingMore: "加载中…",
+  evidenceLoadMore: "加载更多证据（已显示 {shown} / {total}）",
         askDefault: "请解释这段内容，并说明它与论文主题的关系。",
         delete: "删除",
         confirmDelete: "确认删除？",
@@ -363,6 +373,10 @@ window.__ModuleLoader__.load({
   sortRelevance: "Relevance",
   sortCitations: "Most cited",
   sortYear: "Newest",
+  loadMore: "Load more ({shown} of {total} shown)",
+  loadedOf: "{shown} of {total} papers shown",
+  loadingMore: "Loading…",
+  evidenceLoadMore: "Load more evidence ({shown} of {total} shown)",
         askDefault: "Explain this passage and its role in the paper.",
         delete: "Delete",
         confirmDelete: "Delete this paper?",
@@ -832,9 +846,15 @@ function describeError(error, t) {
      * An unparseable value must not make the card look verified: the honest
      * fallback is to assume nothing is confirmed, because the alternative is
      * presenting a guess as a fact.
+     *
+     * `unverifiedFields` is the precomputed answer from the Host list projection
+     * (PT-015 trims `metadataSource` off the list payload). The local parse is kept
+     * for records that still carry the raw column — the metadata editor opens with
+     * the full row from `readPaper`, which does.
      */
     function guessedFields(paper) {
       const known = ["title", "authors", "year", "venue", "doi"];
+      if (Array.isArray(paper?.unverifiedFields)) return paper.unverifiedFields;
       const raw = paper?.metadataSource;
       // No provenance at all means the row predates v4 or was never imported
       // through the extractor; either way we cannot claim it was checked.
@@ -867,6 +887,7 @@ function describeError(error, t) {
      */
     function crossrefFields(paper) {
       const known = ["title", "authors", "year", "venue", "doi"];
+      if (Array.isArray(paper?.fromCrossrefFields)) return paper.fromCrossrefFields;
       const raw = paper?.metadataSource;
       if (typeof raw !== "string" || raw.trim() === "") return [];
       let parsed = null;
@@ -1912,6 +1933,13 @@ function describeError(error, t) {
       const [error, setError] = useState(null);
       const [evidence, setEvidence] = useState([]);
       const [evidenceFilter, setEvidenceFilter] = useState("all");
+      // How much evidence is loaded, and how much exists. Kept apart from
+      // `evidence.length` because a full page of rows is ambiguous: it looks the
+      // same whether the library has exactly one page or many.
+      const [evidencePaging, setEvidencePaging] = useState({ total: 0, hasMore: false, anchoredTotal: 0, allTotal: 0 });
+      // Same idea for the paper list: the sidebar asks for one page and grows it,
+      // instead of requesting the 500-row ceiling and being unable to see row 501.
+      const [paperPaging, setPaperPaging] = useState({ total: 0, hasMore: false, loading: false });
       const [collectQuery, setCollectQuery] = useState("");
       const [matrixClaim, setMatrixClaim] = useState("");
       const [matrix, setMatrix] = useState(null);
@@ -1959,13 +1987,87 @@ function describeError(error, t) {
         setCancelMessage(t("cancelledByUser"));
       }, [t]);
 
+      /**
+       * Reload the first page of evidence.
+       *
+       * Was `{ limit: 2000 }` — every refresh re-serialised the entire evidence
+       * table over the wire, and a single new row triggered another full pass.
+       * The list is paged now; the total comes back with it so the footer can say
+       * how much is not yet loaded instead of implying the page is everything.
+       *
+       * The filter is read through a ref, not a dependency, so this callback keeps
+       * one identity across a filter change. Depending on `evidenceFilter` made
+       * `refresh` (which calls this) unstable, so switching the filter re-fetched
+       * the paper list and annotations too — three requests to answer one click.
+       * The dedicated effect below owns the filter-change refetch instead.
+       */
+      const evidenceFilterRef = useRef(evidenceFilter);
+      evidenceFilterRef.current = evidenceFilter;
       const loadEvidence = useCallback(async () => {
         if (!sessionId) return [];
-        const result = await callRemote(sessionId, "listEvidence", { limit: 2000 });
+        const result = await callRemote(sessionId, "listEvidence", {
+          limit: EVIDENCE_PAGE_SIZE,
+          anchor: evidenceFilterRef.current,
+        });
         const rows = result.evidence ?? [];
         setEvidence(rows);
+        setEvidencePaging({
+          total: result.paging?.total ?? rows.length,
+          hasMore: result.paging?.hasMore === true,
+          anchoredTotal: result.paging?.anchoredTotal ?? rows.filter((row) => row.charStart >= 0).length,
+          allTotal: result.paging?.allTotal ?? rows.length,
+        });
         return rows;
       }, [sessionId]);
+
+      /** Append the next page of evidence, keeping what is already loaded. */
+      const loadMoreEvidence = useCallback(async () => {
+        if (!sessionId) return;
+        setBusy("evidenceMore");
+        try {
+          const result = await callRemote(sessionId, "listEvidence", {
+            limit: EVIDENCE_PAGE_SIZE,
+            offset: evidence.length,
+            anchor: evidenceFilterRef.current,
+          });
+          const rows = result.evidence ?? [];
+          // Replace rather than blindly append: a row may have been deleted
+          // between pages, in which case the offset has shifted and appending
+          // would duplicate the tail. Deduplication by id is cheap and makes the
+          // accumulated list correct regardless of what moved.
+          setEvidence((current) => {
+            const seen = new Set(current.map((row) => row.evidenceId));
+            return [...current, ...rows.filter((row) => !seen.has(row.evidenceId))];
+          });
+          setEvidencePaging({
+            total: result.paging?.total ?? evidence.length + rows.length,
+            hasMore: result.paging?.hasMore === true,
+            anchoredTotal: result.paging?.anchoredTotal ?? evidencePaging.anchoredTotal,
+            allTotal: result.paging?.allTotal ?? evidencePaging.allTotal,
+          });
+        } catch (evidenceError) {
+          setError(describeError(evidenceError, t));
+        } finally {
+          setBusy(null);
+        }
+      }, [sessionId, evidence.length, evidencePaging.anchoredTotal, evidencePaging.allTotal, t]);
+
+      /**
+       * Reload evidence when the filter changes.
+       *
+       * The filter is a Host-side query, so changing it has to refetch rather than
+       * re-render what is loaded. This effect is the only thing that reacts to the
+       * filter: `loadEvidence` reads it through a ref precisely so that `refresh`
+       * does not also re-run on a filter change.
+       *
+       * Skipped on the first run because `refresh` already loads page one —
+       * without this guard every mount would fetch twice.
+       */
+      const evidenceFilterMounted = useRef(false);
+      useEffect(() => {
+        if (!evidenceFilterMounted.current) { evidenceFilterMounted.current = true; return; }
+        void loadEvidence();
+      }, [evidenceFilter, loadEvidence]);
 
       /**
        * Load this paper's annotations from the host.
@@ -2017,15 +2119,44 @@ function describeError(error, t) {
         [sessionId, loadAnnotations],
       );
 
+      /**
+       * Open the metadata editor for one paper.
+       *
+       * Fetches the full row first. The sidebar list is a projection (PT-015) that
+       * omits `abstract`, and the editor has an abstract field — opening it straight
+       * from the list row would show an empty box and, on save, erase the stored
+       * abstract. Reading the row back is one small RPC and keeps the trim honest.
+       */
+      const openEditor = useCallback(async (paper) => {
+        if (!sessionId) return;
+        setBusy("edit");
+        try {
+          const full = await callRemote(sessionId, "readPaper", { paperId: paper.paperId });
+          setEditing(full?.paper ?? paper);
+        } catch (editError) {
+          // Fall back to the list row rather than refusing to open the editor,
+          // but say so: saving then would write an empty abstract over the real one.
+          setError(describeError(editError, t));
+          setEditing(paper);
+        } finally {
+          setBusy(null);
+        }
+      }, [sessionId, t]);
+
       const refresh = useCallback(async () => {
         if (!sessionId) return;
         try {
           const [state, listed] = await Promise.all([
             callRemote(sessionId, "status"),
-            callRemote(sessionId, "listPapers", { limit: 500 }),
+            callRemote(sessionId, "listPapers", { limit: PAPER_PAGE_SIZE }),
           ]);
           setStatus(state);
           setPapers(listed.papers ?? []);
+          setPaperPaging({
+            total: listed.paging?.total ?? (listed.papers ?? []).length,
+            hasMore: listed.paging?.hasMore === true,
+            loading: false,
+          });
           setError(null);
           await loadEvidence();
           // Annotations load alongside evidence but from their own endpoint: they are
@@ -2036,6 +2167,40 @@ function describeError(error, t) {
           setError(describeError(statusError, t));
         }
       }, [sessionId, loadEvidence, loadAnnotations, t]);
+
+      /**
+       * Append the next page of papers.
+       *
+       * This is what makes paper 501 reachable at all: the old request stopped at
+       * the Host's 500-row ceiling, so beyond that the sidebar simply never showed
+       * the row — not slow, absent.
+       *
+       * Deduplicated by id on append: importing or deleting between pages shifts
+       * the offsets, and a stale offset would otherwise duplicate a row.
+       */
+      const loadMorePapers = useCallback(async () => {
+        if (!sessionId) return;
+        setPaperPaging((current) => ({ ...current, loading: true }));
+        try {
+          const listed = await callRemote(sessionId, "listPapers", {
+            limit: PAPER_PAGE_SIZE,
+            offset: papers.length,
+          });
+          const rows = listed.papers ?? [];
+          setPapers((current) => {
+            const seen = new Set(current.map((paper) => paper.paperId));
+            return [...current, ...rows.filter((paper) => !seen.has(paper.paperId))];
+          });
+          setPaperPaging({
+            total: listed.paging?.total ?? papers.length + rows.length,
+            hasMore: listed.paging?.hasMore === true,
+            loading: false,
+          });
+        } catch (listError) {
+          setPaperPaging((current) => ({ ...current, loading: false }));
+          setError(describeError(listError, t));
+        }
+      }, [sessionId, papers.length, t]);
 
       useEffect(() => { refresh(); }, [refresh]);
 
@@ -2548,28 +2713,31 @@ function describeError(error, t) {
       // Only evidence whose offsets were located in the page text may be
       // exported: a citation that cannot point at the source is exactly what
       // the traceability claim forbids.
-      const locatedEvidence = useMemo(
-        () => evidence.filter((row) => Number.isInteger(row.charStart) && row.charStart >= 0),
-        [evidence],
-      );
-      const evidenceIds = useMemo(
-        () => locatedEvidence.map((row) => row.evidenceId),
-        [locatedEvidence],
-      );
-      const excludedCount = evidence.length - locatedEvidence.length;
+      //
+      // These two are now *counts over the whole library*, taken from the paging
+      // envelope. Deriving them from `evidence` would have been correct only while
+      // the whole table was loaded; with paging it would report the size of the
+      // current page as the size of the library.
+      const anchoredTotal = evidencePaging.anchoredTotal;
+      const allTotal = evidencePaging.allTotal;
+      const excludedCount = allTotal - anchoredTotal;
 
       const readerHighlight = useMemo(
         () => (reader?.quote ? { quote: reader.quote, pageIndex: reader.pageIndex } : null),
         [reader?.quote, reader?.pageIndex],
       );
 
+      // Citations pass `anchoredOnly`, not an id list. The Host then filters in SQL
+      // over the whole library. Passing the ids of the loaded page would have
+      // produced a bibliography that silently omitted every unloaded row — the
+      // failure mode is invisible, which is the worst kind for a citation tool.
       const renderCitations = useCallback(async () => {
         if (!sessionId) return;
         setBusy("citations");
         setError(null);
         try {
           const result = await callRemote(sessionId, "formatCitations", {
-            style: citationStyle, locale: citationLocale, evidenceIds,
+            style: citationStyle, locale: citationLocale, anchor: "anchored",
           });
           setCitation(result);
         } catch (citationError) {
@@ -2577,7 +2745,7 @@ function describeError(error, t) {
         } finally {
           setBusy(null);
         }
-      }, [sessionId, citationStyle, citationLocale, evidenceIds, t]);
+      }, [sessionId, citationStyle, citationLocale, t]);
 
       const doExport = useCallback(async () => {
         if (!sessionId) return;
@@ -2587,7 +2755,7 @@ function describeError(error, t) {
           const result = await callRemote(sessionId, "exportReview", {
             style: citationStyle,
             locale: citationLocale,
-            evidenceIds,
+            anchor: "anchored",
           });
           setExported(result);
           if (result.ok !== true) setError(result.reason ?? "export failed");
@@ -2603,7 +2771,7 @@ function describeError(error, t) {
         } finally {
           setBusy(null);
         }
-      }, [sessionId, citationStyle, citationLocale, evidenceIds, t]);
+      }, [sessionId, citationStyle, citationLocale, t]);
 
       const copyMarkdown = useCallback(async () => {
         const text = exported?.markdown ?? citation?.bibliography;
@@ -2641,16 +2809,18 @@ function describeError(error, t) {
         return [...grouped.values()];
       }, [hits, papers]);
 
+      // Grouping only. The anchored/unanchored filter is applied by the Host now
+      // (see `loadEvidence`), because it has to select across the whole library
+      // rather than within the loaded page — re-applying it here would be
+      // harmless but would imply to a later reader that the filter lives here.
       const evidenceGroups = useMemo(() => {
         const grouped = new Map();
         for (const row of evidence) {
-          if (evidenceFilter === "anchored" && !(Number.isInteger(row.charStart) && row.charStart >= 0)) continue;
-          if (evidenceFilter === "unanchored" && Number.isInteger(row.charStart) && row.charStart >= 0) continue;
           if (!grouped.has(row.paperId)) grouped.set(row.paperId, []);
           grouped.get(row.paperId).push(row);
         }
         return [...grouped.entries()];
-      }, [evidence, evidenceFilter]);
+      }, [evidence]);
 
       const jumpToEvidence = useCallback((row) => {
         openReader({
@@ -2969,12 +3139,26 @@ function describeError(error, t) {
               t,
               busy,
               onOpen: openReader,
-              onEdit: setEditing,
+              onEdit: openEditor,
               onReextract: reextractOne,
               onEnrich: enrichOne,
               onReocr: reocrOne,
               onDelete: deletePaper,
             }))),
+          // Only offered when there is more: a button that does nothing is worse
+          // than no button. Hidden while a search is showing, because those results
+          // are not paged at all.
+          hits === null && paperPaging.hasMore
+            ? h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+              h(Button, {
+                onClick: loadMorePapers,
+                disabled: busy !== null || paperPaging.loading,
+              }, paperPaging.loading
+                ? t("loadingMore")
+                : t("loadMore", { shown: papers.length, total: paperPaging.total })),
+              h("span", { className: "pt-caption" },
+                t("loadedOf", { shown: papers.length, total: paperPaging.total })))
+            : null,
         ),
       );
 
@@ -3000,8 +3184,12 @@ function describeError(error, t) {
 
         const filterBar = h("div", { className: "pt-toolbar" },
           h("span", { className: "pt-caption pt-num" },
-            `${evidenceGroups.length} ${t("paperCount")} · ${evidence.length} ${t("evidenceCount")} · ${locatedEvidence.length} ${t("anchoredCount")}`),
+            `${evidenceGroups.length} ${t("paperCount")} · ${evidence.length} ${t("evidenceCount")} · ${anchoredTotal} ${t("anchoredCount")}`),
           h("div", { className: "pt-spacer" }),
+          // These switch the Host-side filter and reload page one. Filtering the
+          // loaded rows in the browser would have answered a different question:
+          // it would show the anchored rows *on this page*, while the label claims
+          // to count all of them.
           h(Button, {
             variant: evidenceFilter === "all" ? "primary" : "ghost",
             onClick: () => setEvidenceFilter("all"),
@@ -3009,7 +3197,7 @@ function describeError(error, t) {
           h(Button, {
             variant: evidenceFilter === "anchored" ? "primary" : "ghost",
             onClick: () => setEvidenceFilter("anchored"),
-          }, `${t("filterAnchored")} ${locatedEvidence.length}`),
+          }, `${t("filterAnchored")} ${anchoredTotal}`),
           excludedCount > 0 ? h(Button, {
             variant: evidenceFilter === "unanchored" ? "primary" : "ghost",
             onClick: () => setEvidenceFilter("unanchored"),
@@ -3018,7 +3206,21 @@ function describeError(error, t) {
 
         const evidenceBody = evidence.length === 0
           ? h(Empty, { title: t("evidenceEmpty"), hint: t("evidenceEmptyHint") })
-          : h(React.Fragment, null, filterBar, evidenceList);
+          : h(React.Fragment, null, filterBar, evidenceList,
+            evidencePaging.hasMore
+              ? h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+                h(Button, {
+                  onClick: loadMoreEvidence,
+                  disabled: busy !== null,
+                }, busy === "evidenceMore"
+                  ? t("loadingMore")
+                  : t("evidenceLoadMore", { shown: evidence.length, total: evidencePaging.total })),
+                // Say how much is not loaded. Silently showing one page of a larger
+                // list reads as "this is everything", which for an evidence list
+                // means a review that looks complete and is not.
+                h("span", { className: "pt-caption" },
+                  t("loadedOf", { shown: evidence.length, total: evidencePaging.total })))
+              : null);
 
         return h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 10 } },
         h("div", { className: "pt-toolbar" },
@@ -3116,13 +3318,15 @@ function describeError(error, t) {
             ),
           ),
           h("div", { className: "pt-spacer" }),
-          h(Button, { variant: "primary", onClick: renderCitations, disabled: busy !== null || locatedEvidence.length === 0 },
+          h(Button, { variant: "primary", onClick: renderCitations, disabled: busy !== null || anchoredTotal === 0 },
             busy === "citations" ? t("searching") : t("generateCitations")),
         ),
         h("p", { className: "pt-caption", style: { margin: 0 } },
-          locatedEvidence.length === 0
+          // Counted over the whole library, not the loaded page: this caption sits
+          // next to the citation button and describes what that button will cite.
+          anchoredTotal === 0
             ? t("noEvidence")
-            : `${locatedEvidence.length} ${t("evidenceCount")} · ${t("anchoredCount")}${excludedCount > 0 ? ` · ${t("unlocatedExcluded", { n: excludedCount })}` : ""}`),
+            : `${anchoredTotal} ${t("evidenceCount")} · ${t("anchoredCount")}${excludedCount > 0 ? ` · ${t("unlocatedExcluded", { n: excludedCount })}` : ""}`),
 
         citation?.ok
           ? h("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
@@ -3141,7 +3345,7 @@ function describeError(error, t) {
         h("div", { className: "pt-toolbar" },
           h(Button, {
             variant: "primary", onClick: doExport,
-            disabled: busy !== null || locatedEvidence.length === 0,
+            disabled: busy !== null || anchoredTotal === 0,
           }, busy === "export" ? t("exporting") : t("export")),
           h(Button, { onClick: copyMarkdown, disabled: !exported?.markdown && !citation?.bibliography }, t("copy")),
         ),

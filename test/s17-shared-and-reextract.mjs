@@ -1,4 +1,4 @@
-﻿// S17: the three defects reported after the sidebar mount fix.
+// S17: the three defects reported after the sidebar mount fix.
 //
 // 1. Opening the workbench from another workspace showed an empty shelf. The
 //    library was per-workspace by construction, so a paper imported in one
@@ -117,7 +117,13 @@ const workspaceB = mkdtempSync(join(tmpdir(), "paper-tool-S17-b-"));
 
   // The original name must survive the import: without it a re-extract cannot
   // reproduce the import's own result.
-  const paper = (await service.listPapers(scope, {})).papers.find((row) => row.paperId === paperId);
+  //
+  // Read through `readPaper`, not `listPapers`: the list is a projection built for
+  // the sidebar and deliberately omits storage-only fields such as `sourceName`
+  // (PT-015 trimmed the payload). Asserting a storage fact through the list would
+  // tie this gate to a payload shape it does not own — the full row is what the
+  // metadata editor reads, so that is the right surface for this claim.
+  const paper = (await service.readPaper(scope, { paperId })).paper;
   check("the import stores the original file name",
     typeof paper.sourceName === "string" && paper.sourceName === originalName,
     JSON.stringify(paper.sourceName));
@@ -131,14 +137,19 @@ const workspaceB = mkdtempSync(join(tmpdir(), "paper-tool-S17-b-"));
   // an empty provenance map, and NO verified stamp 鈥?`upsertPaper` never wrote
   // one, which is why all four real imported rows carry `metadataVerifiedAt = ''`
   // while still being wrong.
+  // Read the full stored row, not the sidebar projection: this block asserts
+  // storage facts (`metadataVerifiedAt`, `metadataSource`) that the list payload
+  // deliberately omits as of PT-015. Using `store.getPaper` also keeps the
+  // guarantee aimed at the layer that owns it.
+  const row = () => service.storeFor(scope).getPaper(paperId);
   service.storeFor(scope).db
     .prepare("UPDATE papers SET year = '2013', metadataSource = '{}', metadataVerifiedAt = '' WHERE paperId = ?")
     .run(paperId);
-  const legacy = (await service.listPapers(scope, {})).papers.find((row) => row.paperId === paperId);
+  const legacy = row();
   check("legacy row starts with the wrong year", legacy.year === "2013", legacy.year);
 
   const repaired = await service.reextractMetadata(scope, { paperId });
-  const after = (await service.listPapers(scope, {})).papers.find((row) => row.paperId === paperId);
+  const after = row();
   const expected = repaired.guess.year;
   if (expected !== "" && expected !== "2013") {
     check("a wrong year on a legacy row is repairable", after.year === expected,
@@ -158,13 +169,15 @@ const workspaceB = mkdtempSync(join(tmpdir(), "paper-tool-S17-b-"));
   service.storeFor(scope).updatePaper(paperId, {
     title: "A Title The User Typed Themselves",
   });
-  const edited = (await service.listPapers(scope, {})).papers.find((row) => row.paperId === paperId);
+  const edited = row();
   check("a user edit records the verified stamp", edited.metadataVerifiedAt !== "", edited.metadataVerifiedAt);
   check("a user edit drops the field's provenance",
     JSON.parse(edited.metadataSource || "{}").title === undefined, edited.metadataSource);
 
   await service.reextractMetadata(scope, { paperId });
-  const preserved = (await service.listPapers(scope, {})).papers.find((row) => row.paperId === paperId);
+  // This one does go through the projection on purpose: a user-written title must
+  // survive, and that is exactly what the sidebar renders.
+  const preserved = (await service.listPapers(scope, {})).papers.find((entry) => entry.paperId === paperId);
   check("a user-written title is never overwritten",
     preserved.title === "A Title The User Typed Themselves", preserved.title);
 

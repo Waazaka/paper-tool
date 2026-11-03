@@ -95,6 +95,8 @@ const GATES = [
   { name: "s27-inline-ask", script: "s27-inline-ask.mjs", needsCorpus: false, what: "anchored question packet, answer write-back, no model channel" },
   { name: "s28-manual-ocr", script: "s28-manual-ocr.mjs", needsCorpus: false, what: "manual OCR re-run, configurable page cap, anchor repair" },
   { name: "s29-external-sources", script: "s29-external-sources.mjs", needsCorpus: false, what: "five external sources, citations carried through, source-order-independent merge" },
+  { name: "s30-paging", script: "s30-paging.mjs", needsCorpus: false, what: "list paging past the 500 ceiling, payload trimming, library-wide citation scope" },
+  { name: "s30b-paging-mount", script: "s30b-paging-mount.mjs", needsCorpus: false, what: "the mounted client actually pages, refetches on filter change, loads the full row before editing" },
 ];
 
 function corpusLooksUsable(dir) {

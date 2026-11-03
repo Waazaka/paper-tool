@@ -353,6 +353,17 @@ class Element extends Node {
   set value(next) {
     this._value = String(next ?? "");
   }
+  // React's textarea wrapper writes the initial text through `node.defaultValue`,
+  // not `node.value` (ReactDOMTextarea.postMountWrapper). A real textarea treats
+  // setting `defaultValue` as replacing its rendered text, so the two have to stay
+  // linked here; without this, every <textarea> in the stub read back as "" and the
+  // metadata editor's abstract looked empty even when it had been populated.
+  get defaultValue() {
+    return this._value;
+  }
+  set defaultValue(next) {
+    this._value = String(next ?? "");
+  }
   get children() {
     return this.childNodes.filter((child) => child.nodeType === 1);
   }
