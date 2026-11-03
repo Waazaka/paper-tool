@@ -26,7 +26,7 @@ const dbPath = join(dir, "library.sqlite");
 {
   const store = openStore(dbPath);
   const db = new DatabaseSync(dbPath);
-  check("user_version is 6", db.prepare("PRAGMA user_version").get().user_version === 6,
+  check("user_version is 7", db.prepare("PRAGMA user_version").get().user_version === 7,
     String(db.prepare("PRAGMA user_version").get().user_version));
   const table = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='annotations'").get();
   check("annotations table exists", table !== undefined);

@@ -100,6 +100,7 @@ const GATES = [
   { name: "s31-stance", script: "s31-stance.mjs", needsCorpus: false, what: "graded stance judgement: adversarial cases, strength levels, per-evidence rationale, determinism" },
   { name: "s32-import-dir-watch", script: "s32-import-dir-watch.mjs", needsCorpus: false, what: "directory and drag import, one limit source, opt-in folder watching that waits for the file to settle" },
   { name: "s32b-import-mount", script: "s32b-import-mount.mjs", needsCorpus: false, what: "the mounted panel really renders a folder picker, accepts a drop, walks dropped folders, and reports leftovers" },
+  { name: "s33-translate", script: "s33-translate.mjs", needsCorpus: false, what: "anchored segmentation, anchored write-back, side-by-side alignment, search isolation, OCR caveat" },
 ];
 
 function corpusLooksUsable(dir) {

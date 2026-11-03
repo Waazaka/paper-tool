@@ -180,6 +180,32 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         evidenceUnanchored: "仅记录页码",
         evidenceUnanchoredHint: "这段引文没能在该页文本中定位，跳转只到页码。",
         quoteTooLong: "选中的文字超过 {limit} 字，请缩短后再存。",
+        translateTab: "对照",
+        translateIntro: "插件不翻译：它把原文切段并带上页码锚点，由对话里的 Agent 翻译，再把译文按锚点写回。",
+        translatePaper: "选择论文",
+        translatePickPaper: "选择一篇论文",
+        translateFrom: "从第",
+        translateTo: "到第",
+        translateInto: "译为",
+        loadSegments: "取分段",
+        loadingSegments: "取分段中…",
+        saveTranslation: "保存译文",
+        saving: "保存中…",
+        segmentCount: "段",
+        translatedCount: "已译",
+        untranslatedCount: "未译",
+        translatedCountShort: "已译",
+        translationSaved: "段译文已保存",
+        translationRejected: "段被拒绝",
+        noTranslationEntered: "没有填写任何译文",
+        translateEmpty: "先选一篇论文并点「取分段」",
+        translateSourceCol: "原文（带锚点）",
+        translateTargetCol: "译文",
+        translateSegmentAria: "第 {page} 页 {start} 处的译文",
+        alignedAll: "全部对齐",
+        alignedPartly: "还有 {n} 段未译",
+        translateOcrNote: "{n} 页原文来自 OCR，译文会继承识别错误",
+        translateOcrCaveat: "原文来自 OCR，译文可能继承识别错误",
         importFolder: "选目录",
         noPdfFound: "没有找到 PDF 文件",
         dropToImport: "松开即入库",
@@ -417,6 +443,32 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         evidenceUnanchored: "page only",
         evidenceUnanchoredHint: "This quote could not be located in the page text, so jumps land on the page.",
         quoteTooLong: "Selection exceeds {limit} characters. Shorten it before saving.",
+        translateTab: "Translation",
+        translateIntro: "The plugin does not translate: it cuts the page into anchored segments, the Agent translates them in conversation, and the result is written back by anchor.",
+        translatePaper: "Paper",
+        translatePickPaper: "Pick a paper",
+        translateFrom: "From",
+        translateTo: "To",
+        translateInto: "Into",
+        loadSegments: "Load segments",
+        loadingSegments: "Loading…",
+        saveTranslation: "Save translation",
+        saving: "Saving…",
+        segmentCount: "segments",
+        translatedCount: "translated",
+        untranslatedCount: "untranslated",
+        translatedCountShort: "translated",
+        translationSaved: "segment(s) saved",
+        translationRejected: "rejected",
+        noTranslationEntered: "No translation entered",
+        translateEmpty: "Pick a paper and load its segments first",
+        translateSourceCol: "Original (anchored)",
+        translateTargetCol: "Translation",
+        translateSegmentAria: "Translation for page {page} at {start}",
+        alignedAll: "Fully aligned",
+        alignedPartly: "{n} segment(s) untranslated",
+        translateOcrNote: "{n} page(s) were OCR'd; the translation inherits recognition errors",
+        translateOcrCaveat: "Original is OCR text; the translation may inherit recognition errors",
         importFolder: "Folder",
         noPdfFound: "No PDF files found",
         dropToImport: "Drop to import",
@@ -539,6 +591,8 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
       // watchStart takes an { dir } input object. watchStatus/watchStop take
       // nothing, so listing them would wrap an empty object for no reason.
       "watchStart",
+      // Translation RPCs all take an input object.
+      "translateSegments", "saveTranslation", "listTranslations", "deleteTranslation",
     ]);
 
     /** Typed transport failure. `code` drives the recovery the UI offers. */
@@ -618,6 +672,22 @@ function describeError(error, t) {
      */
     const CSS = `
       .pt-root { position: relative; }
+      .pt-table-wrap { overflow-x: auto; }
+      .pt-tr-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+      .pt-tr-table th, .pt-tr-table td {
+        text-align: left; vertical-align: top; padding: 6px 8px;
+        border-top: 1px solid var(--dsw-alias-border-l1);
+        word-break: break-word;
+      }
+      .pt-tr-table th { font-weight: 600; font-size: 12px; color: var(--dsw-alias-label-secondary); }
+      .pt-tr-meta { font-size: 11px; color: var(--dsw-alias-label-tertiary); margin-bottom: 2px; }
+      .pt-tr-caveat { font-size: 11px; margin-top: 4px; color: var(--dsw-alias-state-warn-primary); }
+      .pt-tr-input {
+        box-sizing: border-box; width: 100%; min-height: 62px; resize: vertical;
+        font: inherit; font-size: 12px; padding: 4px 6px;
+        background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary);
+        border: 1px solid var(--dsw-alias-border-l1); border-radius: 4px;
+      }
       .pt-drop-veil {
         position: absolute; inset: 0; z-index: 30;
         display: flex; align-items: center; justify-content: center;
@@ -2024,6 +2094,16 @@ function describeError(error, t) {
       // Watch folder state. Default {watching:false} because the Host defaults to
       // off; the UI reflects the Host rather than holding its own opinion.
       const [watchState, setWatchState] = useState(null);
+      // Translation is an RPC path, not a tool (D-014): the plugin cuts the page
+      // into segments and stores what comes back; the Agent writes the text.
+      const [translatePaperId, setTranslatePaperId] = useState("");
+      const [translateFrom, setTranslateFrom] = useState(0);
+      const [translateTo, setTranslateTo] = useState(0);
+      const [translateTarget, setTranslateTarget] = useState("zh");
+      const [translateResult, setTranslateResult] = useState(null);
+      const [translateDraft, setTranslateDraft] = useState({});
+      const [translationRows, setTranslationRows] = useState([]);
+      const [translateBusy, setTranslateBusy] = useState(null);
 
       const openReader = useCallback((target) => {
         setReader(target);
@@ -2655,6 +2735,80 @@ function describeError(error, t) {
           setError(describeError(watchError, t));
         }
       }, [sessionId, t, watchState]);
+
+      const loadSegments = useCallback(async () => {
+        if (!sessionId || translatePaperId === "") return;
+        setTranslateBusy("segments");
+        setError(null);
+        try {
+          const result = await callRemote(sessionId, "translateSegments", {
+            paperId: translatePaperId,
+            fromPage: translateFrom,
+            toPage: translateTo,
+            targetLang: translateTarget,
+          });
+          setTranslateResult(result);
+          const stored = await callRemote(sessionId, "listTranslations", {
+            paperId: translatePaperId, targetLang: translateTarget,
+          });
+          setTranslationRows(stored.translations ?? []);
+          // Seed the editor with what is already stored, so re-opening a translated
+          // page shows the existing text instead of looking untranslated.
+          const seed = {};
+          for (const row of stored.translations ?? []) seed[`${row.pageIndex}:${row.charStart}:${row.charEnd}`] = row.text;
+          setTranslateDraft(seed);
+          setNote(`${result.segments.length} ${t("segmentCount")}`);
+        } catch (loadError) {
+          setError(describeError(loadError, t));
+        } finally {
+          setTranslateBusy(null);
+        }
+      }, [sessionId, translatePaperId, translateFrom, translateTo, translateTarget, t]);
+
+      const saveTranslations = useCallback(async () => {
+        if (!sessionId || translatePaperId === "" || translateResult === null) return;
+        setTranslateBusy("save");
+        setError(null);
+        try {
+          const items = [];
+          for (const segment of translateResult.segments) {
+            const key = `${segment.pageIndex}:${segment.charStart}:${segment.charEnd}`;
+            const text = (translateDraft[key] ?? "").trim();
+            if (text === "") continue;
+            items.push({
+              pageIndex: segment.pageIndex,
+              charStart: segment.charStart,
+              charEnd: segment.charEnd,
+              text,
+            });
+          }
+          if (items.length === 0) {
+            setError(t("noTranslationEntered"));
+            return;
+          }
+          const saved = await callRemote(sessionId, "saveTranslation", {
+            paperId: translatePaperId,
+            targetLang: translateTarget,
+            items,
+          });
+          const stored = await callRemote(sessionId, "listTranslations", {
+            paperId: translatePaperId, targetLang: translateTarget,
+          });
+          setTranslationRows(stored.translations ?? []);
+          await refresh();
+          // Report rejections instead of only the success count: an item the Host
+          // refused has silently disappeared otherwise.
+          setNote(`${saved.saved} ${t("translationSaved")}`
+            + (saved.rejected.length > 0 ? ` · ${saved.rejected.length} ${t("translationRejected")}` : ""));
+          setError(saved.rejected.length > 0
+            ? saved.rejected.map((row) => row.reason).join("; ")
+            : null);
+        } catch (saveError) {
+          setError(describeError(saveError, t));
+        } finally {
+          setTranslateBusy(null);
+        }
+      }, [sessionId, translatePaperId, translateTarget, translateResult, translateDraft, refresh, t]);
 
       const saveMetadata = useCallback(async (form) => {
         if (!sessionId || !editing) return;
@@ -3587,6 +3741,127 @@ function describeError(error, t) {
       );
       };
 
+      // --- translation view ------------------------------------------------
+      // Two columns, paired by anchor rather than by position. Pairing by position
+      // would look correct until one paragraph is skipped and then silently shift
+      // every translation below it onto the wrong original.
+      const segmentKey = (row) => `${row.pageIndex}:${row.charStart}:${row.charEnd}`;
+      const renderTranslate = () => {
+        const paperChoices = papers.map((paper) => h("option", { key: paper.paperId, value: paper.paperId },
+          paper.title || paper.paperId));
+        const segments = translateResult?.segments ?? [];
+        const stored = new Map(translationRows.map((row) => [segmentKey(row), row]));
+        const ocrPages = new Set(translateResult?.ocrPages ?? []);
+
+        const rows = segments.map((segment) => {
+          const key = segmentKey(segment);
+          const saved = stored.get(key);
+          const draftValue = translateDraft[key] ?? saved?.text ?? "";
+          return h("tr", { key },
+            h("td", { className: "pt-tr-src" },
+              h("div", { className: "pt-tr-meta" }, `p${segment.pageIndex + 1} · ${segment.charStart}-${segment.charEnd}`),
+              h("div", null, segment.text),
+              // OCR provenance is shown per segment, next to the original it applies
+              // to. A translation of recognized text inherits the recognition errors,
+              // and the reader has to be able to see that while reading the
+              // translation rather than being told once at the top.
+              ocrPages.has(segment.pageIndex)
+                ? h("div", { className: "pt-tr-caveat" }, t("translateOcrCaveat"))
+                : null,
+            ),
+            h("td", { className: "pt-tr-dst" },
+              h("textarea", {
+                className: "pt-tr-input",
+                value: draftValue,
+                "aria-label": t("translateSegmentAria", { page: segment.pageIndex + 1, start: segment.charStart }),
+                onChange: (event) => setTranslateDraft((current) => ({ ...current, [key]: event.target.value })),
+              }),
+            ),
+          );
+        });
+
+        const untranslated = translateResult === null
+          ? 0
+          : segments.filter((segment) => !stored.has(segmentKey(segment))).length;
+
+        return h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 10 } },
+          h("p", { className: "pt-caption", style: { margin: 0 } }, t("translateIntro")),
+          h("div", { className: "pt-toolbar" },
+            h("select", {
+              className: "pt-select pt-toolbar-grow",
+              value: translatePaperId,
+              "aria-label": t("translatePaper"),
+              onChange: (event) => { setTranslatePaperId(event.target.value); setTranslateResult(null); setTranslationRows([]); setTranslateDraft({}); },
+            },
+              h("option", { value: "" }, t("translatePickPaper")),
+              paperChoices,
+            ),
+          ),
+          h("div", { className: "pt-toolbar" },
+            h("label", { style: { display: "flex", gap: 4, alignItems: "center" } },
+              h("span", { className: "pt-caption" }, t("translateFrom")),
+              h("input", {
+                className: "pt-input pt-num", type: "number", min: 1, value: translateFrom + 1,
+                style: { width: 64 }, "aria-label": t("translateFrom"),
+                onChange: (event) => setTranslateFrom(Math.max(0, Number(event.target.value) - 1)),
+              }),
+            ),
+            h("label", { style: { display: "flex", gap: 4, alignItems: "center" } },
+              h("span", { className: "pt-caption" }, t("translateTo")),
+              h("input", {
+                className: "pt-input pt-num", type: "number", min: 1, value: translateTo + 1,
+                style: { width: 64 }, "aria-label": t("translateTo"),
+                onChange: (event) => setTranslateTo(Math.max(0, Number(event.target.value) - 1)),
+              }),
+            ),
+            h("label", { style: { display: "flex", gap: 4, alignItems: "center" } },
+              h("span", { className: "pt-caption" }, t("translateInto")),
+              h("select", {
+                className: "pt-select", style: { width: "auto" }, value: translateTarget,
+                "aria-label": t("translateInto"),
+                onChange: (event) => setTranslateTarget(event.target.value),
+              },
+                h("option", { value: "zh" }, "中文"),
+                h("option", { value: "en" }, "English"),
+              ),
+            ),
+            h("div", { className: "pt-spacer" }),
+            h(Button, { onClick: loadSegments, disabled: translateBusy !== null || translatePaperId === "" },
+              translateBusy === "segments" ? t("loadingSegments") : t("loadSegments")),
+            h(Button, {
+              variant: "primary", onClick: saveTranslations,
+              disabled: translateBusy !== null || segments.length === 0,
+            }, translateBusy === "save" ? t("saving") : t("saveTranslation")),
+          ),
+          translateResult === null
+            ? h(Empty, { title: t("translateEmpty") })
+            : h("div", null,
+              h("div", { className: "pt-toolbar" },
+                h("span", { className: "pt-caption pt-num" },
+                  `${segments.length} ${t("segmentCount")} · ${stored.size} ${t("translatedCount")} · ${untranslated} ${t("untranslatedCount")}`),
+                h("div", { className: "pt-spacer" }),
+                h(Badge, { tone: untranslated === 0 ? "support" : undefined },
+                  untranslated === 0 ? t("alignedAll") : t("alignedPartly", { n: untranslated })),
+              ),
+              ocrPages.size > 0
+                ? h("p", { className: "pt-caption", style: { margin: "0 0 6px" } },
+                  t("translateOcrNote", { n: ocrPages.size }))
+                : null,
+              h("div", { className: "pt-table-wrap" },
+                h("table", { className: "pt-tr-table" },
+                  h("thead", null,
+                    h("tr", null,
+                      h("th", null, t("translateSourceCol")),
+                      h("th", null, t("translateTargetCol")),
+                    ),
+                  ),
+                  h("tbody", null, rows),
+                ),
+              ),
+            ),
+        );
+      };
+
       const renderReview = () => h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 10 } },
         h("div", { className: "pt-toolbar" },
           h("span", { className: "pt-h2" }, t("outline")),
@@ -3675,6 +3950,7 @@ function describeError(error, t) {
       const tabs = [
         ["library", t("library"), counts.library],
         ["evidence", t("evidenceTab"), counts.evidence],
+        ["translate", t("translateTab"), translationRows.length > 0 ? translationRows.length : null],
         ["review", t("reviewTab"), null],
       ];
       return h("div", {
@@ -3745,7 +4021,7 @@ function describeError(error, t) {
           // Keyed by view so a crash in one tab does not leave the other tabs
           // showing a stale error, and so switching tabs clears the failure.
           h(ViewBoundary, { key: view, t },
-            view === "library" ? renderLibrary() : view === "evidence" ? renderEvidence() : renderReview()),
+            view === "library" ? renderLibrary() : view === "evidence" ? renderEvidence() : view === "translate" ? renderTranslate() : renderReview()),
         ),
       );
     }
