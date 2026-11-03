@@ -94,6 +94,7 @@ const GATES = [
   { name: "s26-cancel-ui", script: "s26-cancel-ui.mjs", needsCorpus: false, what: "cancel button wired, busy stage shown, abort not shown as error" },
   { name: "s27-inline-ask", script: "s27-inline-ask.mjs", needsCorpus: false, what: "anchored question packet, answer write-back, no model channel" },
   { name: "s28-manual-ocr", script: "s28-manual-ocr.mjs", needsCorpus: false, what: "manual OCR re-run, configurable page cap, anchor repair" },
+  { name: "s29-external-sources", script: "s29-external-sources.mjs", needsCorpus: false, what: "five external sources, citations carried through, source-order-independent merge" },
 ];
 
 function corpusLooksUsable(dir) {

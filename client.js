@@ -141,6 +141,11 @@ window.__ModuleLoader__.load({
   reocrHint: "这篇还没有可搜索的文本。重新识别会把扫描页转成可搜索文本。",
   reocrDone: "已识别 {pages} 页（{failed} 页失败）· 证据重新锚定 {moved} 条，失效 {lost} 条",
   reocrSkipped: "未执行：{reason}",
+  citationCount: "{n} 次引用",
+  sortBy: "排序方式",
+  sortRelevance: "相关度",
+  sortCitations: "被引最多",
+  sortYear: "最新",
         askDefault: "请解释这段内容，并说明它与论文主题的关系。",
         delete: "删除",
         confirmDelete: "确认删除？",
@@ -353,6 +358,11 @@ window.__ModuleLoader__.load({
   reocrHint: "This paper has no searchable text yet. Re-running recognition turns the scanned pages into searchable text.",
   reocrDone: "Recognised {pages} page(s) ({failed} failed) · {moved} evidence row(s) re-anchored, {lost} no longer locatable",
   reocrSkipped: "Not run: {reason}",
+  citationCount: "{n} citations",
+  sortBy: "Sort by",
+  sortRelevance: "Relevance",
+  sortCitations: "Most cited",
+  sortYear: "Newest",
         askDefault: "Explain this passage and its role in the paper.",
         delete: "Delete",
         confirmDelete: "Delete this paper?",
@@ -1862,6 +1872,9 @@ function describeError(error, t) {
       ensureCss();
       const [view, setView] = useState("library");
       const [mode, setMode] = useState("library");
+      // How external results are ordered. Kept as state rather than read from the last
+      // response so the control still reflects the user's choice while a search runs.
+      const [sortMode, setSortMode] = useState("relevance");
       const [query, setQuery] = useState("");
       const [papers, setPapers] = useState([]);
       const [hits, setHits] = useState(null);
@@ -2050,7 +2063,7 @@ function describeError(error, t) {
             // External search hits the network across several sources, so it is the
             // search most likely to hang long enough for the user to give up.
             const result = await runCancellable(t("busyStageSearch"), (signal) =>
-              callRemote(sessionId, "searchExternal", { query, limit: 10 }, signal),
+              callRemote(sessionId, "searchExternal", { query, limit: 10, sort: sortMode }, signal),
             );
             setCandidates(result.candidates ?? []);
             setFailures(result.failures ?? []);
@@ -2098,7 +2111,7 @@ function describeError(error, t) {
         } finally {
           setBusy(null);
         }
-      }, [sessionId, query, mode, t, runCancellable]);
+      }, [sessionId, query, mode, sortMode, t, runCancellable]);
 
       const addPicked = useCallback(async () => {
         if (!sessionId || !candidates) return;
@@ -2688,6 +2701,21 @@ function describeError(error, t) {
               variant: mode === "cnki" ? "primary" : "ghost",
               onClick: () => { setMode("cnki"); setHits(null); },
             }, t("cnki")),
+            // The sort control only appears for external search: the local library and
+            // CNKI have one ranking each, so offering the choice there would be a control
+            // that changes nothing.
+            mode === "external"
+              ? h("select", {
+                className: "pt-input",
+                value: sortMode,
+                "aria-label": t("sortBy"),
+                onChange: (event) => setSortMode(event.target.value),
+              },
+                h("option", { value: "relevance" }, t("sortRelevance")),
+                h("option", { value: "citations" }, t("sortCitations")),
+                h("option", { value: "year" }, t("sortYear")),
+              )
+              : null,
             h("div", { className: "pt-spacer" }),
             h(Button, { onClick: () => fileInputRef.current?.click(), disabled: busy !== null },
               busy === "import" ? t("importing") : t("import")),
@@ -2893,7 +2921,20 @@ function describeError(error, t) {
                 h("span", { className: "pt-row-main" },
                   h("span", { className: "pt-h2", style: { display: "block", color: "var(--dsw-alias-label-primary)", wordBreak: "break-word" } }, candidate.title),
                   h("span", { className: "pt-meta", style: { display: "block", marginTop: 2 } },
-                    [candidate.authors, candidate.year, candidate.venue, candidate.source, candidate.doi].filter(Boolean).join(" · ")),
+                    [
+                      candidate.authors,
+                      candidate.year,
+                      candidate.venue,
+                      candidate.source,
+                      candidate.doi,
+                      // A known zero and an unknown count must read differently. arXiv and
+                      // PubMed publish no counts, so their candidates carry no number at all
+                      // — writing "0 引用" would state a fact the source never provided, and
+                      // would make a brand-new preprint look discredited.
+                      candidate.citations === undefined || candidate.citations === null
+                        ? null
+                        : t("citationCount", { n: candidate.citations }),
+                    ].filter(Boolean).join(" · ")),
                   candidate.abstract
                     ? h("span", { className: "pt-meta", style: { display: "block", marginTop: 4 } }, candidate.abstract.slice(0, 220))
                     : null,

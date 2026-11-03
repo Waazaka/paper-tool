@@ -37,7 +37,17 @@ const src = readFileSync("client.js", "utf8");
   const withSignal = (src.match(/callRemote\([^)]*,\s*signal\)/g) ?? []).length;
   check("more than one call site passes a signal to callRemote", withSignal >= 3, String(withSignal));
   check("import sends a signal", /"importPdf",\s*\{ files \},\s*signal\)/.test(src));
-  check("external search sends a signal", /"searchExternal",\s*\{ query, limit: 10 \},\s*signal\)/.test(src));
+  // Match on intent rather than an exact argument list: the external call also passes a
+  // `sort` mode, and pinning the full object would make this assertion fail every time a
+  // parameter is added — turning a real guarantee into a maintenance chore that people
+  // eventually "fix" by deleting. What must hold is: it is the searchExternal call, it
+  // carries the query and a limit, and it passes the signal as the third argument.
+  const externalCall = /"searchExternal",\s*\{[^}]*\},\s*signal\)/.exec(src);
+  check("external search sends a signal", externalCall !== null);
+  check("the external call still carries the query",
+    externalCall !== null && /query/.test(externalCall[0]));
+  check("the external call still carries a limit",
+    externalCall !== null && /limit/.test(externalCall[0]));
   check("cnki search sends a signal", /"cnkiSearch",\s*\{ query, limit: 20 \},\s*signal\)/.test(src));
 }
 
