@@ -200,6 +200,32 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         pathsRewritten: "条路径已重写",
         restoreMissingPdf: "以下论文的 PDF 未随备份恢复",
         refresh: "刷新",
+        topicsTab: "选题",
+        topicRecommend: "生成素材",
+        topicWorking: "检索中…",
+        topicPlaceholder: "领域关键词，例如 deep learning in education",
+        topicIntro: "插件不替你选题：它检索外部源、统计年度分布与标题共现，把素材摆在下面，由你在对话里判断。",
+        topicDisclaimer: "下面的数字是标题词频与共现计数，不是研究结论。创新性与可行性需你自己判断。",
+        topicSample: "有效样本",
+        topicPapers: "篇",
+        topicUndated: "篇年份缺失",
+        topicMinSample: "最低样本",
+        topicInsufficient: "样本不足",
+        topicTrend: "年度分布",
+        topicDirection: "方向",
+        topicDir_rising: "上升",
+        topicDir_falling: "下降",
+        topicDir_flat: "平稳",
+        topicGaps: "共现组合（可能的研究缺口）",
+        topicCoOccur: "共现",
+        topicIndependent: "各自独立出现",
+        topicCandidates: "条候选",
+        topicQuestion: "研究问题",
+        topicFeasibility: "可行性依据",
+        topicInnovation: "缺口依据",
+        topicRepresentatives: "高引代表",
+        topicFound: "已统计",
+        topicSourceFailures: "失败的数据源",
         translateTab: "对照",
         translateIntro: "插件不翻译：它把原文切段并带上页码锚点，由对话里的 Agent 翻译，再把译文按锚点写回。",
         translatePaper: "选择论文",
@@ -483,6 +509,32 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         pathsRewritten: "path(s) rewritten",
         restoreMissingPdf: "PDFs missing after restore",
         refresh: "Refresh",
+        topicsTab: "Topics",
+        topicRecommend: "Gather material",
+        topicWorking: "Searching…",
+        topicPlaceholder: "Field keywords, e.g. deep learning in education",
+        topicIntro: "The plugin does not pick your topic: it queries external sources, counts years and title co-occurrence, and lays the material out here for you to judge.",
+        topicDisclaimer: "The numbers below are title word counts and co-occurrence, not research conclusions. Judge novelty and feasibility yourself.",
+        topicSample: "usable sample",
+        topicPapers: "papers",
+        topicUndated: "undated",
+        topicMinSample: "minimum sample",
+        topicInsufficient: "Insufficient sample",
+        topicTrend: "Papers per year",
+        topicDirection: "direction",
+        topicDir_rising: "rising",
+        topicDir_falling: "falling",
+        topicDir_flat: "flat",
+        topicGaps: "Co-occurring pairs (possible gaps)",
+        topicCoOccur: "co-occurs",
+        topicIndependent: "independent",
+        topicCandidates: "candidates",
+        topicQuestion: "Question",
+        topicFeasibility: "Feasibility basis",
+        topicInnovation: "Gap basis",
+        topicRepresentatives: "Most cited",
+        topicFound: "Counted",
+        topicSourceFailures: "Failed sources",
         translateTab: "Translation",
         translateIntro: "The plugin does not translate: it cuts the page into anchored segments, the Agent translates them in conversation, and the result is written back by anchor.",
         translatePaper: "Paper",
@@ -636,6 +688,8 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
       // Backup RPCs: backupStatus and backupLibrary take no input, restoreLibrary
       // does, so all three go through the wrapped path.
       "backupLibrary", "restoreLibrary", "backupStatus",
+      // Topic recommendation: an RPC with no tool behind it (D-014).
+      "topicRecommend",
     ]);
 
     /** Typed transport failure. `code` drives the recovery the UI offers. */
@@ -725,7 +779,33 @@ function describeError(error, t) {
       .pt-tr-table th { font-weight: 600; font-size: 12px; color: var(--dsw-alias-label-secondary); }
       .pt-tr-meta { font-size: 11px; color: var(--dsw-alias-label-tertiary); margin-bottom: 2px; }
       .pt-tr-caveat { font-size: 11px; margin-top: 4px; color: var(--dsw-alias-state-warn-primary); }
-      .pt-tr-input {
+      .pt-tr-bar {
+    display: inline-block;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--dsw-alias-brand-primary);
+    opacity: 0.75;
+  }
+  .pt-topic-gap {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    /* No fill: the pair is set off by spacing and the left rule, and a tinted
+       block would compete with the candidate cards drawn in the same column. */
+    background: transparent;
+  }
+  .pt-topic-card {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 8px;
+    border-left: 2px solid var(--dsw-alias-brand-primary);
+    border-radius: 4px;
+    background: transparent;
+  }
+  .pt-tr-input {
         box-sizing: border-box; width: 100%; min-height: 62px; resize: vertical;
         font: inherit; font-size: 12px; padding: 4px 6px;
         background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary);
@@ -2186,6 +2266,11 @@ function describeError(error, t) {
       const [backupResult, setBackupResult] = useState(null);
       const [backupBusy, setBackupBusy] = useState(null);
       const [restoreForce, setRestoreForce] = useState(false);
+      // Topic recommendation. The result is whole-payload or null: a partial
+      // recommendation would be a chart drawn from less data than it claims.
+      const [topicQuery, setTopicQuery] = useState("");
+      const [topicResult, setTopicResult] = useState(null);
+      const [topicBusy, setTopicBusy] = useState(false);
 
       const openReader = useCallback((target) => {
         setReader(target);
@@ -2881,6 +2966,28 @@ function describeError(error, t) {
           setBackupBusy(null);
         }
       }, [sessionId, backupStatus, restoreForce, refresh, refreshBackup, t]);
+
+      const runTopicRecommend = useCallback(async () => {
+        const query = topicQuery.trim();
+        if (!sessionId || query === "") return;
+        setTopicBusy(true);
+        setError(null);
+        try {
+          const result = await callRemote(sessionId, "topicRecommend", { query });
+          setTopicResult(result);
+          // A refusal is a real answer, not a failure: say why instead of leaving
+          // the panel looking broken.
+          if (result.refusal !== null && result.refusal !== undefined) {
+            setNote(result.refusal.message);
+          } else {
+            setNote(`${t("topicFound")} · ${result.sample.dated} ${t("topicPapers")} · ${result.candidates.length} ${t("topicCandidates")}`);
+          }
+        } catch (topicError) {
+          setError(describeError(topicError, t));
+        } finally {
+          setTopicBusy(false);
+        }
+      }, [sessionId, topicQuery, t]);
 
       const loadSegments = useCallback(async () => {
         if (!sessionId || translatePaperId === "") return;
@@ -4084,6 +4191,135 @@ function describeError(error, t) {
         );
       };
 
+      const renderTopics = () => {
+        const result = topicResult;
+        const trend = result?.trend;
+        // The strongest year in the window, used only to scale the bars: a chart
+        // that does not show its own scale is a decoration.
+        const peak = trend === undefined || trend.years.length === 0
+          ? 0
+          : Math.max(...trend.years.map((row) => row.count), 1);
+        return h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 10 } },
+          h("div", { className: "pt-toolbar" },
+            h("input", {
+              className: "pt-input pt-toolbar-grow",
+              value: topicQuery,
+              placeholder: t("topicPlaceholder"),
+              "aria-label": t("topicPlaceholder"),
+              onChange: (event) => setTopicQuery(event.target.value),
+              onKeyDown: (event) => { if (event.key === "Enter") void runTopicRecommend(); },
+            }),
+            h(Button, { variant: "primary", onClick: runTopicRecommend, disabled: topicBusy || topicQuery.trim() === "" },
+              topicBusy ? t("topicWorking") : t("topicRecommend")),
+          ),
+          // The disclaimer sits above the result, not below it: this is the one
+          // screen where a user is most likely to read counted material as a
+          // literature conclusion.
+          h("p", { className: "pt-caption", style: { margin: 0 } }, t("topicDisclaimer")),
+
+          result === null
+            ? h("p", { className: "pt-caption", style: { margin: 0 } }, t("topicIntro"))
+            : h(React.Fragment, null,
+              // Provenance first: the sample size decides whether anything below is
+              // worth reading, so it cannot be buried under the results.
+              h("div", { className: "pt-toolbar" },
+                h("span", { className: "pt-caption" },
+                  `${t("topicSample")}: ${result.sample.dated} ${t("topicPapers")}`),
+                result.sample.undated > 0
+                  ? h("span", { className: "pt-caption" }, `· ${result.sample.undated} ${t("topicUndated")}`)
+                  : null,
+                h("div", { className: "pt-spacer" }),
+                result.refusal === null
+                  ? h("span", { className: "pt-caption" }, `· ${t("topicMinSample")} ${result.sample.minSample}`)
+                  : null,
+              ),
+
+              // Refusal is rendered prominently and replaces the results, rather than
+              // appearing as a footnote under an empty chart.
+              result.refusal === null
+                ? null
+                : h(Banner, { tone: "warning", title: t("topicInsufficient") }, result.refusal.message),
+
+              result.refusal === null && trend !== undefined && trend.years.length > 0
+                ? h("div", { style: { display: "flex", flexDirection: "column", gap: 2 } },
+                  h("div", { className: "pt-toolbar" },
+                    h("span", { className: "pt-h2" }, t("topicTrend")),
+                    h("div", { className: "pt-spacer" }),
+                    h("span", { className: "pt-caption" },
+                      `${trend.window.from}–${trend.window.to} · ${t("topicDirection")}: ${t(`topicDir_${trend.direction}`)}`),
+                  ),
+                  // One row per year with a bar proportional to the peak. Rendered as
+                  // text-width bars so it works at any panel width without a chart lib.
+                  ...trend.years.map((row) => h("div", { key: row.year, className: "pt-toolbar" },
+                    h("span", { className: "pt-caption pt-num", style: { width: 44 } }, String(row.year)),
+                    h("span", {
+                      className: "pt-tr-bar",
+                      style: { width: `${Math.max(2, Math.round((row.count / peak) * 100))}%` },
+                      "aria-label": `${row.year}: ${row.count}`,
+                    }),
+                    h("span", { className: "pt-caption pt-num" }, String(row.count)),
+                  )),
+                )
+                : null,
+
+              // Counts this plugin computed, stated as counts. Nothing here infers a
+              // conclusion from them.
+              result.gaps.length === 0
+                ? null
+                : h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+                  h("span", { className: "pt-h2" }, t("topicGaps")),
+                  ...result.gaps.slice(0, 6).map((gap) => h("div", { key: gap.terms.join("+"), className: "pt-topic-gap" },
+                    h("div", { className: "pt-toolbar" },
+                      h("span", { className: "pt-meta" }, gap.terms.join(" × ")),
+                      h("div", { className: "pt-spacer" }),
+                      h("span", { className: "pt-caption" },
+                        `${t("topicCoOccur")} ${gap.coOccurrences} · ${t("topicIndependent")} ${gap.independentA}/${gap.independentB}`),
+                    ),
+                    // The supporting paper ids, so the claim is checkable.
+                    h("span", { className: "pt-caption pt-num" }, gap.paperIds.slice(0, 6).join(", ")),
+                  )),
+                ),
+
+              result.candidates.length === 0
+                ? null
+                : h("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
+                  h("span", { className: "pt-h2" }, t("topicCandidates")),
+                  ...result.candidates.map((candidate, index) => h("div", { key: index, className: "pt-topic-card" },
+                    h("div", { className: "pt-meta", style: { fontWeight: 600 } }, candidate.title),
+                    h("p", { className: "pt-caption", style: { margin: "2px 0" } },
+                      `${t("topicQuestion")}: ${candidate.researchQuestion}`),
+                    h("p", { className: "pt-caption", style: { margin: 0 } },
+                      `${t("topicFeasibility")}: ${candidate.feasibility.note}`),
+                    h("p", { className: "pt-caption", style: { margin: 0 } },
+                      `${t("topicInnovation")}: ${candidate.innovation.note}`),
+                    // Provenance is shown, not hidden: every row names what produced it.
+                    h("p", { className: "pt-caption pt-num", style: { margin: 0, opacity: 0.75 } },
+                      `${candidate.provenance.kind} · ${(candidate.provenance.paperIds ?? []).length} ${t("topicPapers")}`),
+                  )),
+                ),
+
+              result.representatives.length === 0
+                ? null
+                : h("div", { style: { display: "flex", flexDirection: "column", gap: 3 } },
+                  h("span", { className: "pt-h2" }, t("topicRepresentatives")),
+                  ...result.representatives.map((paper, index) => h("div", { key: index, className: "pt-toolbar" },
+                    h("span", { className: "pt-meta" }, paper.title),
+                    h("div", { className: "pt-spacer" }),
+                    h("span", { className: "pt-caption pt-num" },
+                      paper.citations === null ? paper.year : `${paper.year} · ${paper.citations}`),
+                  )),
+                ),
+
+              // Source health last: a source that failed changes how much of the
+              // sample above is missing, and that is worth knowing.
+              result.provenance.failures.length === 0
+                ? null
+                : h("p", { className: "pt-caption", style: { margin: 0 } },
+                  `${t("topicSourceFailures")}: ${result.provenance.failures.map((row) => `${row.source} (${row.reason})`).join("; ")}`),
+            ),
+        );
+      };
+
       const renderReview = () => h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 10 } },
         h("div", { className: "pt-toolbar" },
           h("span", { className: "pt-h2" }, t("outline")),
@@ -4173,6 +4409,7 @@ function describeError(error, t) {
         ["library", t("library"), counts.library],
         ["evidence", t("evidenceTab"), counts.evidence],
         ["translate", t("translateTab"), translationRows.length > 0 ? translationRows.length : null],
+        ["topics", t("topicsTab"), topicResult === null ? null : topicResult.candidates.length],
         ["review", t("reviewTab"), null],
       ];
       return h("div", {
@@ -4243,7 +4480,7 @@ function describeError(error, t) {
           // Keyed by view so a crash in one tab does not leave the other tabs
           // showing a stale error, and so switching tabs clears the failure.
           h(ViewBoundary, { key: view, t },
-            view === "library" ? renderLibrary() : view === "evidence" ? renderEvidence() : view === "translate" ? renderTranslate() : renderReview()),
+            view === "library" ? renderLibrary() : view === "evidence" ? renderEvidence() : view === "translate" ? renderTranslate() : view === "topics" ? renderTopics() : renderReview()),
         ),
       );
     }

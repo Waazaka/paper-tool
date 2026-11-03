@@ -102,6 +102,7 @@ const GATES = [
   { name: "s32b-import-mount", script: "s32b-import-mount.mjs", needsCorpus: false, what: "the mounted panel really renders a folder picker, accepts a drop, walks dropped folders, and reports leftovers" },
   { name: "s33-translate", script: "s33-translate.mjs", needsCorpus: false, what: "anchored segmentation, anchored write-back, side-by-side alignment, search isolation, OCR caveat" },
   { name: "s34-backup", script: "s34-backup.mjs", needsCorpus: false, what: "whole-library backup as a consistent snapshot, relocatable restore, overwrite guard, table parity" },
+  { name: "s35-topics", script: "s35-topics.mjs", needsCorpus: false, what: "counted trend and co-occurrence material, sample-floor refusal, mounted topics panel" },
 ];
 
 function corpusLooksUsable(dir) {
