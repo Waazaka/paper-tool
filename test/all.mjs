@@ -103,6 +103,7 @@ const GATES = [
   { name: "s33-translate", script: "s33-translate.mjs", needsCorpus: false, what: "anchored segmentation, anchored write-back, side-by-side alignment, search isolation, OCR caveat" },
   { name: "s34-backup", script: "s34-backup.mjs", needsCorpus: false, what: "whole-library backup as a consistent snapshot, relocatable restore, overwrite guard, table parity" },
   { name: "s35-topics", script: "s35-topics.mjs", needsCorpus: false, what: "counted trend and co-occurrence material, sample-floor refusal, mounted topics panel" },
+  { name: "s36-compare", script: "s36-compare.mjs", needsCorpus: false, what: "independent panes with separate documents, close-one isolation, matrix entry, stored layout" },
 ];
 
 function corpusLooksUsable(dir) {

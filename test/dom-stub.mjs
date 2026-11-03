@@ -507,6 +507,40 @@ class Document extends Node {
  * the reader derives its scale from clientWidth and divides by it. A zero-width
  * box would make the fit-to-width path silently no-op and hide a real crash.
  */
+/**
+ * A minimal localStorage.
+ *
+ * The client keeps view state there (the compare set), and every call site guards
+ * with `typeof localStorage === "undefined"` so its absence is survivable. That guard
+ * also means a test of the persistence path cannot run without it — so the stub
+ * provides one. Values are strings, keys are strings, and a missing key returns null
+ * rather than undefined, which is what the real API does and what callers branch on.
+ */
+class StorageArea {
+  constructor() {
+    this._data = new Map();
+  }
+  get length() {
+    return this._data.size;
+  }
+  key(index) {
+    return [...this._data.keys()][index] ?? null;
+  }
+  getItem(name) {
+    const key = String(name);
+    return this._data.has(key) ? this._data.get(key) : null;
+  }
+  setItem(name, value) {
+    this._data.set(String(name), String(value));
+  }
+  removeItem(name) {
+    this._data.delete(String(name));
+  }
+  clear() {
+    this._data.clear();
+  }
+}
+
 export function installDom({ width = 360, height = 640 } = {}) {
   const document = new Document();
   const window = {
@@ -543,9 +577,12 @@ export function installDom({ width = 360, height = 640 } = {}) {
     clearTimeout: globalThis.clearTimeout,
     queueMicrotask: globalThis.queueMicrotask,
     console: globalThis.console,
+    localStorage: new StorageArea(),
   };
   window.window = window;
   window.self = window;
+  // The bundle reads the bare global, not window.localStorage.
+  globalThis.localStorage = window.localStorage;
   window.globalThis = window;
   window.HTMLElement = Element;
   window.Element = Element;

@@ -200,6 +200,18 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         pathsRewritten: "条路径已重写",
         restoreMissingPdf: "以下论文的 PDF 未随备份恢复",
         refresh: "刷新",
+        compareAdd: "加入比较",
+        compareHint: "与已打开的论文并排阅读（最多 3 篇）",
+        compareSet: "比较",
+        compareClear: "全部关闭",
+        compareClose: "关闭这一篇",
+        compareFocused: "当前",
+        compareFromMatrix: "与当前论文并排",
+        compareJump: "跳到各篇对应处",
+        compareJumpHint: "把其他面板移到同一论断的对应证据",
+        compareJumped: "已在 {count} 个面板中定位到对应证据",
+        compareNoMatch: "这篇的同一论断在已加载证据里没找到对应段落，面板未移动。",
+        compareRestored: "已恢复上次的比较组合",
         topicsTab: "选题",
         topicRecommend: "生成素材",
         topicWorking: "检索中…",
@@ -509,6 +521,18 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         pathsRewritten: "path(s) rewritten",
         restoreMissingPdf: "PDFs missing after restore",
         refresh: "Refresh",
+        compareAdd: "Compare",
+        compareHint: "Read beside an already-open paper (up to 3)",
+        compareSet: "Comparing",
+        compareClear: "Close all",
+        compareClose: "Close this one",
+        compareFocused: "focused",
+        compareFromMatrix: "Side by side with current",
+        compareJump: "Jump panes to match",
+        compareJumpHint: "Move the other panes to this claim's matching evidence",
+        compareJumped: "Located matching evidence in {count} pane(s)",
+        compareNoMatch: "No stored evidence for this claim in the loaded rows; panes were not moved.",
+        compareRestored: "Restored the previous comparison",
         topicsTab: "Topics",
         topicRecommend: "Gather material",
         topicWorking: "Searching…",
@@ -779,7 +803,55 @@ function describeError(error, t) {
       .pt-tr-table th { font-weight: 600; font-size: 12px; color: var(--dsw-alias-label-secondary); }
       .pt-tr-meta { font-size: 11px; color: var(--dsw-alias-label-tertiary); margin-bottom: 2px; }
       .pt-tr-caveat { font-size: 11px; margin-top: 4px; color: var(--dsw-alias-state-warn-primary); }
-      .pt-tr-bar {
+      /* Compare panes: stacked, and each pane is its own container so the height
+     adaptation follows the pane rather than the window. min-height: 0 on every
+     level is what actually prevents the overflow — a flex child defaults to
+     min-height:auto and refuses to shrink below its content. */
+  .pt-pane-stack {
+    container-type: size;
+    container-name: ptpanes;
+    overflow: hidden;
+  }
+  .pt-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 0;
+    flex: 1 1 0;
+    overflow: hidden;
+    border-radius: 6px;
+    border: 1px solid transparent;
+  }
+  /* Focus is shown by a rule on the left edge, not a fill: a tinted block would
+     compete with the page itself. */
+  .pt-pane-focus {
+    border-color: var(--dsw-alias-label-tertiary);
+  }
+  .pt-pane-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .pt-pane-title {
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    color: var(--dsw-alias-label-primary);
+  }
+  /* Narrow or short panes hide the secondary chrome so the page keeps the space.
+     scrollWidth <= clientWidth is asserted by the gate at 320-420 px. */
+  @container ptpanes (max-height: 260px) {
+    .pt-pane-head { display: none; }
+  }
+  @container ptpanes (max-width: 300px) {
+    .pt-pane-title { font-size: 10px; }
+  }
+  .pt-tr-bar {
     display: inline-block;
     height: 8px;
     border-radius: 2px;
@@ -1505,7 +1577,7 @@ function describeError(error, t) {
 
     // --- library ----------------------------------------------------------
 
-    function PaperCard({ paper, t, onOpen, onEdit, onReextract, onEnrich, onReocr, onDelete, busy }) {
+    function PaperCard({ paper, t, onOpen, onCompare, onEdit, onReextract, onEnrich, onReocr, onDelete, busy }) {
       // Three states, three different claims. Folding OCR into "full text"
       // would present guessed characters as if they were the PDF's own text,
       // and folding it into "metadata only" would deny that the paper is
@@ -1590,6 +1662,22 @@ function describeError(error, t) {
               paper,
             }),
           }, t("open")),
+          // Compare needs a PDF for the same reason reading does: the panes render
+          // pages, and a metadata-only entry would open an empty pane.
+          hasPdf
+            ? h(Button, {
+              variant: "ghost",
+              disabled: busy !== null,
+              title: t("compareHint"),
+              onClick: () => onCompare({
+                paperId: paper.paperId,
+                title: paper.title,
+                pageIndex: Number.isInteger(paper.pageIndex) ? paper.pageIndex : 0,
+                quote: null,
+                paper,
+              }),
+            }, t("compareAdd"))
+            : null,
           h(Button, { onClick: () => onEdit(paper), disabled: busy !== null }, t("editMeta")),
           // Only for a paper with no usable text. On a `fulltext` paper OCR would replace
           // correct text with guesses (the Host refuses it too); on an `ocr` paper there is
@@ -1763,7 +1851,86 @@ function describeError(error, t) {
       return `${root.replace(/[\\/]+$/, "")}${separator}${name}`;
     }
 
-    function PdfReader({ sessionId, paper, initialPage, highlight, annotations, t, onSelectionChange, onClose }) {
+    /**
+     * Where the compare set is remembered between panel mounts.
+     *
+     * The panel is remounted whenever the sidebar closes, so React state alone cannot
+     * restore "the four papers I was comparing". A store table would be the other
+     * option, but this is view state, not library data: it belongs to the window, and
+     * putting it in the SQLite file would make a throwaway layout survive a backup and
+     * a restore into another machine, which is wrong.
+     */
+    const COMPARE_STORAGE_KEY = "paper-tool.compare";
+
+    /** Read the stored compare set, or an empty list if there is none or it is junk. */
+    function readStoredCompare() {
+      try {
+        if (typeof localStorage === "undefined") return [];
+        const raw = localStorage.getItem(COMPARE_STORAGE_KEY);
+        if (typeof raw !== "string" || raw === "") return [];
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        // Only the fields needed to re-open a pane. A stored row from an older version
+        // with extra fields must not break the reader.
+        return parsed
+          .filter((row) => typeof row?.paperId === "string" && row.paperId !== "")
+          .slice(0, 3)
+          .map((row) => ({
+            paperId: row.paperId,
+            title: typeof row.title === "string" ? row.title : row.paperId,
+            pageIndex: Number.isInteger(row.pageIndex) ? row.pageIndex : 0,
+            quote: null,
+          }));
+      } catch {
+        // A corrupt entry is not an error worth a banner: the user loses a layout they
+        // can rebuild in one click. Silently starting empty is the correct response.
+        return [];
+      }
+    }
+
+    /** Write the compare set, ignoring quota or absence failures. */
+    function writeStoredCompare(rows) {
+      try {
+        if (typeof localStorage === "undefined") return;
+        if (rows.length === 0) localStorage.removeItem(COMPARE_STORAGE_KEY);
+        else localStorage.setItem(COMPARE_STORAGE_KEY, JSON.stringify(rows.map((row) => ({
+          paperId: row.paperId, title: row.title, pageIndex: row.pageIndex,
+        }))));
+      } catch { /* layout state is not worth failing a render over */ }
+    }
+
+    /**
+     * Decide which panes a cross-paper jump would move, and where to.
+     *
+     * Extracted because the interesting part is the decision — "only panes that have a
+     * stored row for this exact quote move"— and burying it inside a setState updater
+     * leaves it testable only by driving a real text selection through a real PDF. The
+     * panel and the gate now run the same function.
+     *
+     * @param {Array<{paperId: string, pageIndex: number}>} panes
+     * @param {Array<{paperId: string, quote: string, pageIndex: number}>} rows
+     * @param {string} quote
+     * @returns {{moved: number, panes: Array<object>}} the new pane list and how many moved
+     */
+    function matchComparison(panes, rows, quote) {
+      const needle = String(quote ?? "");
+      const matching = needle === "" ? [] : rows.filter((row) => row.quote === needle);
+      if (matching.length === 0) return { moved: 0, panes };
+      const byPaper = new Map();
+      for (const row of matching) {
+        if (byPaper.has(row.paperId) === false) byPaper.set(row.paperId, row);
+      }
+      let moved = 0;
+      const next = panes.map((pane) => {
+        const hit = byPaper.get(pane.paperId);
+        if (hit === undefined) return pane;
+        moved += 1;
+        return { ...pane, pageIndex: hit.pageIndex, quote: hit.quote, jumpToken: Date.now() };
+      });
+      return { moved, panes: next };
+    }
+
+    function PdfReader({ sessionId, paper, initialPage, highlight, jumpToken, annotations, t, onSelectionChange, onClose }) {
       const canvasRef = useRef(null);
       const textLayerRef = useRef(null);
       const pageWrapRef = useRef(null);
@@ -1801,6 +1968,14 @@ function describeError(error, t) {
       useEffect(() => {
         setPageNumber(Math.max(1, (initialPage ?? 0) + 1));
       }, [initialPage, paper.paperId]);
+
+      // A repeat jump to the page already shown would otherwise be a no-op: the page
+      // number does not change, so nothing re-renders and the highlight the user just
+      // asked for never appears. `jumpToken` is a fresh identity per jump.
+      useEffect(() => {
+        if (jumpToken === undefined) return;
+        setPageNumber(Math.max(1, (initialPage ?? 0) + 1));
+      }, [jumpToken]);
 
       useEffect(() => {
         let cancelled = false;
@@ -2188,6 +2363,16 @@ function describeError(error, t) {
       const [failures, setFailures] = useState([]);
       const [cnki, setCnki] = useState(null);
       const [reader, setReader] = useState(null);
+      // Compare set. The single-reader model above is kept as-is: the ordinary case
+      // is reading one paper, and rebuilding that path to be a list would put the
+      // lifecycle guarantees in s12/s14/s15 at risk for a feature used occasionally.
+      // When a set exists the panes render instead, each an independent <PdfReader>
+      // with its own document, page and zoom — which is what gives the "closing one
+      // does not disturb the other" property for free rather than by bookkeeping.
+      const [comparePapers, setComparePapers] = useState(() => readStoredCompare());
+      // Which pane the toolbar and evidence actions apply to. Without a focus concept
+      // "select text" would be ambiguous across panes.
+      const [compareFocus, setCompareFocus] = useState(null);
       const [editing, setEditing] = useState(null);
       const [selection, setSelection] = useState(null);
       const [question, setQuestion] = useState("");
@@ -2276,6 +2461,58 @@ function describeError(error, t) {
         setReader(target);
         setSelection(null);
         setView("library");
+      }, []);
+
+      /**
+       * Add a paper to the compare set, or focus it if already there.
+       *
+       * Capped at three: each pane holds a live PDF document and its worker, and the
+       * criterion is memory staying bounded. Three is what fits in a 320-420 px
+       * column as stacked panes with a usable height each.
+       */
+      const addToCompare = useCallback((target) => {
+        if (target === null || target === undefined) return;
+        setComparePapers((current) => {
+          if (current.some((row) => row.paperId === target.paperId)) return current;
+          if (current.length >= 3) return current;
+          return [...current, target];
+        });
+        setCompareFocus(target.paperId);
+        setReader(null);
+        setSelection(null);
+        setView("library");
+      }, []);
+
+      const removeFromCompare = useCallback((paperId) => {
+        // Both updates are computed from the same snapshot, outside each other's
+        // updater. Calling setCompareFocus INSIDE the setComparePapers updater made the
+        // focus update depend on when React chose to run that updater (and on how many
+        // times it ran), which is exactly the kind of ordering that turns into a focus
+        // pointing at a pane that is no longer on screen.
+        setComparePapers((current) => {
+          const remaining = current.filter((row) => row.paperId !== paperId);
+          setCompareFocus((focus) => {
+            if (focus !== paperId) return focus;
+            const survivor = remaining[0]?.paperId ?? null;
+            return survivor;
+          });
+          return remaining;
+        });
+        setSelection(null);
+      }, []);
+
+      // Persist on every change rather than on unmount: the sidebar can be closed
+      // without an unmount callback firing reliably (the Host tears the column down),
+      // and losing the layout on close is exactly the case this is for.
+      useEffect(() => {
+        writeStoredCompare(comparePapers);
+      }, [comparePapers]);
+
+      const clearCompare = useCallback(() => {
+        setComparePapers([]);
+        setCompareFocus(null);
+        setReader(null);
+        setSelection(null);
       }, []);
 
       /**
@@ -3400,6 +3637,29 @@ function describeError(error, t) {
       const allTotal = evidencePaging.allTotal;
       const excludedCount = allTotal - anchoredTotal;
 
+      /**
+       * Jump the OTHER panes to the same claim's evidence.
+       *
+       * The matrix already knows which evidence supports a claim in each paper. This
+       * turns that into a reading action: with a selection made in pane A, each other
+       * pane moves to its own matching passage. Without it, comparing means scrolling
+       * each pane by hand and remembering the previous sentence — which is the whole
+       * complaint PT-020 started from.
+       */
+      const jumpCompareToMatching = useCallback(() => {
+        if (selection === null || comparePapers.length === 0) return;
+        // Which rows in the loaded evidence share this claim's paper? Without a stored
+        // claim there is nothing to match on, and guessing would jump to an unrelated
+        // passage — so the honest answer is to say so rather than move the panes.
+        const result = matchComparison(comparePapers, evidence, selection.text);
+        if (result.moved === 0) {
+          setNote(t("compareNoMatch"));
+          return;
+        }
+        setComparePapers(result.panes);
+        setNote(t("compareJumped", { count: String(result.moved) }));
+      }, [selection, comparePapers, evidence, t]);
+
       const readerHighlight = useMemo(
         () => (reader?.quote ? { quote: reader.quote, pageIndex: reader.pageIndex } : null),
         [reader?.quote, reader?.pageIndex],
@@ -3698,7 +3958,68 @@ function describeError(error, t) {
           editing ? h(MetadataEditor, { paper: editing, t, onSave: saveMetadata, onCancel: () => setEditing(null), busy }) : null,
         ),
 
-        reader ? h("div", { style: { padding: "8px 12px 0", flex: "1 1 auto", minHeight: 0, display: "flex" } },
+        // --- compare panes -------------------------------------------------
+        // Stacked, not side by side. The sidebar is 320-420 px wide; two columns would
+        // give each page ~150 px, which is not a readable page but a thumbnail. A
+        // vertical split keeps the full width and buys height instead, and this is the
+        // documented tradeoff for PT-020 rather than an oversight.
+        comparePapers.length > 0 ? h("div", {
+          // The container query hook: each pane adapts to the PANE height, not the
+          // window, which is what makes three stacked panes still usable.
+          className: "pt-pane-stack",
+          "data-paper-tool": "compare",
+          style: { padding: "8px 12px 0", flex: "1 1 auto", minHeight: 0, display: "flex", flexDirection: "column", gap: 8 },
+        },
+          h("div", { className: "pt-toolbar" },
+            h("span", { className: "pt-caption" }, `${t("compareSet")} · ${comparePapers.length}/3`),
+            h("div", { className: "pt-spacer" }),
+            h(Button, { variant: "ghost", onClick: clearCompare }, t("compareClear")),
+          ),
+          ...comparePapers.map((paper) => h("div", {
+            key: paper.paperId,
+            className: `pt-pane${compareFocus === paper.paperId ? " pt-pane-focus" : ""}`,
+            "data-compare-paper": paper.paperId,
+            // The focused pane is marked with an attribute, not only a class: an
+            // attribute survives class-list mechanics and is what the gate reads.
+            "data-compare-focus": compareFocus === paper.paperId ? "true" : "false",
+            // Focus follows interaction: clicking anywhere in a pane makes it the
+            // target for the evidence panel and the toolbar.
+            // Focus follows interaction. Only a click sets it: a focusin fires when the
+            // close button inside a pane takes focus, which arrives as part of closing
+            // that pane and would re-focus the paper being removed.
+            onClick: () => setCompareFocus(paper.paperId),
+          },
+            h("div", { className: "pt-pane-head" },
+              h("span", { className: "pt-pane-title" }, paper.title || paper.paperId),
+              h("div", { className: "pt-spacer" }),
+              compareFocus === paper.paperId
+                ? h("span", { className: "pt-caption" }, t("compareFocused"))
+                : null,
+              // Only this pane's document is released: each PdfReader owns its own
+              // loading task, so removing one pane cannot touch the others.
+              h(Button, {
+                variant: "ghost", icon: true, label: t("compareClose"),
+                onClick: (event) => { event?.stopPropagation?.(); removeFromCompare(paper.paperId); },
+              }, "×"),
+            ),
+            h("div", { style: { flex: "1 1 auto", minHeight: 0, display: "flex" } },
+              h(PdfReader, {
+                // Keyed by paper so going from 2 panes to 1 cannot shift a document
+                // onto a different pane's canvas.
+                key: paper.paperId,
+                sessionId, paper, initialPage: paper.pageIndex, jumpToken: paper.jumpToken,
+                // Each pane highlights its OWN quote. Using the focused pane's
+                // highlight in every pane would paint the same passage onto papers
+                // that never contained it.
+                highlight: paper.quote ? { quote: paper.quote, pageIndex: paper.pageIndex } : null,
+                annotations,
+                t,
+                onSelectionChange: (next) => { if (compareFocus === paper.paperId) setSelection(next); },
+                onClose: () => removeFromCompare(paper.paperId),
+              }),
+            ),
+          )),
+        ) : reader ? h("div", { style: { padding: "8px 12px 0", flex: "1 1 auto", minHeight: 0, display: "flex" } },
           h(PdfReader, {
             sessionId, paper: reader, initialPage: reader.pageIndex,
             highlight: readerHighlight,
@@ -3711,7 +4032,7 @@ function describeError(error, t) {
           }),
         ) : null,
 
-        selection && reader ? h("div", { style: { padding: "8px 12px 0" } },
+        selection && (reader !== null || comparePapers.length > 0) ? h("div", { style: { padding: "8px 12px 0" } },
           h("div", { className: "pt-well", style: { padding: 8, display: "flex", flexDirection: "column", gap: 6 } },
             h("div", { className: "pt-caption" },
               `${t("selected")} · ${t("page")} ${selection.pageIndex + 1} · ${selection.text.length}/${MAX_QUOTE_CHARS}`),
@@ -3733,6 +4054,11 @@ function describeError(error, t) {
               }),
               h(Button, { variant: "primary", onClick: () => { void askSelection(); }, disabled: !inputActions || busy !== null }, t("ask")),
               h(Button, { onClick: saveEvidence, disabled: busy !== null }, t("evidence")),
+              // Only meaningful with more than one pane: with a single reader there is
+              // nothing to jump the comparison to.
+              comparePapers.length > 1
+                ? h(Button, { onClick: jumpCompareToMatching, disabled: busy !== null, title: t("compareJumpHint") }, t("compareJump"))
+                : null,
             ),
             // Write-back panel: appears once a question was actually inserted, because
             // writing an answer back needs a packet — a page and character anchor — to
@@ -3793,7 +4119,7 @@ function describeError(error, t) {
         // The annotation list is rendered whenever a paper is open, not only when a
         // selection exists: its purpose is to show what the reader has already marked,
         // which is exactly the moment there is no selection.
-        reader ? h("div", { style: { padding: "8px 12px 0", display: "flex", flexDirection: "column", gap: 6 } },
+        reader !== null || comparePapers.length > 0 ? h("div", { style: { padding: "8px 12px 0", display: "flex", flexDirection: "column", gap: 6 } },
           h("div", { className: "pt-toolbar" },
             h("span", { className: "pt-h2" }, `${t("annotationList")} · ${annotations.length}`),
             h("div", { className: "pt-spacer" }),
@@ -3887,7 +4213,10 @@ function describeError(error, t) {
             ))),
         ) : null,
 
-        reader ? null : h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 8 } },
+        // Hidden for a single reader (which wants the whole column) but NOT for the
+        // compare set: adding the second paper requires the list to be reachable.
+        // Hiding it made the feature a one-shot.
+        reader !== null ? null : h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 8 } },
           h("div", { className: "pt-toolbar" },
             h("span", { className: "pt-caption pt-num" }, hits !== null
               ? `${hits.length} ${t("total")}`
@@ -3913,6 +4242,7 @@ function describeError(error, t) {
               t,
               busy,
               onOpen: openReader,
+          onCompare: addToCompare,
               onEdit: openEditor,
               onReextract: reextractOne,
               onEnrich: enrichOne,
@@ -4051,7 +4381,48 @@ function describeError(error, t) {
                       variant: "ghost", icon: true, label: t("jumpToPage"),
                       onClick: () => jumpToEvidence(target),
                     }, "↗") : null,
-                  ),
+                    // The real motivation for PT-020: the matrix already says "3 papers
+                    // support this, 1 conflicts", but to read what those 4 actually said
+                    // the user had to open them one at a time and remember the previous
+                    // sentence. This opens the row's paper beside whatever is currently
+                    // open, landing on the evidence the matrix is pointing at.
+                    h(Button, {
+                      variant: "ghost",
+                      label: t("compareFromMatrix"),
+                      onClick: () => {
+                        const landing = target ?? null;
+                        // Current context first: whichever paper is open in the single
+                        // reader, or the focused pane. Otherwise the click would produce
+                        // a lone pane and there would be nothing to compare against.
+                        const context = reader !== null
+                          ? reader
+                          : (comparePapers.find((paper) => paper.paperId === compareFocus) ?? null);
+                        // A comparison needs two DIFFERENT papers. When the row's paper is
+                        // already the one being read, bring in another paper from the same
+                        // matrix instead of adding a duplicate — otherwise the click lands
+                        // on a single pane and looks like it did nothing.
+                        if (context === null || context.paperId === row.paperId) {
+                          const sibling = (matrix?.rows ?? []).find((candidate) => candidate.paperId !== row.paperId);
+                          if (sibling === undefined) return;
+                          addToCompare({
+                            paperId: sibling.paperId,
+                            title: sibling.title,
+                            pageIndex: 0,
+                            quote: null,
+                            paper: { paperId: sibling.paperId, title: sibling.title },
+                          });
+                        } else {
+                          addToCompare(context);
+                        }
+                        addToCompare({
+                          paperId: row.paperId,
+                          title: row.title,
+                          pageIndex: landing === null ? 0 : landing.pageIndex,
+                          quote: landing === null ? null : landing.quote,
+                          paper: { paperId: row.paperId, title: row.title },
+                        });
+                      },
+                    }, t("compareFromMatrix")),               ),
                   // The reasons behind this row's verdict. Without them the matrix
                   // is a set of numbers the reviewer has to take on faith; with
                   // them it is a list of passages to go read, which is what a
@@ -4641,7 +5012,7 @@ function describeError(error, t) {
       // react-dom/server. The loader only reads `inject` and `apply`, so this
       // extra key is inert at runtime; it exists because a render error in a
       // view the user has not opened yet is otherwise invisible to every test.
-      __test: { Body, PdfReader, PaperCard, MetadataEditor, EvidenceRow, StanceBadge, ViewBoundary, snippetNodes, CSS, DICTS },
+      __test: { Body, PdfReader, PaperCard, MetadataEditor, EvidenceRow, StanceBadge, ViewBoundary, snippetNodes, CSS, DICTS, matchComparison, readStoredCompare, writeStoredCompare },
     };
   },
 });
