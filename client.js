@@ -27,9 +27,13 @@ window.__ModuleLoader__.load({
 
     // Bounds mirrored from the Host service. Duplicated here so the browser can
     // reject a file before reading it into memory; the Host still enforces them.
-    const MAX_PDF_BYTES = 64 * 1024 * 1024;
+    const MAX_PDF_BYTES_FALLBACK = 64 * 1024 * 1024;
     const MAX_QUOTE_CHARS = 500;
-    const MAX_IMPORT_FILES = 32;
+    // Fallback only. The authoritative limits come from `status` (Host-side
+// `MAX_IMPORT_FILES` / `MAX_PDF_BYTES`): a copy here drifts, and drift between
+// the two means "client lets it through, Host rejects it" with no way to tell
+// which number was real. This value is used only before the first status reply.
+const MAX_IMPORT_FILES_FALLBACK = 32;
 
     // One page of the sidebar list. The Host accepts up to 500, which is why the
     // old client asked for all 500 and could never see row 501; a page this small
@@ -176,6 +180,19 @@ window.__ModuleLoader__.load({
         evidenceUnanchored: "仅记录页码",
         evidenceUnanchoredHint: "这段引文没能在该页文本中定位，跳转只到页码。",
         quoteTooLong: "选中的文字超过 {limit} 字，请缩短后再存。",
+        importFolder: "选目录",
+        noPdfFound: "没有找到 PDF 文件",
+        dropToImport: "松开即入库",
+        importLeftover: "另有 {n} 个文件超出单次上限 {limit}，未处理",
+        importTooLargeSkipped: "{n} 个文件超过 {limit} MB，已跳过",
+        watch: "监目录",
+        watchOn: "监目录已开",
+        watchOff: "监目录已关",
+        watchPick: "选择监听目录",
+        watchHint: "只在你开启后监听；新 PDF 掉进目录会自动入库",
+        watchRoot: "监听中：{dir}",
+        watchNeedsPath: "无法取得目录的绝对路径：请在系统文件对话框里选择，或手动开启监目录",
+        watchNoDir: "未选择目录",
         collect: "按主题收集",
         collectPlaceholder: "输入主题，例如：碳排放 影响因素",
         collectHint: "在全部已索引页里找相关句子，并保存为证据",
@@ -400,6 +417,19 @@ window.__ModuleLoader__.load({
         evidenceUnanchored: "page only",
         evidenceUnanchoredHint: "This quote could not be located in the page text, so jumps land on the page.",
         quoteTooLong: "Selection exceeds {limit} characters. Shorten it before saving.",
+        importFolder: "Folder",
+        noPdfFound: "No PDF files found",
+        dropToImport: "Drop to import",
+        importLeftover: "{n} more file(s) exceed the {limit}-file limit and were not processed",
+        importTooLargeSkipped: "{n} file(s) exceed {limit} MB and were skipped",
+        watch: "Watch folder",
+        watchOn: "Watching",
+        watchOff: "Not watching",
+        watchPick: "Choose a folder to watch",
+        watchHint: "Off until you turn it on; new PDFs dropped in the folder are imported",
+        watchRoot: "Watching: {dir}",
+        watchNeedsPath: "Could not resolve the folder's absolute path; pick it in the native dialog instead",
+        watchNoDir: "No folder selected",
         collect: "Collect by topic",
         collectPlaceholder: "Topic, e.g. carbon emissions determinants",
         collectHint: "Find relevant sentences in indexed pages and store them",
@@ -506,6 +536,9 @@ window.__ModuleLoader__.load({
       // askContext and saveAnswer take an `input` object like the rest, so they must be
       // listed here; the wiring gate checks both sides agree.
       "askContext", "saveAnswer",
+      // watchStart takes an { dir } input object. watchStatus/watchStop take
+      // nothing, so listing them would wrap an empty object for no reason.
+      "watchStart",
     ]);
 
     /** Typed transport failure. `code` drives the recovery the UI offers. */
@@ -564,7 +597,7 @@ function describeError(error, t) {
           return t("quoteTooLong", { limit });
         }
         if (error.code === "paper-tool/too-large") {
-          const limit = Math.round((error.details?.limit ?? MAX_PDF_BYTES) / 1024 / 1024);
+          const limit = Math.round((error.details?.limit ?? MAX_PDF_BYTES_FALLBACK) / 1024 / 1024);
           return t("tooLarge", { limit });
         }
         if (error.code === "paper-tool/too-many-files") {
@@ -584,6 +617,16 @@ function describeError(error, t) {
      * citation and the whole bibliography became invisible.
      */
     const CSS = `
+      .pt-root { position: relative; }
+      .pt-drop-veil {
+        position: absolute; inset: 0; z-index: 30;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--dsw-alias-bg-layer-1);
+        background: color-mix(in srgb, var(--dsw-alias-bg-layer-1) 88%, transparent);
+        border: 2px dashed var(--dsw-alias-brand-primary);
+        border-radius: 8px; pointer-events: none;
+      }
+      .pt-drop-veil-label { font-size: 13px; font-weight: 600; }
       .pt-root {
         box-sizing: border-box; height: 100%; min-height: 100%;
         display: flex; flex-direction: column;
@@ -1953,6 +1996,12 @@ function describeError(error, t) {
       const [evidencePaging, setEvidencePaging] = useState({ total: 0, hasMore: false, anchoredTotal: 0, allTotal: 0 });
       // Same idea for the paper list: the sidebar asks for one page and grows it,
       // instead of requesting the 500-row ceiling and being unable to see row 501.
+      // Host-declared import limits. Held in state rather than read from a
+      // constant so the client and Host cannot disagree.
+      const [importLimits, setImportLimits] = useState({
+        maxImportFiles: MAX_IMPORT_FILES_FALLBACK,
+        maxPdfBytes: MAX_PDF_BYTES_FALLBACK,
+      });
       const [paperPaging, setPaperPaging] = useState({ total: 0, hasMore: false, loading: false });
       const [collectQuery, setCollectQuery] = useState("");
       const [matrixClaim, setMatrixClaim] = useState("");
@@ -1963,6 +2012,18 @@ function describeError(error, t) {
       const [citation, setCitation] = useState(null);
       const [exported, setExported] = useState(null);
       const fileInputRef = useRef(null);
+      // Directory pick. `webkitdirectory` is the only way a file input can be
+      // asked for a folder; it leaves `multiple` on too, so the same handler
+      // receives every PDF found under the chosen tree.
+      const dirInputRef = useRef(null);
+      // Depth counter for dragover/dragleave. dragleave fires when the pointer
+      // crosses a child element, so a boolean flag flickers; counting is the
+      // standard way to know when the drag has really left the panel.
+      const dragDepthRef = useRef(0);
+      const [dragging, setDragging] = useState(false);
+      // Watch folder state. Default {watching:false} because the Host defaults to
+      // off; the UI reflects the Host rather than holding its own opinion.
+      const [watchState, setWatchState] = useState(null);
 
       const openReader = useCallback((target) => {
         setReader(target);
@@ -2165,6 +2226,12 @@ function describeError(error, t) {
             callRemote(sessionId, "listPapers", { limit: PAPER_PAGE_SIZE }),
           ]);
           setStatus(state);
+          if (state?.limits !== undefined && state.limits !== null) {
+            setImportLimits({
+              maxImportFiles: Number(state.limits.maxImportFiles) || MAX_IMPORT_FILES_FALLBACK,
+              maxPdfBytes: Number(state.limits.maxPdfBytes) || MAX_PDF_BYTES_FALLBACK,
+            });
+          }
           setPapers(listed.papers ?? []);
           setPaperPaging({
             total: listed.paging?.total ?? (listed.papers ?? []).length,
@@ -2348,24 +2415,43 @@ function describeError(error, t) {
         setNote("");
         setError(null);
         try {
-          if (fileList.length > MAX_IMPORT_FILES) {
-            setError(t("tooManyFiles", { limit: MAX_IMPORT_FILES }));
+          // Only PDFs. A directory pick can include anything; filtering here keeps
+          // the error message about PDFs rather than about a stray .DS_Store.
+          const picked = [...fileList].filter((file) => /\.pdf$/i.test(file.name ?? ""));
+          if (picked.length === 0) {
+            setError(t("noPdfFound"));
             return;
           }
+          const maxFiles = importLimits.maxImportFiles;
+          const maxBytes = importLimits.maxPdfBytes;
+          // Over the limit is no longer a rejection. A folder of 41 papers imports
+          // the first 32 and *says* how many were left, instead of refusing all 41
+          // and leaving the user to work out which 32 to select by hand.
+          const batch = picked.slice(0, maxFiles);
+          const leftover = picked.length - batch.length;
           const files = [];
-          for (let index = 0; index < fileList.length; index += 1) {
-            const file = fileList[index];
+          const tooLarge = [];
+          for (let index = 0; index < batch.length; index += 1) {
+            const file = batch[index];
             // Check the size before reading: turning a 300MB file into a number
-            // array blocks the tab long before the Host can reject it.
-            if (file.size > MAX_PDF_BYTES) {
-              setError(t("tooLarge", { limit: Math.round(MAX_PDF_BYTES / 1024 / 1024) }));
-              return;
+            // array blocks the tab long before the Host can reject it. Reported
+            // per file rather than aborting the batch — one oversized scan must
+            // not stop the other 31 from importing.
+            if (file.size > maxBytes) {
+              tooLarge.push(file.name);
+              continue;
             }
-            setNote(`${t("importing")} ${index + 1}/${fileList.length}`);
+            setNote(`${t("importing")} ${index + 1}/${batch.length}`);
             const buffer = await file.arrayBuffer();
             // The wire is JSON: send a number array, not a Uint8Array (which
             // would serialize as an object and fail the Host's byte parser).
             files.push({ name: file.name, data: Array.from(new Uint8Array(buffer)) });
+          }
+          if (files.length === 0) {
+            setError(tooLarge.length > 0
+              ? t("tooLarge", { limit: Math.round(maxBytes / 1024 / 1024) })
+              : t("noPdfFound"));
+            return;
           }
           const result = await runCancellable(t("busyStageImport"), (signal) =>
             callRemote(sessionId, "importPdf", { files }, signal),
@@ -2373,6 +2459,9 @@ function describeError(error, t) {
           const okCount = result.imported?.length ?? 0;
           const dupCount = result.duplicates?.length ?? 0;
           const failCount = result.failed?.length ?? 0;
+          // Files the Host did not take because a caller sent more than the cap.
+          const hostLeft = result.remaining ?? 0;
+          const notHandled = leftover + hostLeft;
           await refresh();
           setNote([
             okCount > 0 ? `✓ ${okCount}` : "",
@@ -2381,6 +2470,12 @@ function describeError(error, t) {
             // A cancelled import keeps what finished and says how much was dropped;
             // reporting only the successes would make a half-done import look done.
             result.aborted === true ? t("cancelSkipped", { n: result.skipped ?? 0 }) : "",
+            // Say exactly what was skipped and why, with the number that applies.
+            // "32 imported" out of 41 picked reads as "all done" otherwise.
+            notHandled > 0 ? t("importLeftover", { n: notHandled, limit: maxFiles }) : "",
+            tooLarge.length > 0
+              ? t("importTooLargeSkipped", { n: tooLarge.length, limit: Math.round(maxBytes / 1024 / 1024) })
+              : "",
           ].filter(Boolean).join(" · "));
           setHits(null);
           setError(failCount > 0 ? result.failed.map((item) => `${item.filename}: ${item.reason}`).join("; ") : null);
@@ -2397,7 +2492,169 @@ function describeError(error, t) {
           setBusy(null);
           if (fileInputRef.current) fileInputRef.current.value = "";
         }
-      }, [sessionId, t, refresh, runCancellable]);
+      }, [sessionId, t, refresh, runCancellable, importLimits]);
+
+      /**
+       * Collect the files from a drop, walking directories.
+       *
+       * A drop carries DataTransferItem entries; anything dropped from the
+       * filesystem is a file entry, and a directory has to be walked explicitly
+       * because the browser does not flatten it. Dropping a Zotero `storage`
+       * folder is the common case here — it is one directory containing hundreds
+       * of subdirectories, which is exactly the shape a file picker handles badly.
+       */
+      const filesFromDataTransfer = useCallback(async (dataTransfer) => {
+        const collected = [];
+        // Safari exposes only `items` in some versions and only `files` in others;
+        // `files` is already flattened, so use it when the entries are unusable.
+        const items = dataTransfer?.items === undefined || dataTransfer.items === null
+          ? []
+          : [...dataTransfer.items];
+        const entries = items
+          .filter((item) => item.kind === "file")
+          .map((item) => (typeof item.webkitGetAsEntry === "function" ? item.webkitGetAsEntry() : null))
+          .filter((entry) => entry !== null);
+
+        const readFile = (fileEntry) => new Promise((resolve) => {
+          fileEntry.file((file) => resolve(file), () => resolve(null));
+        });
+        const readDirectory = (directoryEntry) => new Promise((resolve) => {
+          const reader = directoryEntry.createReader();
+          const all = [];
+          // readEntries returns at most 100 entries per call, so it has to be
+          // called until it yields nothing — a single call silently truncates a
+          // large folder, which looks like "only part of the folder imported".
+          // A reader that never returns an empty batch would spin forever. 200
+          // batches is far past the 100-entry chunking a real browser does, so
+          // hitting the cap means the reader is broken, not that the folder is big.
+          const MAX_BATCHES = 200;
+          let batches = 0;
+          const step = () => reader.readEntries((entries) => {
+            batches += 1;
+            if (entries.length === 0 || batches > MAX_BATCHES) { resolve(all); return; }
+            all.push(...entries);
+            step();
+          }, () => resolve(all));
+          step();
+        });
+        // Depth cap. A folder tree is walked recursively, and a drop can name a
+        // directory whose reader keeps producing entries (a symlink loop, or a
+        // broken reader that never drains). Without a bound that is an unbounded
+        // recursion inside a click handler, which shows up as "Maximum call stack
+        // size exceeded" and loses the whole drop — including the files already
+        // found.
+        const MAX_DEPTH = 12;
+        const walk = async (entry, depth = 0) => {
+          if (depth > MAX_DEPTH) return;
+          if (entry.isFile) {
+            const file = await readFile(entry);
+            if (file !== null) collected.push(file);
+            return;
+          }
+          if (entry.isDirectory) {
+            const children = await readDirectory(entry);
+            for (const child of children) await walk(child, depth + 1);
+          }
+        };
+        for (const entry of entries) await walk(entry);
+        if (collected.length > 0) return collected;
+        return [...(dataTransfer?.files ?? [])];
+      }, []);
+
+      const onPanelDragEnter = useCallback((event) => {
+        // Only react to a file drag, not to text dragged out of the reader.
+        if (![...(event.dataTransfer?.types ?? [])].includes("Files")) return;
+        event.preventDefault();
+        dragDepthRef.current += 1;
+        setDragging(true);
+      }, []);
+
+      const onPanelDragOver = useCallback((event) => {
+        if (![...(event.dataTransfer?.types ?? [])].includes("Files")) return;
+        // Without preventDefault the drop event never fires at all.
+        event.preventDefault();
+        if (event.dataTransfer !== null && event.dataTransfer !== undefined) {
+          event.dataTransfer.dropEffect = "copy";
+        }
+      }, []);
+
+      const onPanelDragLeave = useCallback((event) => {
+        if (![...(event.dataTransfer?.types ?? [])].includes("Files")) return;
+        dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+        if (dragDepthRef.current === 0) setDragging(false);
+      }, []);
+
+      const onPanelDrop = useCallback(async (event) => {
+        if (![...(event.dataTransfer?.types ?? [])].includes("Files")) return;
+        event.preventDefault();
+        dragDepthRef.current = 0;
+        setDragging(false);
+        const dropped = await filesFromDataTransfer(event.dataTransfer);
+        if (dropped.length === 0) return;
+        await doImport(dropped);
+      }, [doImport, filesFromDataTransfer]);
+
+      const refreshWatch = useCallback(async () => {
+        try {
+          setWatchState(await callRemote(sessionId, "watchStatus"));
+        } catch {
+          // A status probe failing must not spam the panel with an error banner.
+          setWatchState({ watching: false, dir: null });
+        }
+      }, [sessionId]);
+
+      // Probe once on mount. The Host is the source of truth for whether a
+      // watcher exists; the panel must show that, not a remembered preference.
+      useEffect(() => { void refreshWatch(); }, [refreshWatch]);
+
+      const toggleWatch = useCallback(async () => {
+        setError(null);
+        try {
+          if (watchState?.watching === true) {
+            setWatchState(await callRemote(sessionId, "watchStop"));
+            setNote(t("watchOff"));
+            return;
+          }
+          // A directory picker is the only way to name a folder from the browser.
+          //
+          // Cancelling has to resolve too. `oncancel` is not implemented in every
+          // browser and never fires in some, so a promise that only resolves from
+          // `onchange` leaves the panel waiting forever after the user closes the
+          // dialog — no error, no state change, just a toggle that did nothing.
+          const chosen = await new Promise((resolve) => {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.webkitdirectory = true;
+            let settled = false;
+            const finish = (value) => {
+              if (settled) return;
+              settled = true;
+              resolve(value);
+            };
+            input.onchange = () => {
+              const first = input.files?.[0];
+              // webkitRelativePath carries the folder name; the Host needs an
+              // absolute path, which only the desktop shell can supply. The RPC
+              // takes the path the caller knows, so this is a fallback for when
+              // the shell exposes one.
+              finish(first?.path ?? null);
+            };
+            input.oncancel = () => finish(null);
+            // The safety net: if neither event fires within a couple of minutes,
+            // report the cancellation instead of holding the promise open.
+            setTimeout(() => finish(null), 120_000);
+            input.click();
+          });
+          if (chosen === null) {
+            setError(t("watchNeedsPath"));
+            return;
+          }
+          setWatchState(await callRemote(sessionId, "watchStart", { dir: chosen }));
+          setNote(t("watchOn"));
+        } catch (watchError) {
+          setError(describeError(watchError, t));
+        }
+      }, [sessionId, t, watchState]);
 
       const saveMetadata = useCallback(async (form) => {
         if (!sessionId || !editing) return;
@@ -2856,6 +3113,17 @@ function describeError(error, t) {
 
       // --- views ----------------------------------------------------------
 
+      const renderWatchBar = () => h("div", { className: "pt-toolbar" },
+        h(Badge, { tone: watchState?.watching === true ? "support" : undefined },
+          watchState?.watching === true ? t("watchOn") : t("watchOff")),
+        watchState?.watching === true && typeof watchState.dir === "string"
+          ? h("span", { className: "pt-caption", style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
+            t("watchRoot", { dir: watchState.dir }))
+          : h("span", { className: "pt-caption", style: { flex: 1, minWidth: 0 } }, t("watchHint")),
+        h(Button, { variant: "ghost", onClick: toggleWatch, disabled: busy !== null },
+          watchState?.watching === true ? t("watchOff") : t("watch")),
+      );
+
       const renderLibrary = () => h(React.Fragment, null,
         h("div", { style: { padding: "10px 12px 0", display: "flex", flexDirection: "column", gap: 8 } },
           h("div", { className: "pt-toolbar" },
@@ -2903,13 +3171,26 @@ function describeError(error, t) {
             h("div", { className: "pt-spacer" }),
             h(Button, { onClick: () => fileInputRef.current?.click(), disabled: busy !== null },
               busy === "import" ? t("importing") : t("import")),
+            h(Button, { onClick: () => dirInputRef.current?.click(), disabled: busy !== null },
+              t("importFolder")),
             h("input", {
               ref: fileInputRef, type: "file", accept: "application/pdf", multiple: true,
               "aria-label": t("import"),
               style: { display: "none" },
               onChange: (event) => doImport(event.target.files),
             }),
+            h("input", {
+              ref: dirInputRef, type: "file", accept: "application/pdf", multiple: true,
+              // Non-standard but universally supported for directory picking, and
+              // there is no standard alternative for it.
+              webkitdirectory: "",
+              directory: "",
+              "aria-label": t("importFolder"),
+              style: { display: "none" },
+              onChange: (event) => doImport(event.target.files),
+            }),
           ),
+          renderWatchBar(),
           (mode === "external" || mode === "cnki") ? h("div", { className: "pt-toolbar" },
             h(Badge, { tone: cnki?.loggedIn ? "support" : undefined },
               `${t("cnki")} · ${cnki === null ? "—" : cnki.loggedIn ? t("cnkiConnected") : t("cnkiNotLoggedIn")}`),
@@ -3396,7 +3677,19 @@ function describeError(error, t) {
         ["evidence", t("evidenceTab"), counts.evidence],
         ["review", t("reviewTab"), null],
       ];
-      return h("div", { className: "pt-root", "data-paper-tool": view },
+      return h("div", {
+        className: "pt-root",
+        "data-paper-tool": view,
+        // Dropping PDFs anywhere on the panel imports them. Bound on the root so
+        // the whole surface is a target, not just a small drop zone.
+        onDragEnter: onPanelDragEnter,
+        onDragOver: onPanelDragOver,
+        onDragLeave: onPanelDragLeave,
+        onDrop: onPanelDrop,
+      },
+        dragging
+          ? h("div", { className: "pt-drop-veil" }, h("span", { className: "pt-drop-veil-label" }, t("dropToImport")))
+          : null,
         h("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 12px 6px" } },
           h("span", { className: "pt-h1" }, t("title")),
           h("span", { className: "pt-caption pt-num", style: { flex: 1, minWidth: 0 } },

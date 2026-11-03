@@ -98,6 +98,8 @@ const GATES = [
   { name: "s30-paging", script: "s30-paging.mjs", needsCorpus: false, what: "list paging past the 500 ceiling, payload trimming, library-wide citation scope" },
   { name: "s30b-paging-mount", script: "s30b-paging-mount.mjs", needsCorpus: false, what: "the mounted client actually pages, refetches on filter change, loads the full row before editing" },
   { name: "s31-stance", script: "s31-stance.mjs", needsCorpus: false, what: "graded stance judgement: adversarial cases, strength levels, per-evidence rationale, determinism" },
+  { name: "s32-import-dir-watch", script: "s32-import-dir-watch.mjs", needsCorpus: false, what: "directory and drag import, one limit source, opt-in folder watching that waits for the file to settle" },
+  { name: "s32b-import-mount", script: "s32b-import-mount.mjs", needsCorpus: false, what: "the mounted panel really renders a folder picker, accepts a drop, walks dropped folders, and reports leftovers" },
 ];
 
 function corpusLooksUsable(dir) {
