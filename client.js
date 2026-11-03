@@ -297,6 +297,21 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         review: "综述材料",
         outline: "证据大纲",
         generateOutline: "生成大纲",
+        // 章节骨架与证据大纲是两个产出（D-016）：一个按论文列材料，一个按章节分材料。
+        skeleton: "章节骨架",
+        buildSkeleton: "生成章节骨架",
+        skeletonHint: "按论文列材料是上面的证据大纲；这里是把材料分到章节里，每章给出应引用的证据。",
+        citeImport: "导入 .bib / .ris",
+        citeImportHint: "从 Zotero / EndNote / Mendeley 导出引用文件后在这里导入，条目以仅元数据状态入库。",
+        citeImportPick: "选择引用文件",
+        citeImportDone: "导入完成",
+        citeImportEmpty: "还没有导入。",
+        similar: "库内重叠提示",
+        similarHint: "只与你库里已存的证据比对，用来发现自己是否在重复引用同一批材料；不联网、不给分数、不是查重率。",
+        similarCheck: "检查重叠",
+        similarPlaceholder: "粘贴一段你写的文字…",
+        similarHits: "重叠条目",
+        similarDisclosure: "仅作辅助：不评判原创性，不是查重率。",
         citations: "引文",
         style: "引用样式",
         locale: "语言",
@@ -618,6 +633,20 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         review: "Review material",
         outline: "Evidence outline",
         generateOutline: "Build outline",
+        skeleton: "Section skeleton",
+        buildSkeleton: "Build section skeleton",
+        skeletonHint: "The outline above lists material by paper; this files it into sections and names the evidence each section should cite.",
+        citeImport: "Import .bib / .ris",
+        citeImportHint: "Export from Zotero / EndNote / Mendeley, then import the file here. Entries land as metadata only.",
+        citeImportPick: "Choose a citation file",
+        citeImportDone: "Import finished",
+        citeImportEmpty: "Nothing imported yet.",
+        similar: "Overlap with library",
+        similarHint: "Compares against evidence you already stored, to show when you are restating the same material. Offline, no score, not a detection rate.",
+        similarCheck: "Check overlap",
+        similarPlaceholder: "Paste a passage you wrote…",
+        similarHits: "Overlapping rows",
+        similarDisclosure: "Assistance only: no originality judgement, not a detection rate.",
         citations: "Citations",
         style: "Style",
         locale: "Locale",
@@ -714,6 +743,8 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
       "backupLibrary", "restoreLibrary", "backupStatus",
       // Topic recommendation: an RPC with no tool behind it (D-014).
       "topicRecommend",
+      // Writing assistance, also RPCs (D-014). All three take an input object.
+      "sectionSkeleton", "importCitations", "similarityNotice",
     ]);
 
     /** Typed transport failure. `code` drives the recovery the UI offers. */
@@ -2418,6 +2449,15 @@ function describeError(error, t) {
       const [matrixClaim, setMatrixClaim] = useState("");
       const [matrix, setMatrix] = useState(null);
       const [outline, setOutline] = useState(null);
+      // Writing assistance (PT-021). All three are view state: the skeleton is a
+      // proposal, the import result is a summary of what just happened, and the overlap
+      // list belongs to the passage currently typed. None of it is library data, so
+      // none of it goes into SQLite.
+      const [skeleton, setSkeleton] = useState(null);
+      const [citeImport, setCiteImport] = useState(null);
+      const [similarText, setSimilarText] = useState("");
+      const [similar, setSimilar] = useState(null);
+      const citeImportRef = useRef(null);
       const [citationStyle, setCitationStyle] = useState("apa");
       const [citationLocale, setCitationLocale] = useState("zh-CN");
       const [citation, setCitation] = useState(null);
@@ -3625,6 +3665,90 @@ function describeError(error, t) {
         }
       }, [sessionId, t]);
 
+      /**
+       * Section skeleton — a structure proposal built from stored evidence.
+       *
+       * Deliberately a different button from 大纲 above. That one lists the material we
+       * hold (evidence grouped by paper); this one proposes chapters and the evidence
+       * each chapter should cite. Same word in Chinese, different output, so they sit in
+       * separate toolbars with their own captions (D-016).
+       */
+      const buildSkeleton = useCallback(async () => {
+        if (!sessionId) return;
+        setBusy("skeleton");
+        setError(null);
+        try {
+          setSkeleton(await callRemote(sessionId, "sectionSkeleton"));
+        } catch (skeletonError) {
+          setError(describeError(skeletonError, t));
+        } finally {
+          setBusy(null);
+        }
+      }, [sessionId, t]);
+
+      const sendSkeleton = useCallback(() => {
+        if (!inputActions || !skeleton?.text) return;
+        inputActions.insertText(skeleton.text);
+      }, [inputActions, skeleton]);
+
+      /**
+       * Import a .bib / .ris file into the library.
+       *
+       * The file is read here, in the panel, and its text goes to the host — the host
+       * has no filesystem access to the user's downloads folder, and asking for a path
+       * would make the feature unusable on a machine where the panel and the CLI are
+       * not the same place.
+       */
+      const importCitationFile = useCallback(async (file) => {
+        if (!sessionId || file === null || file === undefined) return;
+        setBusy("cite-import");
+        setError(null);
+        try {
+          const text = await file.text();
+          const result = await callRemote(sessionId, "importCitations", {
+            fileName: String(file.name ?? ""),
+            text,
+          });
+          setCiteImport(result);
+          // An import changes the library, so the list and the counts have to be
+          // refreshed; without this the new entries exist but the panel still shows the
+          // old library and the import looks like it did nothing.
+          await refresh();
+        } catch (citeError) {
+          // A cancelled import is not a failed import: showing "AbortError: The
+          // operation was aborted" in a red banner reports the user's own cancel as a
+          // defect. The import path above reaches the same conclusion and just refreshes,
+          // letting the cancel banner stand.
+          if (isAbortError(citeError)) {
+            await refresh();
+          } else {
+            setError(describeError(citeError, t));
+          }
+        } finally {
+          setBusy(null);
+        }
+      }, [sessionId, t, refresh]);
+
+      /**
+       * Check a passage against stored evidence.
+       *
+       * Not a similarity score and not an integrity check (D-015): the host returns the
+       * rows that overlap and the disclaimer travels with them. Nothing is sent off the
+       * machine, and no percentage exists to be misread.
+       */
+      const checkSimilarity = useCallback(async () => {
+        if (!sessionId || similarText.trim() === "") return;
+        setBusy("similar");
+        setError(null);
+        try {
+          setSimilar(await callRemote(sessionId, "similarityNotice", { text: similarText }));
+        } catch (similarError) {
+          setError(describeError(similarError, t));
+        } finally {
+          setBusy(null);
+        }
+      }, [sessionId, similarText, t]);
+
       // Only evidence whose offsets were located in the page text may be
       // exported: a citation that cannot point at the source is exactly what
       // the traceability claim forbids.
@@ -4701,6 +4825,125 @@ function describeError(error, t) {
         outline
           ? h("pre", { className: "pt-pre" }, outline.text)
           : h(Empty, { title: t("selectEvidence") }),
+
+        h("hr", { className: "pt-divider" }),
+
+        // --- 章节骨架 ---------------------------------------------------
+        // Sits directly under the evidence outline on purpose: they answer two halves of
+        // the same question, and putting them side by side is what makes the difference
+        // visible instead of something the reader has to take on faith (D-016).
+        h("div", { className: "pt-toolbar" },
+          h("span", { className: "pt-h2" }, t("skeleton")),
+          h("div", { className: "pt-spacer" }),
+          h(Button, { onClick: buildSkeleton, disabled: busy !== null }, t("buildSkeleton")),
+          skeleton?.text ? h(Button, { onClick: sendSkeleton, disabled: !inputActions, variant: "primary" }, t("sendToChat")) : null,
+        ),
+        h("p", { className: "pt-caption", style: { margin: 0 } }, t("skeletonHint")),
+        skeleton
+          ? h("div", { className: "pt-col", style: { gap: 6 } },
+            skeleton.sections.length === 0
+              ? h(Banner, { tone: "info" }, skeleton.note)
+              : skeleton.sections.map((section, index) => h("div", {
+                key: section.id,
+                className: "pt-card",
+                "data-section": section.id,
+                style: { padding: "6px 8px" },
+              },
+                h("div", { className: "pt-toolbar" },
+                  h("span", { className: "pt-meta" }, `${index + 1}. ${section.title}`),
+                  h("div", { className: "pt-spacer" }),
+                  h("span", { className: "pt-caption pt-num" }, `${section.evidenceIds.length} 条 · ${section.paperIds.length} 篇`),
+                ),
+                h("p", { className: "pt-caption", style: { margin: 0 } }, section.purpose),
+                h("p", { className: "pt-caption", style: { margin: 0 } },
+                  `${t("similarHits")}: ${section.evidenceIds.map((id) => id.slice(0, 8)).join(" ")}`),
+              )),
+            h("p", { className: "pt-caption", style: { margin: 0 } }, skeleton.note),
+          )
+          : null,
+
+        h("hr", { className: "pt-divider" }),
+
+        // --- 导入 .bib / .ris -------------------------------------------
+        h("div", { className: "pt-toolbar" },
+          h("span", { className: "pt-h2" }, t("citeImport")),
+          h("div", { className: "pt-spacer" }),
+          h(Button, { onClick: () => citeImportRef.current?.click(), disabled: busy !== null }, t("citeImportPick")),
+          h("input", {
+            ref: citeImportRef,
+            type: "file",
+            // Both extensions: the picker filters by them, and the host detects the
+            // format from the name first and the content second.
+            accept: ".bib,.bibtex,.ris",
+            "aria-label": t("citeImportPick"),
+            style: { display: "none" },
+            onChange: (event) => {
+              const file = event.target.files?.[0] ?? null;
+              // Clear the input so choosing the same file twice still fires onChange.
+              event.target.value = "";
+              if (file !== null) void importCitationFile(file);
+            },
+          }),
+        ),
+        h("p", { className: "pt-caption", style: { margin: 0 } }, t("citeImportHint")),
+        citeImport
+          ? h("div", { className: "pt-col", style: { gap: 4 } },
+            h("p", { className: "pt-caption", style: { margin: 0 } }, citeImport.text),
+            citeImport.imported?.length > 0
+              ? h("p", { className: "pt-caption", style: { margin: 0 } },
+                citeImport.imported.map((row) => row.title).join(" · "))
+              : h("p", { className: "pt-caption", style: { margin: 0 } }, t("citeImportEmpty")),
+          )
+          : null,
+
+        h("hr", { className: "pt-divider" }),
+
+        // --- 库内重叠提示 -----------------------------------------------
+        // Named 重叠 (overlap) rather than 查重 (integrity check) throughout, and the
+        // caption says what it is not. Both choices are load-bearing (D-015): the label
+        // is what stops the next person from growing it into a similarity score.
+        h("div", { className: "pt-toolbar" },
+          h("span", { className: "pt-h2" }, t("similar")),
+          h("div", { className: "pt-spacer" }),
+          h(Button, {
+            onClick: checkSimilarity,
+            disabled: busy !== null || similarText.trim() === "",
+          }, busy === "similar" ? t("searching") : t("similarCheck")),
+        ),
+        h("p", { className: "pt-caption", style: { margin: 0 } }, t("similarHint")),
+        h("textarea", {
+          className: "pt-input",
+          "aria-label": t("similar"),
+          placeholder: t("similarPlaceholder"),
+          rows: 4,
+          value: similarText,
+          onChange: (event) => setSimilarText(event.target.value),
+          style: { resize: "vertical", fontFamily: "inherit" },
+        }),
+        similar
+          ? h("div", { className: "pt-col", style: { gap: 4 } },
+            h("p", { className: "pt-caption", style: { margin: 0 } }, similar.note),
+            similar.hits.length === 0
+              ? null
+              : similar.hits.map((hit) => h("div", {
+                key: hit.evidenceId,
+                className: "pt-card",
+                "data-similar-hit": hit.evidenceId,
+                style: { padding: "6px 8px" },
+              },
+                h("div", { className: "pt-toolbar" },
+                  h("span", { className: "pt-meta" }, hit.paperTitle || hit.paperId),
+                  h("div", { className: "pt-spacer" }),
+                  h("span", { className: "pt-caption pt-num" }, `p.${hit.pageIndex + 1} · ${hit.overlapChars} 字`),
+                ),
+                h("p", { className: "pt-caption", style: { margin: 0 } }, hit.quote),
+              )),
+            // The disclaimer is rendered from the response's own field, not from a
+            // hardcoded string in the client: if the host's wording changes, the panel
+            // cannot drift away from it.
+            h("p", { className: "pt-caption", style: { margin: 0 } }, similar.disclaimer ?? t("similarDisclosure")),
+          )
+          : null,
 
         h("hr", { className: "pt-divider" }),
 

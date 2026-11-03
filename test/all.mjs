@@ -104,6 +104,7 @@ const GATES = [
   { name: "s34-backup", script: "s34-backup.mjs", needsCorpus: false, what: "whole-library backup as a consistent snapshot, relocatable restore, overwrite guard, table parity" },
   { name: "s35-topics", script: "s35-topics.mjs", needsCorpus: false, what: "counted trend and co-occurrence material, sample-floor refusal, mounted topics panel" },
   { name: "s36-compare", script: "s36-compare.mjs", needsCorpus: false, what: "independent panes with separate documents, close-one isolation, matrix entry, stored layout" },
+  { name: "s37-writing-assist", script: "s37-writing-assist.mjs", needsCorpus: false, what: "BibTeX/RIS import with DOI dedupe and round trip, section skeleton bound to real evidence, overlap notice that never becomes a score" },
 ];
 
 function corpusLooksUsable(dir) {
