@@ -301,6 +301,7 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         skeleton: "章节骨架",
         buildSkeleton: "生成章节骨架",
         skeletonHint: "按论文列材料是上面的证据大纲；这里是把材料分到章节里，每章给出应引用的证据。",
+        skeletonBinds: "本章应引用",
         citeImport: "导入 .bib / .ris",
         citeImportHint: "从 Zotero / EndNote / Mendeley 导出引用文件后在这里导入，条目以仅元数据状态入库。",
         citeImportPick: "选择引用文件",
@@ -312,6 +313,7 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         similarPlaceholder: "粘贴一段你写的文字…",
         similarHits: "重叠条目",
         similarDisclosure: "仅作辅助：不评判原创性，不是查重率。",
+        similarNoEvidence: "库里还没有证据，先到阅读器里把要点存成证据。",
         citations: "引文",
         style: "引用样式",
         locale: "语言",
@@ -636,6 +638,7 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         skeleton: "Section skeleton",
         buildSkeleton: "Build section skeleton",
         skeletonHint: "The outline above lists material by paper; this files it into sections and names the evidence each section should cite.",
+        skeletonBinds: "Should cite",
         citeImport: "Import .bib / .ris",
         citeImportHint: "Export from Zotero / EndNote / Mendeley, then import the file here. Entries land as metadata only.",
         citeImportPick: "Choose a citation file",
@@ -647,6 +650,7 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         similarPlaceholder: "Paste a passage you wrote…",
         similarHits: "Overlapping rows",
         similarDisclosure: "Assistance only: no originality judgement, not a detection rate.",
+        similarNoEvidence: "No evidence stored yet — save a passage as evidence in the reader first.",
         citations: "Citations",
         style: "Style",
         locale: "Locale",
@@ -1124,13 +1128,18 @@ function describeError(error, t) {
       }
       .pt-canvas-wrap {
         flex: 1 1 auto; min-height: 180px; max-height: 62vh; overflow: auto;
-        display: flex; justify-content: center; align-items: flex-start;
+        /* Overflow-safe centering: justify-content:center clips the START of an
+           overflowing child, so the page's right side became unreachable in a narrow
+           sidebar. auto margins centre when there is room and fall back to 0 when
+           there is not, keeping every edge reachable by scrolling. */
+        display: flex; align-items: flex-start;
         padding: 8px;
         background: var(--dsw-alias-bg-layer-2);
         border: 1px solid var(--dsw-alias-border-l1);
         border-radius: var(--dsw-radius-md);
       }
-      .pt-page { position: relative; flex: none; }
+      /* auto margins centre the page without clipping either edge. */
+      .pt-page { position: relative; flex: none; margin: 0 auto; }
       .pt-textLayer {
         position: absolute; inset: 0; overflow: hidden; opacity: 1;
         line-height: 1; text-align: initial; text-size-adjust: none;
@@ -1542,6 +1551,22 @@ function describeError(error, t) {
         type: "button", className: cls, onClick, disabled, title: title ?? label,
         "aria-label": icon && label ? label : undefined,
       }, children);
+    }
+
+    /**
+     * Scale that makes a page exactly fill the available content width.
+     *
+     * Extracted so the arithmetic can be tested without a browser: the caller used to
+     * compute this inline against `wrap.clientWidth - 18`, and a magic 18 that does not
+     * match the container's real padding is the kind of thing that silently leaves the
+     * page a few pixels too wide, which then gets clipped instead of scrolled.
+     */
+    function fitScale({ available, pageWidth, min = 0.3, max = 3 }) {
+      if (!Number.isFinite(available) || !Number.isFinite(pageWidth) || pageWidth <= 0 || available <= 0) {
+        return null;
+      }
+      const next = available / pageWidth;
+      return +Math.min(max, Math.max(min, next)).toFixed(2);
     }
 
     function Empty({ title, hint, action }) {
@@ -2077,13 +2102,21 @@ function describeError(error, t) {
         if (!wrap) return undefined;
         const apply = () => {
           const doc = docRef.current;
-          const width = wrap.clientWidth - 18;
-          if (!doc || !Number.isFinite(width) || width <= 0) return;
+          // Read the real horizontal padding instead of assuming a number: the wrap's
+          // clientWidth includes padding, so subtracting a guessed constant either
+          // leaves the page slightly too wide (clipped) or too narrow (wasted space).
+          const style = typeof getComputedStyle === "function" ? getComputedStyle(wrap) : null;
+          const padLeft = parseFloat(style?.paddingLeft ?? "0") || 0;
+          const padRight = parseFloat(style?.paddingRight ?? "0") || 0;
+          // The vertical scrollbar (when the page is taller than the wrap) comes out of
+          // clientWidth already, so it needs no extra allowance here.
+          const width = wrap.clientWidth - padLeft - padRight;
+          if (!doc) return;
           doc.getPage(Math.min(pageNumber, doc.numPages || 1))
             .then((page) => {
               const base = page.getViewport({ scale: 1 });
-              const next = Math.max(0.3, Math.min(3, width / base.width));
-              setScale(+next.toFixed(2));
+              const next = fitScale({ available: width, pageWidth: base.width });
+              if (next !== null) setScale(next);
             })
             .catch(() => {});
         };
@@ -4841,24 +4874,37 @@ function describeError(error, t) {
         h("p", { className: "pt-caption", style: { margin: 0 } }, t("skeletonHint")),
         skeleton
           ? h("div", { className: "pt-col", style: { gap: 6 } },
+            // Empty and non-empty are different answers, so they render different
+            // things. The empty case is a single banner: the host's note already says
+            // why nothing came back, and printing it twice made it read like two
+            // separate problems.
             skeleton.sections.length === 0
               ? h(Banner, { tone: "info" }, skeleton.note)
-              : skeleton.sections.map((section, index) => h("div", {
-                key: section.id,
-                className: "pt-card",
-                "data-section": section.id,
-                style: { padding: "6px 8px" },
-              },
-                h("div", { className: "pt-toolbar" },
-                  h("span", { className: "pt-meta" }, `${index + 1}. ${section.title}`),
-                  h("div", { className: "pt-spacer" }),
-                  h("span", { className: "pt-caption pt-num" }, `${section.evidenceIds.length} 条 · ${section.paperIds.length} 篇`),
+              : [
+                // A Fragment with a key, not a bare array: React cannot key the array
+                // elements themselves, and the raw array form warned about it.
+                h(React.Fragment, { key: "sections" },
+                  ...skeleton.sections.map((section, index) => h("div", {
+                  key: section.id,
+                  className: "pt-card",
+                  "data-section": section.id,
+                  style: { padding: "6px 8px" },
+                },
+                  h("div", { className: "pt-toolbar" },
+                    h("span", { className: "pt-meta" }, `${index + 1}. ${section.title}`),
+                    h("div", { className: "pt-spacer" }),
+                    h("span", { className: "pt-caption pt-num" }, `${section.evidenceIds.length} 条 · ${section.paperIds.length} 篇`),
+                  ),
+                  h("p", { className: "pt-caption", style: { margin: 0 } }, section.purpose),
+                  // The bound ids, labelled as such. This used to reuse the overlap
+                  // panel's "命中条目" caption, which said the ids were overlap hits —
+                  // wrong label on real data.
+                  h("p", { className: "pt-caption", style: { margin: 0 } },
+                    `${t("skeletonBinds")}: ${section.evidenceIds.map((id) => id.slice(0, 8)).join(" ")}`),
+                  )),
                 ),
-                h("p", { className: "pt-caption", style: { margin: 0 } }, section.purpose),
-                h("p", { className: "pt-caption", style: { margin: 0 } },
-                  `${t("similarHits")}: ${section.evidenceIds.map((id) => id.slice(0, 8)).join(" ")}`),
-              )),
-            h("p", { className: "pt-caption", style: { margin: 0 } }, skeleton.note),
+                h("p", { key: "note", className: "pt-caption", style: { margin: 0 } }, skeleton.note),
+              ],
           )
           : null,
 
@@ -4907,10 +4953,19 @@ function describeError(error, t) {
           h("div", { className: "pt-spacer" }),
           h(Button, {
             onClick: checkSimilarity,
-            disabled: busy !== null || similarText.trim() === "",
+            // Disabled when there is nothing to compare against, not only when the box
+            // is empty: a click with an empty library used to come back reading like a
+            // clean result. Better to not offer the action.
+            disabled: busy !== null || similarText.trim() === "" || (evidencePaging.allTotal ?? 0) === 0,
+            title: (evidencePaging.allTotal ?? 0) === 0 ? t("similarNoEvidence") : undefined,
           }, busy === "similar" ? t("searching") : t("similarCheck")),
         ),
         h("p", { className: "pt-caption", style: { margin: 0 } }, t("similarHint")),
+        // Said before the click, not after it: with no evidence stored the action has
+        // no input, and the caption is where that can be stated without a round trip.
+        (evidencePaging.allTotal ?? 0) === 0
+          ? h("p", { className: "pt-caption", style: { margin: 0 } }, t("similarNoEvidence"))
+          : null,
         h("textarea", {
           className: "pt-input",
           "aria-label": t("similar"),
@@ -5255,7 +5310,7 @@ function describeError(error, t) {
       // react-dom/server. The loader only reads `inject` and `apply`, so this
       // extra key is inert at runtime; it exists because a render error in a
       // view the user has not opened yet is otherwise invisible to every test.
-      __test: { Body, PdfReader, PaperCard, MetadataEditor, EvidenceRow, StanceBadge, ViewBoundary, snippetNodes, CSS, DICTS, matchComparison, readStoredCompare, writeStoredCompare },
+      __test: { Body, PdfReader, PaperCard, MetadataEditor, EvidenceRow, StanceBadge, ViewBoundary, snippetNodes, CSS, DICTS, matchComparison, readStoredCompare, writeStoredCompare, fitScale },
     };
   },
 });

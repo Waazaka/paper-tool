@@ -562,6 +562,31 @@ ER  -
   }
 }
 
+// --- 14b. an empty library refuses instead of reporting "no overlap" ------
+// Found on the real GUI: with zero evidence the panel said "compared against 0
+// rows, no overlap of 12+ characters found", which reads as a clean result. It is a
+// conclusion drawn from no samples, so the RPC must refuse. Same rule as the topic
+// recommender's sample floor.
+{
+  const library = makeLibrary("similar-empty");
+  try {
+    const empty = await library.service.similarityNotice(library.scope, {
+      text: "深度学习在图像识别任务上取得了显著进展，这一点值得进一步讨论",
+    });
+    check("an empty library reports nothing was comparable", empty.comparable === false,
+      JSON.stringify(empty));
+    check("an empty library checks zero rows", empty.checked === 0, String(empty.checked));
+    check("an empty library produces no hits", empty.hits.length === 0, String(empty.hits.length));
+    check("the refusal explains that no comparison is not the same as no overlap",
+      /没有比对不等于没有相似/.test(empty.note), empty.note);
+    check("the refusal does not claim the passage is clean",
+      !/没有发现/.test(empty.note), empty.note);
+    check("the refusal still carries the disclaimer", empty.disclaimer === similarity.SIMILARITY_DISCLAIMER);
+  } finally {
+    library.cleanup();
+  }
+}
+
 // --- 15. mounted panel -------------------------------------------------
 const ROOT = join(process.env.USERPROFILE ?? "", ".dsh", "profiles", "node_modules");
 const requireFromProfile = createRequire(join(ROOT, "noop.js"));
@@ -584,6 +609,10 @@ if (React !== undefined) {
     { paperId: "pA", title: "论文 A", authors: "A", year: "2021", venue: "V", material: "metadata", pdfPath: "", hitCount: 0 },
   ];
   const calls = [];
+  // Flipped to 0 for the empty-library case below; the host reports allTotal from the
+  // same count, so the mock has to agree with it or the button state proves nothing.
+  let mountedEvidenceCount = 1;
+  let emptySkeletonNote = "";
   const answer = (method) => {
     switch (method) {
       case "status":
@@ -603,10 +632,24 @@ if (React !== undefined) {
           limits: { maxImportFiles: 32, maxPdfBytes: 67108864 },
         };
       case "listPapers": return { papers, library: { papers: 1, pages: 0, evidence: 1 }, paging: { offset: 0, limit_returned: 1, total: 1, hasMore: false } };
-      case "listEvidence": return { evidence: [{ evidenceId: "e1", paperId: "pA", paperTitle: "论文 A", pageIndex: 0, quote: "深度学习在图像识别任务上取得了显著进展", status: "anchored" }], paging: { offset: 0, limit_returned: 1, total: 1, hasMore: false, anchoredTotal: 1, allTotal: 1 } };
+      case "listEvidence": {
+        const rows = mountedEvidenceCount === 0
+          ? []
+          : [{ evidenceId: "e1", paperId: "pA", paperTitle: "论文 A", pageIndex: 0, quote: "深度学习在图像识别任务上取得了显著进展", status: "anchored" }];
+        return { evidence: rows, paging: { offset: 0, limit_returned: rows.length, total: rows.length, hasMore: false, anchoredTotal: rows.length, allTotal: rows.length } };
+      }
       case "listAnnotations": return { annotations: [] };
       case "listClaims": return { claims: [] };
       case "sectionSkeleton":
+        if (mountedEvidenceCount === 0) {
+          return {
+            sections: [],
+            totalEvidence: 0,
+            droppedEvidence: 0,
+            note: "库里还没有可用证据：这个骨架不是空的建议，是没有材料可依据，所以不产出章节。",
+            text: "库里还没有可用证据：这个骨架不是空的建议，是没有材料可依据，所以不产出章节。",
+          };
+        }
         return {
           sections: [
             { id: "introduction", title: "引言", purpose: "问题是什么", evidenceIds: ["e1"], paperIds: ["pA"] },
@@ -707,10 +750,38 @@ if (React !== undefined) {
   check("the skeleton hint distinguishes it from the evidence outline",
     mountHost.textContent.includes(zh.skeletonHint));
   await click(byText(zh.buildSkeleton)[0]);
+  // Found on the real GUI: with no evidence the panel printed the same sentence
+  // twice (once in the banner, once as the footnote), which read like two problems.
+  {
+    const emptyLibrary = makeLibrary("skeleton-empty");
+    try {
+      const empty = await emptyLibrary.service.sectionSkeleton(emptyLibrary.scope, {});
+      check("an empty skeleton has no sections", empty.sections.length === 0);
+      check("an empty skeleton says why in one note", typeof empty.note === "string" && empty.note.length > 10);
+      // The duplicate sentence was a render bug, so it is counted in the DOM below,
+      // on a mount whose skeleton comes back empty.
+      emptySkeletonNote = empty.note;
+    } finally {
+      emptyLibrary.cleanup();
+    }
+  }
   check("the skeleton renders one card per section",
     mountHost.querySelectorAll("[data-section]").length === 2,
     String(mountHost.querySelectorAll("[data-section]").length));
   const sectionCards = [...mountHost.querySelectorAll("[data-section]")];
+  // Found on the real GUI: the bound-id line reused the overlap panel's caption, so
+  // real evidence ids were labelled as overlap hits.
+  check("the skeleton has its own binding label, not the overlap one",
+    zh.skeletonBinds !== undefined && zh.skeletonBinds !== zh.similarHits,
+    JSON.stringify({ binds: zh.skeletonBinds, hits: zh.similarHits }));
+  // The dictionary keys differing is not enough: the render could still reference the
+  // wrong one. This asserts the label that actually appeared on the card.
+  {
+    const cardText = sectionCards.map((card) => card.textContent ?? "").join(" ");
+    check("the rendered skeleton card uses the binding label",
+      cardText.includes(zh.skeletonBinds) && !cardText.includes(zh.similarHits),
+      cardText.slice(0, 160));
+  }
   check("each skeleton card names an evidence id",
     sectionCards.length > 0 && sectionCards.every((card) => (card.textContent ?? "").includes("e1")),
     sectionCards.map((card) => card.textContent).join(" | "));
@@ -731,6 +802,13 @@ if (React !== undefined) {
     importCall !== undefined && String(importCall.payload?.input?.text ?? importCall.payload?.text ?? "").includes("@article"),
     JSON.stringify(importCall?.payload ?? null).slice(0, 160));
 
+  // Found on the real GUI: with zero evidence the button was still enabled, so the
+  // only way to learn the library could not answer was to click and read a refusal.
+  check("the overlap hint states when there is nothing to compare",
+    zh.similarNoEvidence !== undefined && zh.similarNoEvidence.length > 10);
+  // The button has two independent reasons to be disabled (empty box, empty library),
+  // so "enabled" is only meaningful once text is present — which is asserted below,
+  // after the passage box is filled.
   check("the overlap panel is on screen", byText(zh.similarCheck).length === 1,
     JSON.stringify(buttons().map((b) => b.textContent.trim()).slice(0, 20)));
   check("the overlap hint says it is not a plagiarism rate",
@@ -758,7 +836,97 @@ if (React !== undefined) {
 
   check("no unexpected React errors while driving the writing panels",
     seenErrors.length === 0, seenErrors.slice(0, 2).join(" | "));
+
+  // --- the same panel on an empty library -----------------------------
+  // Found on the real GUI: with zero evidence the overlap button was still enabled,
+  // so the only way to learn the library could not answer was to click and read a
+  // refusal. Mounted separately because the evidence count is read at mount time.
+  mountedEvidenceCount = 0;
+  const emptyHost = document.createElement("div");
+  document.body.appendChild(emptyHost);
+  const emptyRoot = createRoot(emptyHost);
+  emptyRoot.render(React.createElement(Body, { sessionId: "s37-empty", inputActions: { captureInsertion() {}, insertText() {} }, t }));
+  await settle();
+  const emptyTab = [...emptyHost.querySelectorAll("button")].find((b) => b.textContent.trim().startsWith(zh.reviewTab));
+  if (emptyTab !== undefined) {
+    emptyTab.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+    await settle(10);
+  }
+  // Text is filled first on purpose: with an empty box the button is disabled for a
+  // second reason, and that would hide whether the empty-library rule works at all.
+  const emptyBox = emptyHost.querySelector("textarea");
+  check("there is a passage box on the empty library too", emptyBox !== null);
+  if (emptyBox !== null) {
+    const emptyPropsKey = Object.keys(emptyBox).find((key) => key.startsWith("__reactProps"));
+    emptyBox[emptyPropsKey].onChange({ target: { value: "深度学习在图像识别任务上取得了显著进展" } });
+    await settle(10);
+  }
+  const emptyCheck = [...emptyHost.querySelectorAll("button")].filter((b) => b.textContent.trim() === zh.similarCheck);
+  check("the overlap button is disabled while the library holds no evidence",
+    emptyCheck.length === 1 && emptyCheck[0].disabled === true,
+    JSON.stringify(emptyCheck.map((b) => b.disabled)));
+  check("the empty library explanation is shown before any click",
+    emptyHost.textContent.includes(zh.similarNoEvidence), zh.similarNoEvidence);
+  // The skeleton note appeared TWICE on the real GUI (once in the banner, once as the
+  // footnote below it), which read like two separate problems. Counting occurrences in
+  // the rendered text is the only way to see a duplicate.
+  const emptySkeletonButton = [...emptyHost.querySelectorAll("button")].filter((b) => b.textContent.trim() === zh.buildSkeleton);
+  if (emptySkeletonButton.length === 1) {
+    emptySkeletonButton[0].dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+    await settle(20);
+  }
+  const occurrences = emptySkeletonNote === ""
+    ? 0
+    : (emptyHost.textContent.split(emptySkeletonNote).length - 1);
+  check("an empty skeleton explains itself exactly once", occurrences === 1, String(occurrences));
+  check("no React errors on the empty library",
+    seenErrors.length === 0, seenErrors.slice(0, 2).join(" | "));
   console.error = realError;
+
+    // --- fit-to-width does not clip the page -----------------------------
+  // Found on the real GUI: in a narrow sidebar the PDF page was cut off on the right
+  // and could not be scrolled to. Two things had to be true for that: the scale came
+  // from a guessed padding constant, and the container centred an overflowing child in
+  // a way that hides its start edge. Both are asserted here.
+  {
+    // Arithmetic first, as a pure function.
+    const { fitScale } = exported.__test;
+    check("a page is scaled to fill the available width",
+      fitScale({ available: 400, pageWidth: 800 }) === 0.5,
+      String(fitScale({ available: 400, pageWidth: 800 })));
+    check("a narrow container shrinks the page below 1",
+      fitScale({ available: 260, pageWidth: 595 }) === 0.44,
+      String(fitScale({ available: 260, pageWidth: 595 })));
+    check("a wide container enlarges the page",
+      fitScale({ available: 1200, pageWidth: 595 }) === 2.02,
+      String(fitScale({ available: 1200, pageWidth: 595 })));
+    // The floor and ceiling exist so an extreme layout cannot ask for a 0.01x page.
+    check("the scale is clamped from below", fitScale({ available: 10, pageWidth: 800 }) === 0.3,
+      String(fitScale({ available: 10, pageWidth: 800 })));
+    check("the scale is clamped from above", fitScale({ available: 100000, pageWidth: 100 }) === 3,
+      String(fitScale({ available: 100000, pageWidth: 100 })));
+    check("an unmeasurable width yields no scale rather than a guess",
+      fitScale({ available: 0, pageWidth: 800 }) === null);
+    check("a missing page width yields no scale",
+      fitScale({ available: 400, pageWidth: 0 }) === null);
+
+    // The CSS half: centring must not clip an overflowing child.
+    // Strip CSS comments before looking for declarations: the comment above the rule
+    // names the property it replaced, and matching that text makes the assertion
+    // unpassable while telling you nothing about the code.
+    const cssDeclarations = client.replace(/\/\*[\s\S]*?\*\//g, "");
+    check("the page container does not centre by clipping",
+      !/\.pt-canvas-wrap\s*\{[^}]*justify-content:\s*center/.test(cssDeclarations),
+      "justify-content:center clips the start edge of an overflowing child");
+    check("the page uses auto margins to centre", /\.pt-page\s*\{[^}]*margin:\s*0 auto/.test(client));
+    // Same trap: the doc comment quotes the old expression it replaced.
+    const codeDeclarations = client.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    check("the available width is measured from real padding, not a constant",
+      /parseFloat\(style\?\.paddingLeft/.test(codeDeclarations)
+        && !/clientWidth - 18/.test(codeDeclarations),
+      "still subtracting a guessed constant");
+  }
+
 }
 
 // --- summary ---------------------------------------------------------

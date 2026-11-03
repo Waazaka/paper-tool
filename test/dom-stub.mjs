@@ -331,7 +331,6 @@ class Element extends Node {
     // ever successfully typed into a field. The accessor below lives on the
     // prototype so hasOwnProperty("value") stays false, like a real element.
     this._value = "";
-    this.disabled = false;
     this.checked = false;
     this.dataset = {};
     this._rect = { x: 0, y: 0, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 };
@@ -339,6 +338,19 @@ class Element extends Node {
   // react-dom's isTextInputElement() checks `supportedInputTypes[elem.type]`, so
   // an <input> without a type is not treated as a text input and onChange never
   // fires. Real inputs default to type="text".
+  // Boolean attributes are reflected properties on real elements: setting the
+  // attribute flips the property and vice versa. The stub used a plain data property,
+  // so `setAttribute("disabled","")` left `node.disabled === false` while the
+  // attribute existed — a state no real element can be in. Anything asserting on
+  // `:disabled` semantics (the CSS uses it, and most a11y checks read the property)
+  // was therefore testing a fiction.
+  get disabled() {
+    return this.attributes.has("disabled");
+  }
+  set disabled(value) {
+    if (value) this.setAttribute("disabled", "");
+    else this.removeAttribute("disabled");
+  }
   get type() {
     if (this.localName === "input") return this.getAttribute("type") ?? "text";
     if (this.localName === "textarea") return "textarea";
