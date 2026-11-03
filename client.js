@@ -180,6 +180,26 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         evidenceUnanchored: "仅记录页码",
         evidenceUnanchoredHint: "这段引文没能在该页文本中定位，跳转只到页码。",
         quoteTooLong: "选中的文字超过 {limit} 字，请缩短后再存。",
+        backupTitle: "备份与迁移",
+        backupNow: "备份整库",
+        backingUp: "备份中…",
+        backupLoading: "正在读取库大小…",
+        backupSummary: "当前库：{db} 索引 + {files}（{n} 个 PDF）",
+        backupLivesAt: "备份写到",
+        backupWalNote: "备份用 VACUUM INTO 生成一致性快照，不是直接拷文件——库在 WAL 模式下直接拷会漏掉最近提交。",
+        backupNone: "还没有备份。",
+        backupExisting: "已有备份",
+        backupDone: "备份完成",
+        backupIncomplete: "备份不完整",
+        restore: "恢复",
+        restoring: "恢复中…",
+        restoreDone: "恢复完成",
+        restoreForce: "允许覆盖",
+        restoreForceWarning: "将覆盖当前库",
+        restoreForceDetail: "目标位置已有论文。勾选「允许覆盖」后再点恢复，现有库会被备份内容替换且无法撤销。",
+        pathsRewritten: "条路径已重写",
+        restoreMissingPdf: "以下论文的 PDF 未随备份恢复",
+        refresh: "刷新",
         translateTab: "对照",
         translateIntro: "插件不翻译：它把原文切段并带上页码锚点，由对话里的 Agent 翻译，再把译文按锚点写回。",
         translatePaper: "选择论文",
@@ -443,6 +463,26 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         evidenceUnanchored: "page only",
         evidenceUnanchoredHint: "This quote could not be located in the page text, so jumps land on the page.",
         quoteTooLong: "Selection exceeds {limit} characters. Shorten it before saving.",
+        backupTitle: "Backup",
+        backupNow: "Back up library",
+        backingUp: "Backing up…",
+        backupLoading: "Reading library size…",
+        backupSummary: "Library: {db} index + {files} ({n} PDFs)",
+        backupLivesAt: "Backups go to",
+        backupWalNote: "The snapshot uses VACUUM INTO, not a file copy — in WAL mode a plain copy can miss recent commits.",
+        backupNone: "No backups yet.",
+        backupExisting: "Existing backups",
+        backupDone: "Backup complete",
+        backupIncomplete: "Backup incomplete",
+        restore: "Restore",
+        restoring: "Restoring…",
+        restoreDone: "Restore complete",
+        restoreForce: "Allow overwrite",
+        restoreForceWarning: "This will overwrite the library",
+        restoreForceDetail: "The target already holds papers. Tick “allow overwrite” and restore again; the current library is replaced and cannot be undone.",
+        pathsRewritten: "path(s) rewritten",
+        restoreMissingPdf: "PDFs missing after restore",
+        refresh: "Refresh",
         translateTab: "Translation",
         translateIntro: "The plugin does not translate: it cuts the page into anchored segments, the Agent translates them in conversation, and the result is written back by anchor.",
         translatePaper: "Paper",
@@ -593,6 +633,9 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
       "watchStart",
       // Translation RPCs all take an input object.
       "translateSegments", "saveTranslation", "listTranslations", "deleteTranslation",
+      // Backup RPCs: backupStatus and backupLibrary take no input, restoreLibrary
+      // does, so all three go through the wrapped path.
+      "backupLibrary", "restoreLibrary", "backupStatus",
     ]);
 
     /** Typed transport failure. `code` drives the recovery the UI offers. */
@@ -1607,6 +1650,39 @@ function describeError(error, t) {
 
     // --- reader -----------------------------------------------------------
 
+    /** Human-readable byte size. Used by the backup panel, not for exact numbers. */
+    function formatBytes(bytes) {
+      const value = Number(bytes);
+      if (!Number.isFinite(value) || value < 0) return "-";
+      if (value < 1024) return `${value} B`;
+      const units = ["KB", "MB", "GB", "TB"];
+      let scaled = value / 1024;
+      let unit = 0;
+      while (scaled >= 1024 && unit < units.length - 1) { scaled /= 1024; unit += 1; }
+      return `${scaled.toFixed(scaled >= 10 ? 0 : 1)} ${units[unit]}`;
+    }
+
+    /** How long a backup took, short enough for the note line. */
+    function formatDuration(ms) {
+      const value = Number(ms);
+      if (!Number.isFinite(value) || value < 0) return "-";
+      if (value < 1000) return `${Math.round(value)} ms`;
+      return `${(value / 1000).toFixed(1)} s`;
+    }
+
+    /**
+     * Join a backup directory name onto the backups root.
+     *
+     * Kept as a separate function because the two halves arrive from different
+     * places (one from the Host, one from a list the Host produced) and a naive
+     * string concatenation loses the separator on Windows.
+     */
+    function joinBackupPath(root, name) {
+      if (typeof root !== "string" || root === "") return name;
+      const separator = root.includes("\\") ? "\\" : "/";
+      return `${root.replace(/[\\/]+$/, "")}${separator}${name}`;
+    }
+
     function PdfReader({ sessionId, paper, initialPage, highlight, annotations, t, onSelectionChange, onClose }) {
       const canvasRef = useRef(null);
       const textLayerRef = useRef(null);
@@ -2104,6 +2180,12 @@ function describeError(error, t) {
       const [translateDraft, setTranslateDraft] = useState({});
       const [translationRows, setTranslationRows] = useState([]);
       const [translateBusy, setTranslateBusy] = useState(null);
+      // Backup state. The sizes come from the Host so the button can say what it
+      // is about to copy instead of surprising the user with a long copy.
+      const [backupStatus, setBackupStatus] = useState(null);
+      const [backupResult, setBackupResult] = useState(null);
+      const [backupBusy, setBackupBusy] = useState(null);
+      const [restoreForce, setRestoreForce] = useState(false);
 
       const openReader = useCallback((target) => {
         setReader(target);
@@ -2736,6 +2818,70 @@ function describeError(error, t) {
         }
       }, [sessionId, t, watchState]);
 
+      const refreshBackup = useCallback(async () => {
+        if (!sessionId) return;
+        try {
+          setBackupStatus(await callRemote(sessionId, "backupStatus", {}));
+        } catch (statusError) {
+          // A missing backup view must not take the library down with it.
+          setError(describeError(statusError, t));
+        }
+      }, [sessionId, t]);
+
+      // Loaded once on mount so the panel can state the library's size before the
+      // user commits to a backup. Declared here, after refreshBackup, because a
+      // hook that references a `const` callback above its definition hits the
+      // temporal dead zone and takes the whole pane down.
+      useEffect(() => { void refreshBackup(); }, [refreshBackup]);
+
+      const runBackup = useCallback(async () => {
+        if (!sessionId) return;
+        setBackupBusy("backup");
+        setError(null);
+        try {
+          const result = await callRemote(sessionId, "backupLibrary", {});
+          setBackupResult(result);
+          await refreshBackup();
+          // Report the numbers rather than "done": the user needs to know what
+          // actually landed on disk, and an incomplete backup must not look fine.
+          setNote(result.ok
+            ? `${t("backupDone")} · ${formatBytes(result.report.sqliteBytes)} + ${result.report.pdfCount} PDF · ${formatDuration(result.report.durationMs)}`
+            : `${t("backupIncomplete")} · ${result.problems.join("; ")}`);
+          if (!result.ok) setError(result.problems.join("; "));
+        } catch (backupError) {
+          setError(describeError(backupError, t));
+        } finally {
+          setBackupBusy(null);
+        }
+      }, [sessionId, refreshBackup, t]);
+
+      const runRestore = useCallback(async (directory) => {
+        if (!sessionId || typeof directory !== "string" || directory === "") return;
+        setBackupBusy("restore");
+        setError(null);
+        try {
+          const result = await callRemote(sessionId, "restoreLibrary", {
+            from: joinBackupPath(backupStatus?.backupsDir ?? "", directory),
+            force: restoreForce,
+          });
+          setBackupResult(result);
+          await refresh();
+          await refreshBackup();
+          setNote(`${t("restoreDone")} · ${result.filesCopied} PDF · ${result.pathsRewritten} ${t("pathsRewritten")}`);
+          // A paper whose bytes did not come across is a real hole; say which.
+          if ((result.pdfMissing ?? []).length > 0) {
+            setError(`${t("restoreMissingPdf")}: ${result.pdfMissing.join(", ")}`);
+          }
+          setRestoreForce(false);
+        } catch (restoreError) {
+          // The guard's message names the target path; surface it as-is rather
+          // than replacing it with a generic failure.
+          setError(describeError(restoreError, t));
+        } finally {
+          setBackupBusy(null);
+        }
+      }, [sessionId, backupStatus, restoreForce, refresh, refreshBackup, t]);
+
       const loadSegments = useCallback(async () => {
         if (!sessionId || translatePaperId === "") return;
         setTranslateBusy("segments");
@@ -3278,6 +3424,78 @@ function describeError(error, t) {
           watchState?.watching === true ? t("watchOff") : t("watch")),
       );
 
+      // --- backup -----------------------------------------------------------
+      const backupPanel = () => {
+        const measured = backupStatus?.measured;
+        const backups = backupStatus?.backups ?? [];
+        return h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 8 } },
+          h("div", { className: "pt-toolbar" },
+            h("span", { className: "pt-h2" }, t("backupTitle")),
+            h("div", { className: "pt-spacer" }),
+            h(Button, { onClick: refreshBackup, disabled: backupBusy !== null }, t("refresh")),
+            h(Button, { variant: "primary", onClick: runBackup, disabled: backupBusy !== null },
+              backupBusy === "backup" ? t("backingUp") : t("backupNow")),
+          ),
+          // The sizes are shown before the copy, so "2 GB of PDFs" is a decision
+          // the user makes with numbers rather than discovers afterwards.
+          measured === undefined
+            ? h("p", { className: "pt-caption", style: { margin: 0 } }, t("backupLoading"))
+            : h("p", { className: "pt-caption", style: { margin: 0 } },
+              t("backupSummary", {
+                db: formatBytes(measured.dbBytes),
+                files: formatBytes(measured.filesBytes),
+                n: measured.pdfCount,
+              })),
+          backupStatus === null ? null : h("p", { className: "pt-caption", style: { margin: 0, wordBreak: "break-all" } },
+            `${t("backupLivesAt")}: ${backupStatus.backupsDir}`),
+          // Says out loud why the copy is not a file copy: this is the one
+          // implementation detail a user is better off knowing.
+          h("p", { className: "pt-caption", style: { margin: 0 } }, t("backupWalNote")),
+
+          backups.length === 0
+            ? h("p", { className: "pt-caption", style: { margin: 0 } }, t("backupNone"))
+            : h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+              h("div", { className: "pt-toolbar" },
+                h("span", { className: "pt-caption" }, t("backupExisting")),
+                h("div", { className: "pt-spacer" }),
+                h("label", { style: { display: "flex", gap: 4, alignItems: "center" } },
+                  h("input", {
+                    type: "checkbox", checked: restoreForce,
+                    "aria-label": t("restoreForce"),
+                    onChange: (event) => setRestoreForce(event.target.checked),
+                  }),
+                  h("span", { className: "pt-caption" }, t("restoreForce")),
+                ),
+              ),
+              // Overwriting is refused by the Host unless force is ticked, and the
+              // checkbox is right here so the refusal is understandable rather
+              // than mysterious.
+              restoreForce
+                ? h(Banner, { tone: "error", title: t("restoreForceWarning") }, t("restoreForceDetail"))
+                : null,
+              backups.map((name) => h("div", { key: name, className: "pt-toolbar" },
+                h("span", { className: "pt-meta", style: { wordBreak: "break-all" } }, name),
+                h("div", { className: "pt-spacer" }),
+                h(Button, {
+                  onClick: () => runRestore(name),
+                  disabled: backupBusy !== null,
+                }, backupBusy === "restore" ? t("restoring") : t("restore")),
+              )),
+            ),
+
+          backupResult === null ? null : h("div", { style: { display: "flex", flexDirection: "column", gap: 2 } },
+            h("div", { className: "pt-toolbar" },
+              h("span", { className: "pt-caption" }, backupResult.ok === false ? t("backupIncomplete") : t("backupDone")),
+            ),
+            h("p", { className: "pt-caption pt-num", style: { margin: 0, wordBreak: "break-all" } }, backupResult.directory ?? backupResult.to ?? ""),
+            backupResult.report === undefined ? null : h("p", { className: "pt-caption pt-num", style: { margin: 0 } },
+              `sqlite ${formatBytes(backupResult.report.sqliteBytes)} · files ${formatBytes(backupResult.report.filesBytes)} · ${backupResult.report.pdfCount} PDF · ${formatDuration(backupResult.report.durationMs)}`),
+            (backupResult.problems ?? []).length === 0 ? null : h("p", { className: "pt-caption", style: { margin: 0 } },
+              backupResult.problems.join("; ")),
+          ),
+        );
+      };
+
       const renderLibrary = () => h(React.Fragment, null,
         h("div", { style: { padding: "10px 12px 0", display: "flex", flexDirection: "column", gap: 8 } },
           h("div", { className: "pt-toolbar" },
@@ -3609,6 +3827,10 @@ function describeError(error, t) {
                 t("loadedOf", { shown: papers.length, total: paperPaging.total })))
             : null,
         ),
+        // Backup lives at the bottom of the library view: it is about this library,
+        // not about one paper, and it is maintenance rather than daily work.
+        h("hr", { className: "pt-divider" }),
+        backupPanel(),
       );
 
       const renderEvidence = () => {

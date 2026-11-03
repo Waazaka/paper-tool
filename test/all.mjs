@@ -101,6 +101,7 @@ const GATES = [
   { name: "s32-import-dir-watch", script: "s32-import-dir-watch.mjs", needsCorpus: false, what: "directory and drag import, one limit source, opt-in folder watching that waits for the file to settle" },
   { name: "s32b-import-mount", script: "s32b-import-mount.mjs", needsCorpus: false, what: "the mounted panel really renders a folder picker, accepts a drop, walks dropped folders, and reports leftovers" },
   { name: "s33-translate", script: "s33-translate.mjs", needsCorpus: false, what: "anchored segmentation, anchored write-back, side-by-side alignment, search isolation, OCR caveat" },
+  { name: "s34-backup", script: "s34-backup.mjs", needsCorpus: false, what: "whole-library backup as a consistent snapshot, relocatable restore, overwrite guard, table parity" },
 ];
 
 function corpusLooksUsable(dir) {

@@ -194,6 +194,7 @@ client 侧改动会以新的内容版本号下发，只需刷新页面。
 |---|---|
 | `%DSH_HOME%\paper-tool\library.sqlite` | 索引：papers、pages、evidence、claims |
 | `%DSH_HOME%\paper-tool\files\` | 导入的 PDF 原始字节 |
+| `%DSH_HOME%\paper-tool\backups\` | 备份目录（每个备份一个子目录） |
 | `%LOCALAPPDATA%\dsh-paper-tool\cnki-profile` | 知网浏览器会话 |
 
 `DSH_HOME` 是 DSH 的 profile 目录（Windows 上是 `~/.dsh-desktop`）。全局只有一个
@@ -203,6 +204,35 @@ client 侧改动会以新的内容版本号下发，只需刷新页面。
 还不存在时复制，所以永远不会覆盖更新的数据。
 
 插件配置里设 `dbPath` 可指定库文件位置，设 `shared: false` 可退回到按工作区各存一份。
+
+### 备份与迁移
+
+文献库不在版本控制里，也不在任何同步盘的自然位置，而它装的是**不可重建**的东西：带字符
+偏移的手工引文、论断与证据的绑定、手工修正过的元数据。PDF 可以重新下载，这些不行。所以
+侧栏「文献库」页底部有一个「备份与迁移」区。
+
+- **备份整库**：在 `%DSH_HOME%\paper-tool\backups\<时间戳>\` 下生成一个自洽目录，
+  含 `library.sqlite`、`files/`（PDF 原始字节）和 `manifest.json`（字节数、PDF 数、
+  行数）。整个目录可以拷到任何地方。
+- **恢复**：从某个备份目录把库和 PDF 写回当前位置。
+
+两件事是刻意这么做的：
+
+1. **用 `VACUUM INTO` 而不是拷文件**。库跑在 WAL 模式下，最近的提交可能还在 `-wal` 里，
+   直接拷 `.sqlite` 会**漏掉最新的论文**——而备份看起来是成功的，这比没有备份更糟。
+   `VACUUM INTO` 写出的是已 checkpoint 的完整快照。门禁 s34 会先断言主库文件确实
+   小于快照，来证明这个隐患是真的。
+2. **恢复会重写 `pdfPath`**。库里的 `pdfPath` 是绝对路径，换机器或换 profile 后，
+   照抄过去会让每篇论文都指向一个不存在的目录——PDF 明明在，界面上却是「点开无 PDF」。
+   恢复时只保留文件名、重新拼到新的 `files/` 下，这一步才是「可迁移」的真正含义。
+
+恢复默认拒绝覆盖已有数据的库：目标里已有论文时会报出路径与论文数，要求显式勾选
+「允许覆盖」。这个方向在工具内部无法撤销，所以安全的那一边必须是默认值。备份目录里若
+`manifest.json` 与磁盘上的文件对不上（半拷完成的备份），恢复会直接拒绝，而不是写回一个
+缺文件的库。
+
+> 如果库很大，备份期间界面会短暂无响应——它是一次同步的文件操作。进度显示与后台化还没做，
+> 这条记在 `project/STATUS.md` 的已知限制里。
 
 直接用 `node:sqlite` 的 FTS5——不引 SQLite 包。索引有两个，因为一个分词器伺候不了
 两种文字：
@@ -217,7 +247,7 @@ client 侧改动会以新的内容版本号下发，只需刷新页面。
 实测 2 400 页时 10 ms，在这个量级上仍是划算的。到 24 000 页时索引明显占优：
 一个生僻词走 `MATCH` 比走 `LIKE` 快约 **1848 倍**。
 
-Schema 用 `PRAGMA user_version` 版本化，只向前迁移（`SCHEMA_VERSION = 5`）。
+Schema 用 `PRAGMA user_version` 版本化，只向前迁移（`SCHEMA_VERSION = 7`）。
 每次迁移都在打开库时自动、幂等地执行，所以已有库是原地升级的：
 
 | 版本 | 变更 |
@@ -226,6 +256,8 @@ Schema 用 `PRAGMA user_version` 版本化，只向前迁移（`SCHEMA_VERSION =
 | v3 | `metadataSource`——记录每个字段来自哪个通道 |
 | v4 | `claims` 表 |
 | v5 | 恢复 `pages_cjk` trigram 索引，并回填 |
+| v6 | `annotations` 表（阅读器标注，与证据分开存） |
+| v7 | `translations` 表（译文按锚点存，不进全文索引） |
 
 > v2 当初还顺手删掉了 `pages_cjk`，为的是把每页写入成本减半。v5 把中文搜索加回来时，
 > 那行遗留的 `DROP TABLE` 把新 schema 刚建好的索引删掉了——中文搜索返回空。
