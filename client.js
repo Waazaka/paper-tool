@@ -187,6 +187,9 @@ window.__ModuleLoader__.load({
         conflict: "冲突",
         notFound: "未提及",
         noEvidenceStance: "无证据",
+  gradeStrong: "强",
+  gradePartial: "部分",
+  gradeWeak: "弱",
         covered: "有证据",
         emptyCoverage: "无证据",
         jumpToPage: "跳转",
@@ -408,6 +411,9 @@ window.__ModuleLoader__.load({
         conflict: "conflict",
         notFound: "not mentioned",
         noEvidenceStance: "no evidence",
+  gradeStrong: "strong",
+  gradePartial: "partial",
+  gradeWeak: "weak",
         covered: "covered",
         emptyCoverage: "empty",
         jumpToPage: "Open",
@@ -1849,7 +1855,7 @@ function describeError(error, t) {
       empty: "quiet",
     };
 
-    function StanceBadge({ stance, t }) {
+    function StanceBadge({ stance, strength, t }) {
       const label = stance === "support"
         ? t("support")
         : stance === "conflict"
@@ -1861,7 +1867,15 @@ function describeError(error, t) {
               : stance === "empty"
                 ? t("emptyCoverage")
                 : t("notFound");
-      return h(Badge, { tone: STANCE_TONE[stance] }, label);
+      // The grade rides on the badge rather than in a separate row: "支持" alone
+      // was the misreading this task fixes — one hedged sentence and one firm
+      // replication looked identical. No grade means no stance judgement was
+      // made (coverage mode), so nothing is appended.
+      const grade = strength === "strong" ? t("gradeStrong")
+        : strength === "partial" ? t("gradePartial")
+          : strength === "weak" ? t("gradeWeak")
+            : "";
+      return h(Badge, { tone: STANCE_TONE[stance] }, grade === "" ? label : `${label}·${grade}`);
     }
 
     function EvidenceRow({ row, t, onJump, onDelete, busy }) {
@@ -3263,7 +3277,7 @@ function describeError(error, t) {
                 return h("li", { key: row.paperId, className: "pt-card" },
                   h("div", { style: { display: "flex", gap: 6, alignItems: "flex-start" } },
                     h("span", { className: "pt-body", style: { flex: 1, minWidth: 0, wordBreak: "break-word" } }, row.title),
-                    h(StanceBadge, { stance: row.stance, t }),
+                    h(StanceBadge, { stance: row.stance, strength: row.strength, t }),
                   ),
                   h("div", { style: { display: "flex", gap: 8, alignItems: "center", marginTop: 4 } },
                     h("span", { className: "pt-caption pt-num" },
@@ -3274,6 +3288,17 @@ function describeError(error, t) {
                       onClick: () => jumpToEvidence(target),
                     }, "↗") : null,
                   ),
+                  // The reasons behind this row's verdict. Without them the matrix
+                  // is a set of numbers the reviewer has to take on faith; with
+                  // them it is a list of passages to go read, which is what a
+                  // stance judgement is actually for.
+                  (row.judgements ?? []).length === 0 ? null : h("ul", {
+                    className: "pt-caption",
+                    style: { margin: "4px 0 0", paddingLeft: 16 },
+                  }, row.judgements.slice(0, 3).map((judgement) => h("li",
+                    { key: judgement.evidenceId, style: { marginTop: 2 } },
+                    h("span", { className: "pt-caption" },
+                      `${judgement.stance === "conflict" ? "✕" : judgement.stance === "support" ? "✓" : "?"} ${judgement.rationale}`)))),
                 );
               })),
           ) : null,

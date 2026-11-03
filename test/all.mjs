@@ -97,6 +97,7 @@ const GATES = [
   { name: "s29-external-sources", script: "s29-external-sources.mjs", needsCorpus: false, what: "five external sources, citations carried through, source-order-independent merge" },
   { name: "s30-paging", script: "s30-paging.mjs", needsCorpus: false, what: "list paging past the 500 ceiling, payload trimming, library-wide citation scope" },
   { name: "s30b-paging-mount", script: "s30b-paging-mount.mjs", needsCorpus: false, what: "the mounted client actually pages, refetches on filter change, loads the full row before editing" },
+  { name: "s31-stance", script: "s31-stance.mjs", needsCorpus: false, what: "graded stance judgement: adversarial cases, strength levels, per-evidence rationale, determinism" },
 ];
 
 function corpusLooksUsable(dir) {
