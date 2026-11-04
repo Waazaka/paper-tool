@@ -244,6 +244,53 @@ export class TextLayer {
     // Opening the first compare pane must not leave the single reader mounted too; the
     // two would fight over the same selection.
     check("the compare header replaces the single reader's controls", text().includes(zh.compareClear));
+
+
+    // Found on the real GUI: the panes rendered ABOVE the viewport because the library
+    // list was already scrolled down, so clicking 加入比较 looked like it did nothing.
+    // The stack must be scrolled into view when it is off-screen.
+    {
+      const stack = mountHost.querySelector("[data-paper-tool='compare']");
+      const calls = window.document.scrollIntoViewCalls;
+      check("the compare stack exists", stack !== null, "no compare stack in the tree");
+      // The stub has no layout: mark the stack as off-screen, then add a second paper and
+      // assert a scroll was requested for it.
+      if (stack !== null) {
+        stack._rect = { x: 0, y: -980, width: 400, height: 200, top: -980, left: 0, right: 400, bottom: -780 };
+      }
+      const before = calls.length;
+      const panesBefore = mountHost.querySelectorAll("[data-compare-paper]").length;
+      // The SECOND button: adding a paper that is already in the set is a no-op by
+      // design (and correctly does not scroll), so the assertion has to add a new one.
+      const addButtons = byText(zh.compareAdd);
+      await click(addButtons.length > 1 ? addButtons[1] : addButtons[0]);
+      check("adding a paper off-screen really requested a scroll",
+        calls.length > before, `scrollIntoView calls: ${calls.length - before}`);
+
+      // The other half of the rule: when the stack is already visible, adding another
+      // paper must NOT yank the list. Without this assertion, removing the off-screen
+      // guard still passed — the panes scrolled on every add.
+      if (stack !== null) {
+        stack._rect = { x: 0, y: 200, width: 400, height: 200, top: 200, left: 0, right: 400, bottom: 400 };
+      }
+      const beforeVisible = calls.length;
+      // Third paper, so the set grows again and the effect re-runs.
+      const addBtns2 = byText(zh.compareAdd);
+      await click(addBtns2.length > 2 ? addBtns2[2] : addBtns2[0]);
+      check("a visible compare stack is not scrolled again",
+        calls.length === beforeVisible, `scrollIntoView calls: ${calls.length - beforeVisible}`);
+      if (stack !== null) {
+        stack._rect = { x: 0, y: 0, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 };
+      }
+      check("adding a paper off-screen scrolls the panes into view",
+        calls.length > before, `scrollIntoView calls: ${calls.length - before}`);
+      if (stack !== null) {
+        stack._rect = { x: 0, y: 0, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 };
+      }
+      // One paper was already in the set, so this added the second one.
+      const clearButton = byText(zh.compareClear ?? "清空");
+      if (clearButton.length > 0) await click(clearButton[0]);
+    }
   }
 
   // --- 3. a second paper gives a second, independent pane ------------

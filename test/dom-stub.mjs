@@ -405,6 +405,13 @@ class Element extends Node {
   getBoundingClientRect() {
     return { ...this._rect };
   }
+  // Recorded rather than performed: the stub has no layout, so there is nothing to
+  // scroll. Tests assert that a scroll was REQUESTED for an off-screen element, which
+  // is the behaviour that was broken (the compare panes mounted above the viewport and
+  // the click looked like it did nothing).
+  scrollIntoView(options) {
+    this.ownerDocument.scrollIntoViewCalls.push({ node: this, options });
+  }
   focus() {
     this.ownerDocument.activeElement = this;
   }
@@ -555,6 +562,8 @@ class StorageArea {
 
 export function installDom({ width = 360, height = 640 } = {}) {
   const document = new Document();
+// Scroll requests made through Element.scrollIntoView, in order.
+document.scrollIntoViewCalls = [];
   const window = {
     document,
     devicePixelRatio: 2,

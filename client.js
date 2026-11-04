@@ -2436,6 +2436,7 @@ function describeError(error, t) {
       // with its own document, page and zoom — which is what gives the "closing one
       // does not disturb the other" property for free rather than by bookkeeping.
       const [comparePapers, setComparePapers] = useState(() => readStoredCompare());
+      const compareStackRef = useRef(null);
       // Which pane the toolbar and evidence actions apply to. Without a focus concept
       // "select text" would be ambiguous across panes.
       const [compareFocus, setCompareFocus] = useState(null);
@@ -2557,6 +2558,20 @@ function describeError(error, t) {
         setSelection(null);
         setView("library");
       }, []);
+
+      // Bring the panes into view after they mount. The effect keys off the count so it
+      // runs once per add/remove, and it only scrolls when the stack is actually out of
+      // view — scrolling on every add would yank the list away from someone who is
+      // adding three papers in a row and already sees the stack.
+      useEffect(() => {
+        const node = compareStackRef.current;
+        if (node === null || node === undefined) return;
+        if (typeof node.getBoundingClientRect !== "function") return;
+        const rect = node.getBoundingClientRect();
+        const offscreen = rect.bottom < 0 || rect.top > (window.innerHeight ?? 0);
+        if (!offscreen) return;
+        if (typeof node.scrollIntoView === "function") node.scrollIntoView({ block: "start", behavior: "smooth" });
+      }, [comparePapers.length]);
 
       const removeFromCompare = useCallback((paperId) => {
         // Both updates are computed from the same snapshot, outside each other's
@@ -4123,6 +4138,10 @@ function describeError(error, t) {
         // vertical split keeps the full width and buys height instead, and this is the
         // documented tradeoff for PT-020 rather than an oversight.
         comparePapers.length > 0 ? h("div", {
+          // Scrolled into view when the set changes. Found on the real GUI: after
+          // clicking 加入比较 the panes were rendered ABOVE the viewport (the library
+          // list was already scrolled down), so the click looked like it did nothing.
+          ref: compareStackRef,
           // The container query hook: each pane adapts to the PANE height, not the
           // window, which is what makes three stacked panes still usable.
           className: "pt-pane-stack",
