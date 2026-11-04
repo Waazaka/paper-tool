@@ -253,6 +253,27 @@ export class TextLayer {
       const stack = mountHost.querySelector("[data-paper-tool='compare']");
       const calls = window.document.scrollIntoViewCalls;
       check("the compare stack exists", stack !== null, "no compare stack in the tree");
+    // A size container has no intrinsic height: that is the price of making the
+    // @container ptpanes (max-height: ...) rule work. The parent here is an ordinary
+    // block in the scrolling column, not a flex container, so nothing distributes
+    // height to the stack either. Without an explicit height it laid out at 0 and,
+    // with overflow:hidden, the panes were painted into nothing -- which reads on
+    // screen as "the click did nothing". Assert the height is supplied by the very
+    // element that is also the container, or the two rules fight and the panes vanish.
+    {
+      const style = stack === null ? {} : (stack.style ?? {});
+      const height = style.height ?? "";
+      check("the compare stack supplies its own height",
+        height !== "" && height !== "0",
+        "height=" + JSON.stringify(height) + " -- a size container with no height is invisible");
+      // `flex: none` is correct and required: it says "do not stretch me", which is the
+      // opposite of relying on flex. A growing basis (1 1 auto / 1 1 0) is the bug,
+      // because the parent is a block and can never satisfy it.
+      const flexShorthand = String(style.flex ?? "");
+      check("the compare stack does not try to grow inside a non-flex parent",
+        !/^\s*1\b/.test(flexShorthand),
+        "flex=" + JSON.stringify(style.flex) + " -- the parent is a block, so a growing basis collapses to 0");
+    }
       // The stub has no layout: mark the stack as off-screen, then add a second paper and
       // assert a scroll was requested for it.
       if (stack !== null) {

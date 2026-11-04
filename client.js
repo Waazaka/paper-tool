@@ -4150,7 +4150,32 @@ function describeError(error, t) {
           // window, which is what makes three stacked panes still usable.
           className: "pt-pane-stack",
           "data-paper-tool": "compare",
-          style: { padding: "8px 12px 0", flex: "1 1 auto", minHeight: 0, display: "flex", flexDirection: "column", gap: 8 },
+          // An explicit height, not `flex: 1 1 auto`.
+          //
+          // `.pt-pane-stack` is `container-type: size`, which is what makes the
+          // `@container ptpanes (max-height: 260px)` rule able to hide the pane head —
+          // and a size container has NO intrinsic height by design. Its parent
+          // (`renderLibrary`'s output) is an ordinary block inside the scrolling
+          // column, not a flex container, so `flex: 1 1 auto` did nothing here: the
+          // stack laid out at height 0, and with `overflow: hidden` the panes were
+          // painted into nothing. On the real GUI that looked exactly like the click
+          // being ignored.
+          //
+          // 46vh is measured against the window, which is the one dimension this block
+          // can see. Split across up to three panes that is ~15vh each: enough for the
+          // pane head plus a page sliver, which is what the stacked layout traded for
+          // (full width instead of two side-by-side thumbnails).
+                    // Height is supplied here BECAUSE the element is a size container: a
+          // `container-type: size` box has no intrinsic height, so without this its
+          // height is 0 and, with overflow hidden, the panes paint into nothing. That
+          // was the real defect — clicking 加入比较 produced no visible change.
+          //
+          // It is deliberately modest (30vh) and scrolls internally. The panes carry a
+          // canvas with `min-height: 180px`, so up to three panes need ~540px; giving the
+          // stack that much would push the paper list out of the panel and, because the
+          // panel is its own scroll container, leave the list unreachable. Scrolling
+          // inside the stack keeps both usable.
+          style: { padding: "8px 0 0", height: "30vh", minHeight: "180px", flex: "none", display: "flex", flexDirection: "column", gap: 6, overflowY: "auto" },
         },
           h("div", { className: "pt-toolbar" },
             h("span", { className: "pt-caption" }, `${t("compareSet")} · ${comparePapers.length}/3`),
