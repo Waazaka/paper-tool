@@ -894,6 +894,10 @@ function describeError(error, t) {
     border-radius: 2px;
     background: var(--dsw-alias-brand-primary);
     opacity: 0.75;
+    /* Never stretch or shrink: the width IS the measurement. Without this the bar is a
+       flex item and its width is only a starting basis, so the tallest bar grew to fill
+       the row on the real GUI. */
+    flex: 0 0 auto;
   }
   .pt-topic-gap {
     display: flex;
@@ -4829,13 +4833,20 @@ function describeError(error, t) {
                   // One row per year with a bar proportional to the peak. Rendered as
                   // text-width bars so it works at any panel width without a chart lib.
                   ...trend.years.map((row) => h("div", { key: row.year, className: "pt-toolbar" },
-                    h("span", { className: "pt-caption pt-num", style: { width: 44 } }, String(row.year)),
-                    h("span", {
-                      className: "pt-tr-bar",
-                      style: { width: `${Math.max(2, Math.round((row.count / peak) * 100))}%` },
-                      "aria-label": `${row.year}: ${row.count}`,
-                    }),
-                    h("span", { className: "pt-caption pt-num" }, String(row.count)),
+                    h("span", { className: "pt-caption pt-num", style: { width: 44, flex: "none" } }, String(row.year)),
+                    // The bar sits in its OWN track, not directly in the row. A percentage
+                    // width resolves against the row, so the peak year asked for 100% and
+                    // filled it — pushing its own count onto the next line, which is how it
+                    // looked on the real GUI: a full-width bar with a stray number under it.
+                    h("span", { style: { flex: "1 1 auto", minWidth: 0, display: "flex" } },
+                      h("span", {
+                        className: "pt-tr-bar",
+                        style: { width: `${Math.max(2, Math.round((row.count / peak) * 100))}%` },
+                        "aria-label": `${row.year}: ${row.count}`,
+                      }),
+                      h("div", { className: "pt-spacer" }),
+                    ),
+                    h("span", { className: "pt-caption pt-num", style: { flex: "none" } }, String(row.count)),
                   )),
                 )
                 : null,

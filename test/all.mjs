@@ -110,6 +110,10 @@ const GATES = [
   // zero-argument method called with {} reached a release and greeted the user with an
   // error banner.
   { name: "s38-rpc-arity", script: "s38-rpc-arity.mjs", needsCorpus: false, what: "client call sites match host remote signatures: no arguments sent to a zero-argument method" },
+  // Chart-shape gate: the tallest year in the topic trend asked for width:100% and, being
+  // a direct child of the row's flex container, filled it and pushed its own count onto
+  // the next line. Screenshot-visible but invisible to every service-level test.
+  { name: "s39-topic-chart", script: "s39-topic-chart.mjs", needsCorpus: false, what: "topic year bars keep their scale and their count in the same row, including the peak year" },
 ];
 
 function corpusLooksUsable(dir) {
