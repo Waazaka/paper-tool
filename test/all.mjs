@@ -125,6 +125,11 @@ const GATES = [
   // worked. A from-scratch test library can never catch it; this one starts from an
   // up-to-date database with the column stripped out, which is what an old build left.
   { name: "s41-schema-repair", script: "s41-schema-repair.mjs", needsCorpus: false, what: "opening an already-current database repairs columns added after its migration function was written, without bumping the version" },
+  // Generalisation of s41. Every column added after its CREATE TABLE must reach a
+  // database that already claims the current version; this gate strips each one and
+  // requires the repair to put it back. Without it, the next late column someone adds
+  // will be invisible to every upgraded library, exactly as sourceName was.
+  { name: "s42-schema-parity", script: "s42-schema-parity.mjs", needsCorpus: false, what: "each late-added column is restored on a current-version database, and every inserted column exists in the fresh schema" },
 ];
 
 function corpusLooksUsable(dir) {
