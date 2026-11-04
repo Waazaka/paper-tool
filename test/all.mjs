@@ -114,6 +114,11 @@ const GATES = [
   // a direct child of the row's flex container, filled it and pushed its own count onto
   // the next line. Screenshot-visible but invisible to every service-level test.
   { name: "s39-topic-chart", script: "s39-topic-chart.mjs", needsCorpus: false, what: "topic year bars keep their scale and their count in the same row, including the peak year" },
+  // Live-shape gate: s38 catches a call site that sends the wrong shape; this catches the
+  // host giving a wrong ANSWER to a correct call. Runs against a VACUUM INTO snapshot of
+  // the real library, because the panel-only RPCs write. Skips (never passes) when the
+  // machine has no live library.
+  { name: "s40-rpc-live", script: "s40-rpc-live.mjs", needsCorpus: false, what: "panel-only RPCs answer correctly on a copy of the live library: skeleton binding, similarity disclaimer, claims, backup/restore, export" },
 ];
 
 function corpusLooksUsable(dir) {
