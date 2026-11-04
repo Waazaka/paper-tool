@@ -203,6 +203,134 @@ try {
     check("an unrecognised citation format is refused", typeof junkRefused === "string", String(junkRefused));
   }
 
+  // --- annotations, translation, topics, anchored ask -------------------
+  // These eight panel RPCs had no live coverage at all. Four of them are the annotation
+  // RPCs whose wire arity was wrong (see s44); calling them here is what proves the
+  // service side is sound once the transport is fixed, on a real library shape rather
+  // than an empty fixture.
+  {
+    // Pick a paper that actually has page text. `listPapers` returns whatever is newest
+    // first, and by this point the .bib import above has added a metadata-only paper
+    // with no pages — so taking the first row would test against a row that cannot carry
+    // segments or anchors, and the failures would look like product bugs.
+    const withPages = store.listPapers({ limit: 50, offset: 0 })
+      .find((row) => store.getPage(row.paperId, 0) !== null);
+    check("the live library has a paper with page text", withPages !== undefined,
+      "papers=" + store.stats().papers + " pages=" + store.stats().pages);
+
+    if (withPages !== undefined) {
+      const paperId = withPages.paperId;
+
+      const topics = await service.topicRecommend(scope, { query: "旅游" });
+      check("topicRecommend returns candidates and a disclaimer",
+        Array.isArray(topics.candidates) && typeof topics.disclaimer === "string",
+        "candidates=" + (topics.candidates?.length ?? "?"));
+      check("topicRecommend restates the disclaimer at the top level, below `candidates`",
+        typeof topics.disclaimer === "string" && topics.disclaimer.length > 0);
+      check("topicRecommend reports already-in-library separately from candidates",
+        typeof topics.alreadyInLibrary === "number", String(topics.alreadyInLibrary));
+
+      const segments = await service.translateSegments(scope, { paperId, targetLang: "en", fromPage: 0, toPage: 1 });
+      check("translateSegments returns anchored segments",
+        Array.isArray(segments.segments) && segments.segments.length > 0,
+        "segments=" + (segments.segments?.length ?? "?"));
+      const firstSegment = segments.segments?.[0];
+      check("a segment carries a real anchor",
+        Number.isInteger(firstSegment?.pageIndex) && Number.isInteger(firstSegment?.charStart)
+          && Number.isInteger(firstSegment?.charEnd) && firstSegment.charEnd > firstSegment.charStart,
+        JSON.stringify(firstSegment)?.slice(0, 160));
+      check("translateSegments reports unmatched segments instead of hiding them",
+        typeof segments.untranslated === "number" && segments.untranslated === segments.segments.length,
+        "untranslated=" + segments.untranslated + " segments=" + segments.segments.length);
+
+      if (firstSegment !== undefined) {
+        const savedTranslation = await service.saveTranslation(scope, {
+          paperId,
+          targetLang: "en",
+          items: [{ pageIndex: firstSegment.pageIndex, charStart: firstSegment.charStart, charEnd: firstSegment.charEnd, text: "a translation" }],
+        });
+        check("saveTranslation stores an item", savedTranslation.saved === 1, JSON.stringify(savedTranslation)?.slice(0, 160));
+        check("saveTranslation reports rejections as an array", Array.isArray(savedTranslation.rejected));
+        // A bad anchor must be refused, not stored at the wrong place.
+        const beforeBad = store.countTranslations({ paperId });
+        const badTranslation = await service.saveTranslation(scope, {
+          paperId,
+          targetLang: "en",
+          items: [{ pageIndex: -1, charStart: 0, charEnd: 5, text: "x" }],
+        });
+        check("saveTranslation rejects an invalid anchor", badTranslation.rejected.length === 1,
+          JSON.stringify(badTranslation.rejected).slice(0, 160));
+        // Refusing is not enough: nothing may be written. Without this, a version that
+        // reported the rejection but stored the row anyway would pass.
+        check("a rejected translation is not stored",
+          badTranslation.saved === 0 && store.countTranslations({ paperId }) === beforeBad,
+          "saved=" + badTranslation.saved + " count " + beforeBad + " -> " + store.countTranslations({ paperId }));
+      }
+
+      const listedTranslations = await service.listTranslations(scope, { paperId, targetLang: "en" });
+      check("listTranslations reads back what was saved",
+        listedTranslations.translations.length >= 1, "total=" + listedTranslations.total);
+      if (listedTranslations.translations[0] !== undefined) {
+        const removed = await service.deleteTranslation(scope, {
+          translationId: listedTranslations.translations[0].translationId,
+        });
+        check("deleteTranslation removes it", removed.deleted === listedTranslations.translations[0].translationId,
+          JSON.stringify(removed));
+        const afterDelete = await service.listTranslations(scope, { paperId, targetLang: "en" });
+        check("the deleted translation is gone", afterDelete.total === listedTranslations.total - 1,
+          afterDelete.total + " vs " + listedTranslations.total);
+      }
+
+      // Annotations: save, list, promote to evidence, delete.
+      const page = store.getPage(paperId, 0);
+      const quote = String(page?.text ?? "").slice(0, 12);
+      const savedAnnotation = await service.saveAnnotation(scope, {
+        paperId, pageIndex: 0, charStart: 0, charEnd: quote.length, quote, note: "gate note", tags: [], color: "",
+      });
+      check("saveAnnotation stores an annotation with an id",
+        typeof savedAnnotation.annotation?.annotationId === "string", JSON.stringify(savedAnnotation)?.slice(0, 160));
+      const listedAnnotations = await service.listAnnotations(scope, { paperId, limit: 100 });
+      check("listAnnotations reads it back",
+        listedAnnotations.annotations.some((row) => row.annotationId === savedAnnotation.annotation.annotationId));
+      check("listAnnotations reports a total", typeof listedAnnotations.total === "number", String(listedAnnotations.total));
+
+      if (savedAnnotation.annotation?.annotationId !== undefined) {
+        const promoted = await service.promoteAnnotation(scope, { annotationId: savedAnnotation.annotation.annotationId });
+        check("promoteAnnotation creates an evidence row", typeof promoted.evidence?.evidenceId === "string",
+          JSON.stringify(promoted)?.slice(0, 160));
+        check("promoteAnnotation keeps the annotation in place",
+          promoted.annotation?.annotationId === savedAnnotation.annotation.annotationId);
+        const removedAnnotation = await service.deleteAnnotation(scope, { annotationId: savedAnnotation.annotation.annotationId });
+        check("deleteAnnotation removes the annotation", removedAnnotation.ok === true, JSON.stringify(removedAnnotation));
+      }
+
+      // askContext builds a packet; it must never answer. The answer is the Agent's.
+      // The selection is passed as TEXT, not as offsets: the host locates the passage
+      // itself and treats a caller-supplied pageIndex as a hint only, so that a UI
+      // showing page 9 cannot attach every question to page 9. Passing offsets here
+      // would leave the selection unanchored and look like a product defect.
+      const selectionText = String(page?.text ?? "").trim().slice(0, 40);
+      const packet = await service.askContext(scope, {
+        paperId, question: "这一页讲了什么？", selectionText,
+      });
+      check("askContext returns the question and the anchored selection",
+        packet.question === "这一页讲了什么？" && packet.selection?.anchored === true,
+        JSON.stringify(packet.selection));
+      check("askContext located the passage on a real page",
+        Number.isInteger(packet.selection?.pageIndex) && packet.selection.pageIndex >= 0,
+        JSON.stringify(packet.selection));
+      check("askContext returns surrounding context", typeof packet.context?.text === "string" && packet.context.text.length > 0,
+        "len=" + (packet.context?.text?.length ?? 0));
+      check("askContext returns no answer of its own", packet.answer === undefined, JSON.stringify(Object.keys(packet)));
+      // A question with no selection must still work, falling back to a page hint — and
+      // must be reported as unanchored rather than given a plausible-looking offset.
+      const noSelection = await service.askContext(scope, { paperId, question: "无选区", pageIndex: 0 });
+      check("askContext without a selection reports an unanchored selection",
+        noSelection.selection?.anchored === false && noSelection.selection.charStart === -1,
+        JSON.stringify(noSelection.selection));
+    }
+  }
+
   // --- export ---------------------------------------------------------
   // exportReview returns the rendered documents, not paths: the panel writes the files
   // through the file picker, so a path here would mean the host had written somewhere
