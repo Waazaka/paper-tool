@@ -162,6 +162,47 @@ try {
     check("restore refuses to overwrite without force", typeof refused === "string", String(refused));
   }
 
+  // --- importCitations -------------------------------------------------
+  // The status block only ever asserted that this method is NAMED in status.writing;
+  // it was never actually called here, so the panel's .bib/.ris import path had no
+  // live-shape coverage at all. It is the one writing-assist entry point that writes
+  // papers, which makes it the most valuable one to exercise.
+  {
+    const BIB = `@article{verify2024shape,
+  title = {A Verification Entry for Shape Coverage},
+  author = {Smith, John and Doe, Jane},
+  year = {2024},
+  journal = {Journal of Verification},
+  doi = {10.9999/verify.shape.2024},
+}`;
+    const before = store.stats().papers;
+    const out = await service.importCitations(scope, { fileName: "verify.bib", text: BIB });
+    check("importCitations parses a .bib file",
+      out && Array.isArray(out.imported) && out.imported.length >= 1,
+      JSON.stringify(out)?.slice(0, 260));
+    check("importCitations actually added the paper", store.stats().papers === before + 1,
+      before + " -> " + store.stats().papers);
+    const added = out.imported?.[0];
+    check("the imported entry keeps its metadata",
+      added && /Verification Entry/i.test(JSON.stringify(added)) && /2024/.test(JSON.stringify(added)),
+      JSON.stringify(added)?.slice(0, 240));
+
+    // Importing the SAME file again must dedupe on DOI rather than add a second copy:
+    // the panel offers this button twice a session and a duplicate per click would rot
+    // the library silently.
+    const again = await service.importCitations(scope, { fileName: "verify.bib", text: BIB });
+    check("re-importing the same DOI does not duplicate", store.stats().papers === before + 1,
+      "papers=" + store.stats().papers + " result=" + JSON.stringify(again).slice(0, 200));
+
+    // An empty file and an unrecognised format must be refusals, not silent no-ops.
+    const emptyRefused = await service.importCitations(scope, { fileName: "x.bib", text: "   " })
+      .then(() => null).catch((error) => error.message);
+    check("an empty citation file is refused", typeof emptyRefused === "string", String(emptyRefused));
+    const junkRefused = await service.importCitations(scope, { fileName: "x.txt", text: "not a citation file" })
+      .then(() => null).catch((error) => error.message);
+    check("an unrecognised citation format is refused", typeof junkRefused === "string", String(junkRefused));
+  }
+
   // --- export ---------------------------------------------------------
   // exportReview returns the rendered documents, not paths: the panel writes the files
   // through the file picker, so a path here would mean the host had written somewhere

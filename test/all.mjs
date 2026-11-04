@@ -119,6 +119,12 @@ const GATES = [
   // the real library, because the panel-only RPCs write. Skips (never passes) when the
   // machine has no live library.
   { name: "s40-rpc-live", script: "s40-rpc-live.mjs", needsCorpus: false, what: "panel-only RPCs answer correctly on a copy of the live library: skeleton binding, similarity disclaimer, claims, backup/restore, export" },
+  // Schema-repair gate: a column appended to an old migration function never reaches a
+  // database that already passed that version. This shipped — an upgraded library kept
+  // a papers table without sourceName, so every import failed while a fresh install
+  // worked. A from-scratch test library can never catch it; this one starts from an
+  // up-to-date database with the column stripped out, which is what an old build left.
+  { name: "s41-schema-repair", script: "s41-schema-repair.mjs", needsCorpus: false, what: "opening an already-current database repairs columns added after its migration function was written, without bumping the version" },
 ];
 
 function corpusLooksUsable(dir) {
