@@ -139,6 +139,10 @@ const GATES = [
   // this: backupStatus was wrapped but takes no input, and the four annotation RPCs were
   // not wrapped but require one. s38 text-matches the sources; this one runs the payload.
   { name: "s44-rpc-gateway", script: "s44-rpc-gateway.mjs", needsCorpus: false, what: "every RPC the client calls produces arguments the real typert gateway accepts, judged by the gateway's own exact-key check" },
+  // How each half reaches the running DSH, answered from the manifest: the host loads
+  // index.js, the client is served from ./client.js with no build step, and the profile
+  // links to this very checkout. It also pins the two arity fixes in the shipped client.
+  { name: "s45-plugin-entry", script: "s45-plugin-entry.mjs", needsCorpus: false, what: "host and client entries are real source with no build step, and the deployed profile links to this checkout" },
 ];
 
 function corpusLooksUsable(dir) {
