@@ -464,6 +464,12 @@ ER  -
         first !== undefined && /^Paper [01]$/.test(first.paperTitle), JSON.stringify(first));
     }
     check("every section carries a purpose", built.sections.every((s) => typeof s.purpose === "string" && s.purpose.length > 4));
+    // The panel stopped printing raw ids, so a note promising "lists the evidenceId"
+    // would describe something the user cannot see.
+    check("the skeleton note matches what the panel actually shows",
+      !/evidenceId/.test(built.note), built.note);
+    check("the skeleton note says the locator is a paper and a page",
+      /哪篇/.test(built.note) && /哪一页/.test(built.note), built.note);
     check("the skeleton cites all six rows across its sections",
       built.sections.reduce((sum, s) => sum + s.evidenceIds.length, 0) === 6,
       String(built.sections.reduce((sum, s) => sum + s.evidenceIds.length, 0)));
