@@ -512,8 +512,21 @@ function makeLibrary(label, papers = 3) {
   check("no backup tool was added", !/name: "paper_backup"/.test(tools) && !/paper_backup/.test(tools));
   check("the three backup RPCs are registered in markRemote",
     ["backupLibrary", "restoreLibrary", "backupStatus"].every((method) => host.includes(`"${method}"`)));
-  check("the client reaches them through the wrapped input path",
-    /"backupLibrary", "restoreLibrary", "backupStatus"/.test(client));
+  check("the client reaches the input-taking backup RPCs through the wrapped path",
+    /"backupLibrary",\s*"restoreLibrary"/.test(client));
+  // backupStatus takes no input, and listing it in the wrapped set sends `input: {}`
+  // anyway (callRemote defaults args to {}), which the gateway rejects. This assertion
+  // used to require all three to be listed — it was encoding the defect, so fixing the
+  // client turned it red.
+  //
+  // Scoped to the set itself: `backupStatus` is also a local variable holding the panel
+  // state, so a bare /"backupStatus"/ over the whole file would always match.
+  {
+    const setStart = client.indexOf("INPUT_METHODS = new Set([");
+    const setEnd = client.indexOf("]);", setStart);
+    const wrappedSet = setStart >= 0 && setEnd > setStart ? client.slice(setStart, setEnd) : "";
+    check("the zero-input backup RPC is not in the wrapped set", !/"backupStatus"/.test(wrappedSet));
+  }
   // The export must not be built out of listPapers pages: that caps at the list
   // limit and would silently truncate a large library.
   const backupMethod = host.slice(host.indexOf("async backupLibrary("), host.indexOf("async restoreLibrary("));

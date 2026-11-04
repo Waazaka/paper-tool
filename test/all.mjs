@@ -130,6 +130,15 @@ const GATES = [
   // requires the repair to put it back. Without it, the next late column someone adds
   // will be invisible to every upgraded library, exactly as sourceName was.
   { name: "s42-schema-parity", script: "s42-schema-parity.mjs", needsCorpus: false, what: "each late-added column is restored on a current-version database, and every inserted column exists in the fresh schema" },
+  // The DOI-enrichment path had no test at all, and it carries a data-preservation
+  // promise (never overwrite a field the user typed) plus its opposite (never freeze a
+  // pre-provenance guess). Both halves are asserted here, offline, with fetch stubbed.
+  { name: "s43-metadata-enrich", script: "s43-metadata-enrich.mjs", needsCorpus: false, what: "Crossref parsing, the enrichment merge rules, and the lookup network contract (404 skipped, 5xx failed, offline not an error)" },
+  // Judges the wire contract with the gateway's own `assertExactArguments`, read out of
+  // the installed DSH bundle, instead of our reading of it. Two real defects came from
+  // this: backupStatus was wrapped but takes no input, and the four annotation RPCs were
+  // not wrapped but require one. s38 text-matches the sources; this one runs the payload.
+  { name: "s44-rpc-gateway", script: "s44-rpc-gateway.mjs", needsCorpus: false, what: "every RPC the client calls produces arguments the real typert gateway accepts, judged by the gateway's own exact-key check" },
 ];
 
 function corpusLooksUsable(dir) {

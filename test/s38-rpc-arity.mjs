@@ -81,6 +81,39 @@ const backupCall = /callRemote\(\s*sessionId\s*,\s*"backupStatus"\s*(,)?/m.exec(
 check("watchStatus is called with no arguments", watchCall !== null && watchCall[1] !== ",", "watchStatus call shape changed");
 check("backupStatus is called with no arguments", backupCall !== null && backupCall[1] !== ",", "backupStatus call shape changed");
 
+// --- 2b. the wrapped-input set is part of the contract, not a hint -------------------
+// Checking only the call sites was not enough. `callRemote` defaults `args` to `{}`, so a
+// zero-argument method that is still listed in INPUT_METHODS is wrapped as `input: {}`
+// even when the caller passes nothing — the gateway rejects it exactly as before. That
+// happened: backupStatus's call site was fixed while its set membership was not, and the
+// defect survived the gate that was written to catch it.
+const setStart = clientSource.indexOf("INPUT_METHODS = new Set([");
+const setEnd = clientSource.indexOf("]);", setStart);
+check("the client declares its wrapped-input methods in one set", setStart >= 0 && setEnd > setStart,
+  `setStart=${setStart} setEnd=${setEnd}`);
+const wrapped = new Set(
+  [...clientSource.slice(setStart, setEnd).matchAll(/"(\w+)"/g)].map((match) => match[1]),
+);
+check("the wrapped-input set is not empty", wrapped.size > 20, String(wrapped.size));
+
+const wronglyWrapped = noInput.filter((name) => wrapped.has(name));
+check("no zero-input method is listed in the wrapped-input set", wronglyWrapped.length === 0,
+  wronglyWrapped.length === 0 ? undefined : `would be sent input: ${wronglyWrapped.join(", ")}`);
+
+// And the mirror image: a method that DOES take input must be wrapped, or the gateway
+// receives no `input` field at all. Two deliberate exemptions:
+//   - getPdfRuntime's second parameter is a signal, not an input object.
+//   - a method with no client call site cannot be wrong yet; requiring it to be wrapped
+//     would force dead entries into the set, and the call-site check above already
+//     covers the moment a caller appears.
+const takesInput = [...arity].filter(([, count]) => count === 1).map(([name]) => name);
+const calledNames = new Set(callSites.map((site) => site.name));
+const unwrapped = takesInput.filter(
+  (name) => calledNames.has(name) && !wrapped.has(name) && name !== "getPdfRuntime",
+);
+check("every input-taking method the client calls is wrapped", unwrapped.length === 0,
+  unwrapped.length === 0 ? undefined : `would be sent no input: ${unwrapped.join(", ")}`);
+
 // --- 3. the mock used by the UI gates must accept the same shape ---------------------
 // A mock that ignores extra arguments cannot catch this class of bug, which is exactly
 // how the real defect reached a release. Several gates build such mocks; assert at least

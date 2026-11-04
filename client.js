@@ -744,9 +744,25 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
       "watchStart",
       // Translation RPCs all take an input object.
       "translateSegments", "saveTranslation", "listTranslations", "deleteTranslation",
-      // Backup RPCs: backupStatus and backupLibrary take no input, restoreLibrary
-      // does, so all three go through the wrapped path.
-      "backupLibrary", "restoreLibrary", "backupStatus",
+      // Annotation RPCs. All four take an input object, and all four were MISSING from
+      // this set while their call sites passed one — which is the same defect as
+      // backupStatus in the opposite direction. The gateway compares the descriptor's
+      // parameter wire names against the args object exactly: with no `input` field the
+      // call fails as `missing "input"`, and the annotation panel never works at all.
+      // `recordClaims`, `listClaims`, `reviewBodyPlan` and `renderBody` are also
+      // input-taking but have no client call site yet, so they are deliberately not
+      // listed here; add them with their first caller.
+      "saveAnnotation", "listAnnotations", "deleteAnnotation", "promoteAnnotation",
+      // Backup RPCs. backupLibrary and restoreLibrary take an input object, so they go
+      // through the wrapped path; backupStatus takes NO input, and must therefore stay
+      // out of this set entirely.
+      //
+      // It used to be listed here, and fixing only the call site was not enough to fix
+      // the defect: `callRemote` defaults `args` to `{}`, so a listed method is wrapped
+      // as `input: {}` even when the caller passes nothing, and the typert gateway
+      // rejected it exactly as before ("unexpected input"). The set membership is part
+      // of the wire contract, not a hint — a zero-argument method belongs in neither.
+      "backupLibrary", "restoreLibrary",
       // Topic recommendation: an RPC with no tool behind it (D-014).
       "topicRecommend",
       // Writing assistance, also RPCs (D-014). All three take an input object.
