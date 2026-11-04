@@ -105,6 +105,11 @@ const GATES = [
   { name: "s35-topics", script: "s35-topics.mjs", needsCorpus: false, what: "counted trend and co-occurrence material, sample-floor refusal, mounted topics panel" },
   { name: "s36-compare", script: "s36-compare.mjs", needsCorpus: false, what: "independent panes with separate documents, close-one isolation, matrix entry, stored layout" },
   { name: "s37-writing-assist", script: "s37-writing-assist.mjs", needsCorpus: false, what: "BibTeX/RIS import with DOI dedupe and round trip, section skeleton bound to real evidence, overlap notice that never becomes a score" },
+  // Wire-shape gate: the client's call sites against the host's signatures. A unit test
+  // that calls the service directly cannot see the gateway contract, which is how a
+  // zero-argument method called with {} reached a release and greeted the user with an
+  // error banner.
+  { name: "s38-rpc-arity", script: "s38-rpc-arity.mjs", needsCorpus: false, what: "client call sites match host remote signatures: no arguments sent to a zero-argument method" },
 ];
 
 function corpusLooksUsable(dir) {

@@ -3233,7 +3233,11 @@ function describeError(error, t) {
       const refreshBackup = useCallback(async () => {
         if (!sessionId) return;
         try {
-          setBackupStatus(await callRemote(sessionId, "backupStatus", {}));
+          // No third argument: backupStatus takes no input, and passing an empty object made
+          // the typert gateway reject the call ("args fields do not match the descriptor:
+          // unexpected input"), which surfaced as a red error banner over the panel on
+          // open. watchStatus is called the same way for the same reason.
+          setBackupStatus(await callRemote(sessionId, "backupStatus"));
         } catch (statusError) {
           // A missing backup view must not take the library down with it.
           setError(describeError(statusError, t));
