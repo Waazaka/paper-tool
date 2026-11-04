@@ -443,6 +443,26 @@ ER  -
     }
     check("every section binds at least one evidence id", emptySection === "", emptySection);
     check("every bound id exists in the library", dangling === "", dangling);
+    // The panel used to print the first eight characters of an id, which appears
+    // nowhere else in the UI, so the writer could not look the evidence up. The host
+    // now ships a locator per bound id; asserted here because the mounted test below
+    // runs on a mock and would keep passing if the host stopped sending them.
+    {
+      const missing = [];
+      for (const section of built.sections) {
+        if (!Array.isArray(section.citations)) { missing.push(section.id + ":no-array"); continue; }
+        if (section.citations.length !== section.evidenceIds.length) { missing.push(section.id + ":length"); continue; }
+        for (const cite of section.citations) {
+          if (typeof cite.paperTitle !== "string" || cite.paperTitle === "") missing.push(section.id + ":title");
+          if (!Number.isInteger(cite.pageIndex) || cite.pageIndex < 0) missing.push(section.id + ":page");
+          if (typeof cite.quote !== "string") missing.push(section.id + ":quote");
+        }
+      }
+      check("every bound id ships a readable locator", missing.length === 0, missing.join(", "));
+      const first = built.sections[0]?.citations?.[0];
+      check("the locator names the paper the evidence came from",
+        first !== undefined && /^Paper [01]$/.test(first.paperTitle), JSON.stringify(first));
+    }
     check("every section carries a purpose", built.sections.every((s) => typeof s.purpose === "string" && s.purpose.length > 4));
     check("the skeleton cites all six rows across its sections",
       built.sections.reduce((sum, s) => sum + s.evidenceIds.length, 0) === 6,
@@ -652,8 +672,10 @@ if (React !== undefined) {
         }
         return {
           sections: [
-            { id: "introduction", title: "引言", purpose: "问题是什么", evidenceIds: ["e1"], paperIds: ["pA"] },
-            { id: "conclusion", title: "结论", purpose: "综合起来能说什么", evidenceIds: ["e1"], paperIds: ["pA"] },
+            { id: "introduction", title: "引言", purpose: "问题是什么", evidenceIds: ["e1"], paperIds: ["pA"],
+              citations: [{ evidenceId: "e1", paperTitle: "论文 A", pageIndex: 0, quote: "深度学习在图像识别任务上取得了显著进展" }] },
+            { id: "conclusion", title: "结论", purpose: "综合起来能说什么", evidenceIds: ["e1"], paperIds: ["pA"],
+              citations: [{ evidenceId: "e1", paperTitle: "论文 A", pageIndex: 0, quote: "深度学习在图像识别任务上取得了显著进展" }] },
           ],
           totalEvidence: 1,
           droppedEvidence: 0,
@@ -782,8 +804,15 @@ if (React !== undefined) {
       cardText.includes(zh.skeletonBinds) && !cardText.includes(zh.similarHits),
       cardText.slice(0, 160));
   }
-  check("each skeleton card names an evidence id",
-    sectionCards.length > 0 && sectionCards.every((card) => (card.textContent ?? "").includes("e1")),
+  // The card used to print the first eight characters of the id, which appears
+  // nowhere else in the UI. It now names the paper and page, which the writer can
+  // actually look up.
+  check("a skeleton card locates its evidence by paper and page",
+    sectionCards.length > 0
+      && sectionCards.every((card) => (card.textContent ?? "").includes("论文 A p.1")),
+    sectionCards.map((card) => card.textContent).join(" | "));
+  check("a skeleton card no longer prints a bare evidence id",
+    sectionCards.every((card) => !/[0-9a-f]{8}/.test((card.textContent ?? "").replace(/论文 A/g, ""))),
     sectionCards.map((card) => card.textContent).join(" | "));
 
   check("the citation import control is on screen", byText(zh.citeImportPick).length === 1);
@@ -879,6 +908,13 @@ if (React !== undefined) {
     ? 0
     : (emptyHost.textContent.split(emptySkeletonNote).length - 1);
   check("an empty skeleton explains itself exactly once", occurrences === 1, String(occurrences));
+  // Found on the real GUI: the refusal sentence was still offerable as "send to chat",
+  // which would push a non-answer into the conversation.
+  {
+    const sends = [...emptyHost.querySelectorAll("button")].filter((b) => b.textContent.trim() === zh.sendToChat);
+    check("an empty skeleton offers no send button", sends.length === 0,
+      JSON.stringify(sends.map((b) => b.textContent.trim())));
+  }
   check("no React errors on the empty library",
     seenErrors.length === 0, seenErrors.slice(0, 2).join(" | "));
   console.error = realError;

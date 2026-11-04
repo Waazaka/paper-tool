@@ -302,6 +302,7 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         buildSkeleton: "生成章节骨架",
         skeletonHint: "按论文列材料是上面的证据大纲；这里是把材料分到章节里，每章给出应引用的证据。",
         skeletonBinds: "本章应引用",
+        unknownPaper: "（论文标题缺失）",
         citeImport: "导入 .bib / .ris",
         citeImportHint: "从 Zotero / EndNote / Mendeley 导出引用文件后在这里导入，条目以仅元数据状态入库。",
         citeImportPick: "选择引用文件",
@@ -639,6 +640,7 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         buildSkeleton: "Build section skeleton",
         skeletonHint: "The outline above lists material by paper; this files it into sections and names the evidence each section should cite.",
         skeletonBinds: "Should cite",
+        unknownPaper: "(untitled paper)",
         citeImport: "Import .bib / .ris",
         citeImportHint: "Export from Zotero / EndNote / Mendeley, then import the file here. Entries land as metadata only.",
         citeImportPick: "Choose a citation file",
@@ -4869,7 +4871,12 @@ function describeError(error, t) {
           h("span", { className: "pt-h2" }, t("skeleton")),
           h("div", { className: "pt-spacer" }),
           h(Button, { onClick: buildSkeleton, disabled: busy !== null }, t("buildSkeleton")),
-          skeleton?.text ? h(Button, { onClick: sendSkeleton, disabled: !inputActions, variant: "primary" }, t("sendToChat")) : null,
+          // Only offered when there are sections to send. An empty result is a refusal
+          // ("no evidence to build from"); sending that sentence to the conversation
+          // would just push a non-answer into the chat.
+          skeleton !== null && skeleton.sections.length > 0
+            ? h(Button, { onClick: sendSkeleton, disabled: !inputActions, variant: "primary" }, t("sendToChat"))
+            : null,
         ),
         h("p", { className: "pt-caption", style: { margin: 0 } }, t("skeletonHint")),
         skeleton
@@ -4899,8 +4906,18 @@ function describeError(error, t) {
                   // The bound ids, labelled as such. This used to reuse the overlap
                   // panel's "命中条目" caption, which said the ids were overlap hits —
                   // wrong label on real data.
-                  h("p", { className: "pt-caption", style: { margin: 0 } },
-                    `${t("skeletonBinds")}: ${section.evidenceIds.map((id) => id.slice(0, 8)).join(" ")}`),
+                  // Readable locators, not raw ids. `f71258aa` appears nowhere else in
+                  // the UI, so printing the id prefix told the writer nothing they could
+                  // act on; the paper title and page are what they need to find it.
+                  h("div", { className: "pt-col", style: { gap: 2 } },
+                    h("p", { className: "pt-caption", style: { margin: 0 } }, t("skeletonBinds")),
+                    ...(section.citations ?? []).map((cite) => h("p", {
+                      key: cite.evidenceId,
+                      className: "pt-caption",
+                      style: { margin: 0 },
+                      title: cite.quote === "" ? undefined : cite.quote,
+                    }, `· ${cite.paperTitle === "" ? t("unknownPaper") : cite.paperTitle}${cite.pageIndex >= 0 ? ` p.${cite.pageIndex + 1}` : ""}`)),
+                  ),
                   )),
                 ),
                 h("p", { key: "note", className: "pt-caption", style: { margin: 0 } }, skeleton.note),
