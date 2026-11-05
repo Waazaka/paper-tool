@@ -360,6 +360,41 @@ try {
     check("exportReview returns a bibliography", typeof out.bibtex === "string" && out.bibtex.includes("@"),
       (out.bibtex ?? "").slice(0, 120));
     check("exportReview reports no warnings for a clean library", Array.isArray(out.warnings), JSON.stringify(out.warnings));
+
+    // A PDF text layer breaks lines where the page broke them, so stored quotes
+    // routinely contain "\n\n" mid-sentence. Interpolated raw into a markdown list that
+    // splits one bullet into a bullet plus loose paragraphs, and the sentence reads as
+    // if it had ended. The exported review is the artefact people paste into a
+    // manuscript, so this is a correctness issue, not cosmetics.
+    {
+      const lines = out.markdown.split("\n");
+      // Every evidence line starts with "- p.N". With quotes flattened, that bullet is
+      // exactly one line; with a raw newline it is several, and the continuation lines
+      // do not start with "- p.".
+      const bulletStarts = lines.filter((line) => /^- p\.\d+/.test(line)).length;
+      const stored = store.listEvidence({ limit: 5000, anchor: "all" }).length;
+      check("every evidence row is exactly one markdown bullet",
+        bulletStarts === stored, `bullets=${bulletStarts} evidence=${stored}`);
+      // The specific shape that broke: a bullet line followed by a blank line and then
+      // a line that is inside a quote.
+      const splitBullet = lines.some((line, index) =>
+        /^- p\.\d+.*“/.test(line) && lines[index + 1] === "" && lines[index + 2] !== undefined
+        && !/^[-#|]/.test(lines[index + 2]) && lines[index + 2].trim() !== ""
+        && !/“.*”/.test(line));
+      check("no quote is split across a blank line", splitBullet === false,
+        "a bullet with an opening quote ended before its closing quote");
+      // And the quotes still say what they said: flattening whitespace must not drop a
+      // character of the evidence.
+      const firstQuote = store.listEvidence({ limit: 1, anchor: "all" })[0];
+      if (firstQuote !== undefined) {
+        const flat = String(firstQuote.quote).replace(/\s*\n\s*/g, " ").replace(/[ \t]{2,}/g, " ").trim();
+        check("a flattened quote keeps every character", out.markdown.includes(flat.slice(0, 20)),
+          "the flattened opening is not present in the export");
+        check("the export contains no raw newline inside a bullet",
+          !/^- p\.\d+[^\n]*\n[^\n-]/.test(out.markdown.replace(/^- p\.\d+[^\n]*\n/g, "- p.X\n")),
+          "a bullet line is followed by a continuation line");
+      }
+    }
   }
 } finally {
   try { service.dispose(); } catch { /* already closed */ }
