@@ -148,6 +148,12 @@ const GATES = [
   // it. A piece of state shown in the wrong place — invisible to every signature-level
   // gate, which is why it took a real click to find.
   { name: "s46-banner-scope", script: "s46-banner-scope.mjs", needsCorpus: false, what: "a confirmation banner does not follow the user to an unrelated tab, while errors are left for the user to read" },
+  // Found by clicking 导入 PDF in a live panel: "Receiver must be an instance of class
+  // PaperToolService". The gateway invokes a Remote method on a DERIVED receiver, so a
+  // `#private` helper rejects it — while every unit test passes, because they call the
+  // instance directly. This gate reads the gateway's real dispatch code out of the
+  // installed bundle and bans private members on the service class.
+  { name: "s47-remote-receiver", script: "s47-remote-receiver.mjs", needsCorpus: false, what: "a Remote method never touches a #private member, because the gateway dispatches on a derived receiver" },
 ];
 
 function corpusLooksUsable(dir) {

@@ -83,7 +83,12 @@ const store = service.storeFor(scope);
   // message is built from the resolved value rather than the constant — a message that
   // always says 40 while the applied cap is 7 tells the user the wrong number.
   const host = readFileSync("lib/host-service.js", "utf8");
-  const runOcr = host.slice(host.indexOf("async #runOcr("), host.indexOf("async ocrPaper("));
+  // The helper is an ordinary method, not `#runOcr`: a Remote method that calls a
+  // `#private` member fails at RPC time because the gateway dispatches on a derived
+  // receiver (see s47). Slice on the current name.
+  const runOcrAt = host.indexOf("async runOcrInternal(");
+  check("the OCR helper is findable by name", runOcrAt >= 0, String(runOcrAt));
+  const runOcr = host.slice(runOcrAt, host.indexOf("async ocrPaper("));
   check("the skip message interpolates the resolved cap",
     /more than the \$\{maxOcrPages\}-page OCR cap/.test(runOcr));
   check("the skip message does not hardcode the constant",
@@ -100,7 +105,7 @@ const store = service.storeFor(scope);
   // Finite on purpose: unbounded OCR of a 3000-page scan is minutes of no feedback.
   check("the manual cap is finite", value > 0 && value <= 5000, String(value));
   check("ocrPaper passes the manual cap to the recogniser",
-    /this\.#runOcr\(bytes, extracted, signal, MANUAL_OCR_CAP\)/.test(host));
+    /this\.runOcrInternal\(bytes, extracted, signal, MANUAL_OCR_CAP\)/.test(host));
 }
 
 // --- 4. re-running OCR repairs anchors instead of dropping them -------
