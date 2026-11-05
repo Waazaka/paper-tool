@@ -77,8 +77,17 @@ check("tabs expose their selected state", () => {
 
 check("tabs are real buttons, not clickable divs", () => {
   // Clickable <div>s have no keyboard activation and no button role.
-  const tabRender = source.slice(source.indexOf("setView(id)") - 600, source.indexOf("setView(id)") + 200);
+  //
+  // Anchor on the tablist container, not on a byte window around `setView(id)`: that
+  // offset broke the moment the tab's onClick grew a second statement, and the gate
+  // then reported "the tab strip does not use <button>" about a strip that was fine.
+  // Locating the container first keeps the assertion about the markup, not about the
+  // layout of the handler.
+  const tablistAt = source.indexOf('role: "tablist"');
+  assert.ok(tablistAt >= 0, "no tablist container found");
+  const tabRender = source.slice(tablistAt, tablistAt + 900);
   assert.ok(/h\("button"/.test(tabRender), "the tab strip does not use <button> elements");
+  assert.ok(/role: "tab"/.test(tabRender), "tab buttons do not expose role=tab");
 });
 
 // --- 2. state claims ----------------------------------------------------

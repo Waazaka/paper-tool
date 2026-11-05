@@ -143,6 +143,11 @@ const GATES = [
   // index.js, the client is served from ./client.js with no build step, and the profile
   // links to this very checkout. It also pins the two arity fixes in the shipped client.
   { name: "s45-plugin-entry", script: "s45-plugin-entry.mjs", needsCorpus: false, what: "host and client entries are real source with no build step, and the deployed profile links to this checkout" },
+  // Found by clicking: a "45 段" confirmation from the translate tab stayed pinned over
+  // the topics tab, because the banner renders above the view switch and nothing cleared
+  // it. A piece of state shown in the wrong place — invisible to every signature-level
+  // gate, which is why it took a real click to find.
+  { name: "s46-banner-scope", script: "s46-banner-scope.mjs", needsCorpus: false, what: "a confirmation banner does not follow the user to an unrelated tab, while errors are left for the user to read" },
 ];
 
 function corpusLooksUsable(dir) {

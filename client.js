@@ -2557,6 +2557,9 @@ function describeError(error, t) {
         setReader(target);
         setSelection(null);
         setView("library");
+        // Same reason as the tab buttons: a note from whatever view the user was on
+        // would otherwise sit above the library list.
+        setNote("");
       }, []);
 
       /**
@@ -2577,6 +2580,7 @@ function describeError(error, t) {
         setReader(null);
         setSelection(null);
         setView("library");
+        setNote("");
       }, []);
 
       // Bring the panes into view after they mount. The effect keys off the count so it
@@ -3361,7 +3365,12 @@ function describeError(error, t) {
           const seed = {};
           for (const row of stored.translations ?? []) seed[`${row.pageIndex}:${row.charStart}:${row.charEnd}`] = row.text;
           setTranslateDraft(seed);
-          setNote(`${result.segments.length} ${t("segmentCount")}`);
+          // No setNote here on purpose. The segment count is already shown inside the
+          // translate view ("45 段 · 0 已译 · 45 未译") and in the list header, and the
+          // note banner renders ABOVE the view switch — so setting it here left
+          // "45 段" hanging over the evidence tab, the topics tab and the review tab
+          // until the user happened to trigger another action that overwrote it.
+          // A confirmation that follows you to unrelated screens is not a confirmation.
         } catch (loadError) {
           setError(describeError(loadError, t));
         } finally {
@@ -5203,7 +5212,14 @@ function describeError(error, t) {
             role: "tab",
             className: "pt-tab",
             "aria-selected": view === id ? "true" : "false",
-            onClick: () => setView(id),
+            // Clear the banner on a tab change. `note` is one piece of state shared by
+            // every view and it renders above the switch, so without this a "45 段"
+            // confirmation from the translate tab stayed pinned over the topics tab
+            // after the user moved on. `error` is deliberately NOT cleared here: an
+            // error is usually why the user is changing tabs, and hiding it would make
+            // the failure disappear before it was read. `note` is only ever a
+            // confirmation of something that already succeeded.
+            onClick: () => { setView(id); setNote(""); },
           }, label, count === null || count === undefined
             ? null
             : h("span", { className: "pt-tab-count" }, ` ${count}`))),

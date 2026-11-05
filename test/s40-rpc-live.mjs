@@ -56,13 +56,31 @@ const service = new PaperToolService({ inject() {}, get() {} }, { homeDir: home,
 const scope = { sessionId: "rpc-verify", workspaceRoot: work };
 const store = service.storeFor(scope);
 
+// Read the counts straight out of the snapshot instead of hardcoding them. These gates
+// run against the user's live library, which changes: the evidence total moved from 2 to
+// 5 while this file said 2, and the gate failed on a correct build. The contract under
+// test is "status agrees with the database", not "the user has two evidence rows".
+const snapshot = (() => {
+  const db = new DatabaseSync(dest, { readOnly: true });
+  const one = (sql) => db.prepare(sql).get().c;
+  const counts = {
+    papers: one("SELECT COUNT(*) c FROM papers"),
+    pages: one("SELECT COUNT(*) c FROM pages"),
+    evidence: one("SELECT COUNT(*) c FROM evidence"),
+  };
+  db.close();
+  return counts;
+})();
+
 try {
   // --- status ---------------------------------------------------------
   {
     const status = await service.status(scope);
-    check("status reports the copied library", status.library.papers === 4 && status.library.pages === 55,
-      JSON.stringify(status.library));
-    check("status counts the evidence rows", status.library.evidence === 2, JSON.stringify(status.library));
+    check("status reports the copied library",
+      status.library.papers === snapshot.papers && status.library.pages === snapshot.pages,
+      JSON.stringify(status.library) + " vs snapshot " + JSON.stringify(snapshot));
+    check("status counts the evidence rows", status.library.evidence === snapshot.evidence,
+      JSON.stringify(status.library) + " vs snapshot " + JSON.stringify(snapshot));
     check("status exposes the writing block", status.writing?.supported === true, JSON.stringify(status.writing));
     // The panel reads these exact method names off status; a rename would silently
     // break the writing panel without any test noticing.
