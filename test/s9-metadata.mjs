@@ -271,6 +271,125 @@ await check("confidence and source are reported for every field", () => {
   assert.equal(guess.confidence.title, "high");
 });
 
+await check("a byline split across lines keeps every author", () => {
+  // CNKI prints the names at one size with a superscript affiliation number after
+  // each, and the numbers land between the names in page order:
+  //   idx21 "李书昊"  idx22 "1"  idx23 "魏 敏"  idx24 "2"
+  // The extractor used to return at the first match, so this real paper lost 魏敏
+  // and the library showed 「李书昊」 alone. A height-only scan stops at the "1",
+  // which is why the superscript gap has to be stepped over.
+  const layout = [
+    { y: 714.1, height: 19.698114, text: "中国旅游业高质量发展" },
+    { y: 687.7, height: 19.698114, text: "核心要求、实现路径与保障机制" },
+    { y: 656.6, height: 13.681941, text: "李书昊" },
+    { y: 663.6, height: 7.762804, text: "1" },
+    { y: 657.3, height: 13.681941, text: "魏 敏" },
+    { y: 663.6, height: 7.762804, text: "2" },
+    { y: 634.8, height: 8.830189, text: "( 1. 青岛大学 旅游与地理科学学院，山东 青岛 266071; 2. 厦门大学 管理学院，福建 厦门 361005)" },
+  ];
+  const guess = guessMetadata(["", ""], { layout, filename: "" });
+  assert.equal(guess.authors, "李书昊; 魏敏", `a two-author byline was cut down: ${JSON.stringify(guess.authors)}`);
+  // The space in "魏 敏" is justification padding, not a separator.
+  assert.ok(!/魏;\s*敏/.test(guess.authors), "the padding space split a Chinese given name in two");
+  assert.ok(!guess.authors.includes("青岛大学"), "the affiliation block leaked into the author list");
+});
+
+await check("a single-line byline is not extended into the affiliation", () => {
+  // The assertion is on the OUTCOME, not on which guard produces it: the
+  // affiliation must never appear in the author list. Written that way it survives
+  // the guards being reorganised, and it is the property a reader cares about.
+  const layout = [
+    { y: 714, height: 19.7, text: "Some Chinese article title" },
+    { y: 660, height: 13.7, text: "张三" },
+    { y: 646, height: 13.7, text: "( 1. 北京大学 光华管理学院)" },
+  ];
+  const guess = guessMetadata([""], { layout, filename: "" });
+  assert.equal(guess.authors, "张三", `the affiliation was read as a second author: ${JSON.stringify(guess.authors)}`);
+  assert.ok(!guess.authors.includes("北京"), "the affiliation leaked into the author list");
+  // And an affiliation alone must not be accepted as a byline at all.
+  const onlyAffiliation = guessMetadata([""], {
+    layout: [
+      { y: 714, height: 19.7, text: "Some Chinese article title" },
+      { y: 646, height: 13.7, text: "( 1. 北京大学 光华管理学院)" },
+    ],
+    filename: "",
+  });
+  assert.equal(onlyAffiliation.authors, "", `an affiliation block became an author: ${JSON.stringify(onlyAffiliation.authors)}`);
+});
+
+await check("body text at the byline's size is not read as authors", () => {
+  // Found while fixing the missing second author: once the scan was allowed to walk
+  // past the byline it kept going through lines set at the SAME size and returned
+  //   "李书昊; 一; 问题的提出与文献综述; 在党的十九大报告的基础上; 党的二"
+  // — a section heading and half a sentence presented as authors. The section
+  // number is the tell, and it only survives if the whole line is judged before it
+  // is split on 、.
+  const layout = [
+    { y: 714.1, height: 19.698114, text: "中国旅游业高质量发展" },
+    { y: 656.6, height: 13.681941, text: "李书昊" },
+    { y: 640.0, height: 13.681941, text: "一、问题的提出与文献综述" },
+    { y: 620.0, height: 13.681941, text: "在党的十九大报告的基础上，党的二" },
+  ];
+  const guess = guessMetadata([""], { layout, filename: "" });
+  assert.equal(guess.authors, "李书昊", `the body was read as authors: ${JSON.stringify(guess.authors)}`);
+});
+
+await check("a paper with no byline does not turn its first heading into an author", () => {
+  // The main-candidate check is the ONLY guard on the line directly under the title.
+  // With it gone, a paper that has no byline at all yields
+  // "一; 问题的提出与文献综述" — the section heading reported as two authors.
+  const layout = [
+    { y: 714.1, height: 19.698114, text: "中国旅游业高质量发展" },
+    { y: 640.0, height: 13.681941, text: "一、问题的提出与文献综述" },
+  ];
+  const guess = guessMetadata([""], { layout, filename: "" });
+  assert.equal(guess.authors, "", `a section heading became an author: ${JSON.stringify(guess.authors)}`);
+});
+
+await check("a comma-separated Latin byline keeps every name", () => {
+  // The prose filter must not be so strict that an ordinary three-author byline is
+  // rejected: six space-separated tokens are prose, three comma-separated names are
+  // a byline.
+  const layout = [
+    { y: 700, height: 21.5, text: "Some English title here" },
+    { y: 680, height: 12.5, text: "Shuhao Li, Min Wei, San Zhang" },
+  ];
+  const guess = guessMetadata([""], { layout, filename: "" });
+  assert.equal(guess.authors, "Shuhao Li; Min Wei; San Zhang", `comma byline lost names: ${JSON.stringify(guess.authors)}`);
+});
+
+await check("a colon dropped by the layout splitter is restored to the title", () => {
+  // CNKI sets the colon of "中国旅游业高质量发展:核心要求…" as its own text item
+  // carrying `hasEOL`, so it became a line of its own and `cleanValue` stripped it as
+  // leading decoration. Every other colon on the page survived, which is what made
+  // this look like a PDF problem instead of a bug: the page text still had it.
+  const items = [
+    { str: "中国旅游业高质量发展", transform: [1, 0, 0, 1, 100, 714.13], height: 19.698114, hasEOL: false },
+    { str: ":", transform: [1, 0, 0, 1, 300, 714.13], height: 19.698114, hasEOL: true },
+    { str: "核心要求、实现路径与保障机制", transform: [1, 0, 0, 1, 100, 687.74], height: 19.698114, hasEOL: true },
+  ];
+  const lines = layoutLines(items);
+  const guess = guessMetadata([""], { layout: lines, filename: "" });
+  assert.equal(
+    guess.title,
+    "中国旅游业高质量发展：核心要求、实现路径与保障机制",
+    `the colon was lost or spaced: ${JSON.stringify(guess.title)}`,
+  );
+});
+
+await check("a trailing colon on a CJK title line is content, not decoration", () => {
+  // The trailing strip in cleanValue used to include ':' and '：'. Two independent
+  // things depended on it surviving: the title above, and any line ending in a colon
+  // that continues below.
+  const lines = layoutLines([
+    { str: "新常态下中国经济增长:", transform: [1, 0, 0, 1, 100, 700], height: 22, hasEOL: true },
+    { str: "质量的评价体系构建与测度", transform: [1, 0, 0, 1, 100, 676], height: 22, hasEOL: true },
+  ]);
+  const guess = guessMetadata([""], { layout: lines, filename: "" });
+  assert.ok(guess.title.includes("："), `the colon was stripped: ${JSON.stringify(guess.title)}`);
+  assert.ok(!/\s:/.test(guess.title) && !/\s：/.test(guess.title), `a space was inserted before the colon: ${JSON.stringify(guess.title)}`);
+});
+
 // --- against the real corpus ---------------------------------------------
 let pdfs = [];
 try {
