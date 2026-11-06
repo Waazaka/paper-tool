@@ -154,6 +154,10 @@ const GATES = [
   // instance directly. This gate reads the gateway's real dispatch code out of the
   // installed bundle and bans private members on the service class.
   { name: "s47-remote-receiver", script: "s47-remote-receiver.mjs", needsCorpus: false, what: "a Remote method never touches a #private member, because the gateway dispatches on a derived receiver" },
+  // Found by reading a row after a live import: the venue was
+  // "Journal of Destination Marketing &amp; Management", which is Crossref's HTML
+  // escaping, not the journal's name. It would have been printed into every citation.
+  { name: "s48-entities", script: "s48-entities.mjs", needsCorpus: false, what: "network-supplied titles, venues and authors are stored as text: tags stripped before decoding, entities decoded exactly once" },
 ];
 
 function corpusLooksUsable(dir) {
