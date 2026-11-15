@@ -303,6 +303,12 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         skeletonHint: "按论文列材料是上面的证据大纲；这里是把材料分到章节里，每章给出应引用的证据。",
         skeletonBinds: "本章应引用",
         unknownPaper: "（论文标题缺失）",
+        importedOn: "导入日期",
+        importedOnShort: "导入于",
+        confirmAction: "确认无误",
+        confirmHint: "你已核对，这些字段的当前值保持不变，待核对标记将被移除。",
+        confirmDone: "已确认 {count} 个字段，标记已移除。",
+        confirmNothing: "没有需要确认的字段。",
         citeImport: "导入 .bib / .ris",
         citeImportHint: "从 Zotero / EndNote / Mendeley 导出引用文件后在这里导入，条目以仅元数据状态入库。",
         citeImportPick: "选择引用文件",
@@ -361,7 +367,7 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         tooLarge: "文件超过 {limit} MB，请先压缩或拆分。",
         tooManyFiles: "一次最多导入 {limit} 个文件。",
         duplicates: "个已存在，已跳过",
-        noPdfForPaper: "这篇只有书目，没有 PDF。",
+        noPdfForPaper: "这篇只有书目，没有 PDF。要阅读，请先用「导入 PDF」加入原文。",
         anchoredCount: "条可定位原文",
         textFallbackNote: "PDF 文本层无法叠加，改为显示抽取文本，仍可选中。",
         highlightMissed: "已打开对应页，但未在文本层中定位到该引文。",
@@ -641,6 +647,12 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         skeletonHint: "The outline above lists material by paper; this files it into sections and names the evidence each section should cite.",
         skeletonBinds: "Should cite",
         unknownPaper: "(untitled paper)",
+        importedOn: "Imported on",
+        importedOnShort: "Imported",
+        confirmAction: "Confirm",
+        confirmHint: "You have checked these fields. Their current values stay as they are and the check mark is removed.",
+        confirmDone: "Confirmed {count} field(s); the check mark is removed.",
+        confirmNothing: "Nothing needed confirming.",
         citeImport: "Import .bib / .ris",
         citeImportHint: "Export from Zotero / EndNote / Mendeley, then import the file here. Entries land as metadata only.",
         citeImportPick: "Choose a citation file",
@@ -699,7 +711,7 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         tooLarge: "File exceeds {limit} MB. Compress or split it first.",
         tooManyFiles: "At most {limit} files per import.",
         duplicates: "already present, skipped",
-        noPdfForPaper: "This entry is metadata only; there is no PDF.",
+        noPdfForPaper: "This entry is metadata only; there is no PDF. To read it, import the PDF first.",
         anchoredCount: "locatable in source",
         textFallbackNote: "The PDF text layer could not be overlaid; showing extracted text, still selectable.",
         highlightMissed: "Opened the page, but the quote was not found in the text layer.",
@@ -734,7 +746,7 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
       "deleteEvidence", "collectEvidence", "listEvidence", "reviewMatrix",
       "reviewOutline", "formatCitations", "exportReview", "searchExternal",
       "addCandidates", "cnkiSearch", "cnkiDownload",
-      "reextractMetadata", "enrichMetadata",
+      "reextractMetadata", "enrichMetadata", "confirmMetadata",
       "ocrPaper",
       // askContext and saveAnswer take an `input` object like the rest, so they must be
       // listed here; the wiring gate checks both sides agree.
@@ -1655,14 +1667,29 @@ function describeError(error, t) {
 
     // --- library ----------------------------------------------------------
 
-    function PaperCard({ paper, t, onOpen, onCompare, onEdit, onReextract, onEnrich, onReocr, onDelete, busy }) {
+    /** "MM-DD" from the stored ISO time, or "" when absent or malformed. */
+    function shortImportDate(iso) {
+      if (typeof iso !== "string") return "";
+      const match = /^\d{4}-(\d{2})-(\d{2})/.exec(iso);
+      return match === null ? "" : `${match[1]}-${match[2]}`;
+    }
+
+    function PaperCard({ paper, t, onOpen, onCompare, onEdit, onReextract, onEnrich, onReocr, onConfirm, onDelete, busy }) {
       // Three states, three different claims. Folding OCR into "full text"
       // would present guessed characters as if they were the PDF's own text,
       // and folding it into "metadata only" would deny that the paper is
       // searchable at all.
+      const isMetadata = paper.material === "metadata";
       const isFulltext = paper.material === "fulltext";
       const isOcr = paper.material === "ocr";
       const materialLabel = isFulltext ? t("fulltext") : isOcr ? t("ocrText") : t("metaOnly");
+      const materialIcon = isMetadata
+        ? h("svg", { width: 12, height: 12, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 3, style: { marginRight: 4 } },
+            h("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+            h("path", { d: "M14 2v6h6" }))
+        : h("svg", { width: 12, height: 12, viewBox: "0 0 24 24", fill: "currentColor", stroke: "none", style: { marginRight: 4 } },
+            h("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+            h("path", { d: "M14 2v6h6" }));
       const hasPdf = typeof paper.pdfPath === "string" && paper.pdfPath !== "";
       const hasDoi = typeof paper.doi === "string" && paper.doi.trim() !== "";
       const [confirming, setConfirming] = useState(false);
@@ -1678,6 +1705,9 @@ function describeError(error, t) {
       // reports numbers rather than just "done" — especially the anchors it lost track of,
       // which the user would otherwise only notice when a quote stopped highlighting.
       const [reocrResult, setReocrResult] = useState(null);
+      // Result of "确认无误". Kept on the card so the user sees that the click took
+      // effect; without it the badge would just vanish with no sign of what happened.
+      const [confirmResult, setConfirmResult] = useState(null);
       const meta = [paper.authors, paper.year, paper.venue].filter(Boolean).join(" · ");
       // Which fields are still guesses. `metadataSource` records where each value
       // came from; a user correction removes its entry, so this list shrinks as
@@ -1692,14 +1722,31 @@ function describeError(error, t) {
               h("span", {
                 className: "pt-h2",
                 style: { flex: 1, minWidth: 0, fontWeight: 600, color: "var(--dsw-alias-label-primary)", wordBreak: "break-word" },
-              }, paper.title || "(untitled)"),
+              }, paper.title || t("unknownPaper")),
             ),
             meta ? h("div", { className: "pt-meta", style: { marginTop: 2, wordBreak: "break-word" } }, meta) : null,
             h("div", { style: { display: "flex", gap: 4, alignItems: "center", marginTop: 4, flexWrap: "wrap" } },
-              h(Badge, { tone: isFulltext ? "info" : isOcr ? "warn" : undefined, title: isOcr ? t("ocrHint") : undefined }, materialLabel),
-              hasPdf ? null : h(Badge, { tone: "quiet" }, t("noPdf")),
+              h(Badge, { tone: isFulltext ? "info" : isOcr ? "warn" : undefined, title: isOcr ? t("ocrHint") : undefined },
+                materialIcon,
+                materialLabel),
+              hasPdf ? null : h(Badge, { tone: "quiet", title: t("noPdfForPaper") }, t("noPdf")),
               guessed.length > 0
                 ? h(Badge, { tone: "warn", title: t("guessHint") }, t("guessBadge", { fields: guessed.map((field) => t(fieldLabelKey(field))).join(t("listSep")) }))
+                : null,
+              // The badge says "check this" but offered no way to answer it. Without this
+              // button the only exit was retyping every value, so the warning became
+              // background noise. Shown only while there is something to confirm.
+              guessed.length > 0 && onConfirm
+                ? h("button", {
+                  type: "button",
+                  className: "pt-btn pt-btn-ghost",
+                  disabled: busy !== null,
+                  title: t("confirmHint"),
+                  onClick: async () => {
+                    const result = await onConfirm(paper);
+                    if (result !== null) setConfirmResult(result);
+                  },
+                }, t("confirmAction"))
                 : null,
               // A field filled from Crossref is not a guess — it was confirmed
               // against the publisher's own record for that DOI. Saying so is the
@@ -1710,6 +1757,10 @@ function describeError(error, t) {
                 : null,
               h("span", { className: "pt-caption pt-num" },
                 `${paper.numPages || 0} ${t("pages")}${paper.hitCount > 1 ? ` · ${paper.hitCount} ${t("total")}` : ""}`),
+              shortImportDate(paper.indexedAt)
+                ? h("span", { className: "pt-caption pt-num", title: t("importedOn") },
+                  `${t("importedOnShort")} ${shortImportDate(paper.indexedAt)}`)
+                : null,
             ),
             // Where the readable text came from, in words rather than a glyph.
             // The OCR badge above says "scanned", but the consequence — that
@@ -1812,6 +1863,12 @@ function describeError(error, t) {
             : h(Button, { variant: "ghost", onClick: () => setConfirming(true), disabled: busy !== null },
               t("delete")),
         ),
+        confirmResult !== null
+          ? h("p", { className: "pt-caption", role: "status", style: { margin: "6px 0 0" } },
+            confirmResult.confirmed.length === 0
+              ? t("confirmNothing")
+              : t("confirmDone", { count: confirmResult.confirmed.length }))
+          : null,
         reextractResult !== null
           ? h("p", { className: "pt-caption", role: "status", style: { margin: "6px 0 0" } },
             reextractResult.changed.length === 0 && reextractResult.disagreed.length === 0
@@ -2440,6 +2497,7 @@ function describeError(error, t) {
       // How external results are ordered. Kept as state rather than read from the last
       // response so the control still reflects the user's choice while a search runs.
       const [sortMode, setSortMode] = useState("relevance");
+      const [materialFilter, setMaterialFilter] = useState("all");
       const [query, setQuery] = useState("");
       const [papers, setPapers] = useState([]);
       const [hits, setHits] = useState(null);
@@ -2821,7 +2879,7 @@ function describeError(error, t) {
         try {
           const [state, listed] = await Promise.all([
             callRemote(sessionId, "status"),
-            callRemote(sessionId, "listPapers", { limit: PAPER_PAGE_SIZE }),
+            callRemote(sessionId, "listPapers", { limit: PAPER_PAGE_SIZE, material: materialFilter === "all" ? null : materialFilter }),
           ]);
           setStatus(state);
           if (state?.limits !== undefined && state.limits !== null) {
@@ -2845,7 +2903,7 @@ function describeError(error, t) {
         } catch (statusError) {
           setError(describeError(statusError, t));
         }
-      }, [sessionId, loadEvidence, loadAnnotations, t]);
+      }, [sessionId, loadEvidence, loadAnnotations, t, materialFilter]);
 
       /**
        * Append the next page of papers.
@@ -2864,6 +2922,7 @@ function describeError(error, t) {
           const listed = await callRemote(sessionId, "listPapers", {
             limit: PAPER_PAGE_SIZE,
             offset: papers.length,
+            material: materialFilter === "all" ? null : materialFilter
           });
           const rows = listed.papers ?? [];
           setPapers((current) => {
@@ -2879,7 +2938,7 @@ function describeError(error, t) {
           setPaperPaging((current) => ({ ...current, loading: false }));
           setError(describeError(listError, t));
         }
-      }, [sessionId, papers.length, t]);
+      }, [sessionId, papers.length, t, materialFilter]);
 
       useEffect(() => { refresh(); }, [refresh]);
 
@@ -2995,7 +3054,7 @@ function describeError(error, t) {
           } else {
             const result = await callRemote(sessionId, "addCandidates", { candidates: chosen });
             const skipped = result.duplicates?.length ?? 0;
-            setNote(`${t("added")} ${result.imported?.length ?? 0}${skipped > 0 ? ` · ${skipped} ${t("skipped")}` : ""}`);
+            setNote(`${t("added")} ${result.imported?.length ?? 0}${skipped > 0 ? ` · ${skipped} ${t("skipped")}` : ""} · ${t("metadataOnlyNote")}`);
             setPicked({});
             setCandidates(candidates.filter((_candidate, index) => !picked[index]));
           }
@@ -3527,6 +3586,25 @@ function describeError(error, t) {
        * The outcome is returned rather than swallowed: the user asked to fix
        * something and needs to know whether it worked, and if not, why.
        */
+      // Confirm the guessed fields of one paper as correct, without changing them.
+      // Returns how many fields were confirmed so the card can say so, or null on a
+      // transport failure (the banner already carries that).
+      const confirmOne = useCallback(async (paper) => {
+        if (!sessionId) return null;
+        setBusy("confirm");
+        setError("");
+        try {
+          const result = await callRemote(sessionId, "confirmMetadata", { paperId: paper.paperId });
+          await refresh();
+          return { confirmed: Array.isArray(result?.confirmed) ? result.confirmed : [] };
+        } catch (confirmError) {
+          setError(describeError(confirmError, t));
+          return null;
+        } finally {
+          setBusy(null);
+        }
+      }, [sessionId, refresh, t]);
+
       const enrichOne = useCallback(async (paper) => {
         if (!sessionId) return null;
         if (typeof paper?.doi !== "string" || paper.doi.trim() === "") {
@@ -4087,6 +4165,16 @@ function describeError(error, t) {
           ),
           h("div", { className: "pt-toolbar" },
             h("span", { className: "pt-caption" }, t("searchScope")),
+            h("select", {
+              className: "pt-input",
+              style: { width: "auto" },
+              value: materialFilter,
+              onChange: (event) => setMaterialFilter(event.target.value),
+            },
+              h("option", { value: "all" }, t("filterAll")),
+              h("option", { value: "metadata" }, t("metaOnly")),
+              h("option", { value: "fulltext" }, t("fulltext")),
+            ),
             h(Button, {
               variant: mode === "library" ? "primary" : "ghost",
               onClick: () => { setMode("library"); setCandidates(null); setFailures([]); setHits(null); },
@@ -4483,6 +4571,7 @@ function describeError(error, t) {
               onReextract: reextractOne,
               onEnrich: enrichOne,
               onReocr: reocrOne,
+              onConfirm: confirmOne,
               onDelete: deletePaper,
             }))),
           // Only offered when there is more: a button that does nothing is worse
