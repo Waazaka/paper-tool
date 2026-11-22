@@ -13,7 +13,7 @@
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { join, sep } from "node:path";
-import { installDom, clickText } from "./dom-stub.mjs";
+import { installDom, clickText, typeInto } from "./dom-stub.mjs";
 
 const failures = [];
 function check(name, ok, detail = "") {
@@ -25,6 +25,15 @@ function check(name, ok, detail = "") {
 }
 
 // --- React from the desktop profile --------------------------------------
+// The DOM goes in BEFORE `react-dom` is required. react-dom decides once, at
+// module load, whether the environment supports the `input` event; with no
+// `document` yet it concludes it does not and takes the IE9 polyfill path, whose
+// keydown handling dereferences a null `activeElementInst` and throws. That made
+// every keystroke in this gate untestable — and a search gate that cannot type
+// cannot see the defect it is meant to guard. test/s16-typing.mjs and
+// test/s11-interaction.mjs install the DOM first for the same reason.
+const { document, Event: DomEventClass } = installDom({ width: 360, height: 640 });
+
 const ROOT = join(process.env.USERPROFILE ?? "", ".dsh", "profiles", "node_modules");
 const requireFromProfile = createRequire(join(ROOT, "noop.js"));
 let React;
@@ -39,8 +48,6 @@ try {
   console.error(`PAGING-MOUNT: react not resolvable from ${ROOT}: ${error.message}`);
   process.exit(2);
 }
-
-const { document } = installDom({ width: 360, height: 640 });
 
 const seenErrors = [];
 console.error = (...args) => {
@@ -73,6 +80,9 @@ const papers = Array.from({ length: TOTAL_PAPERS }, (_, index) => ({
 }));
 
 const TOTAL_EVIDENCE = 90;
+// Outside the first page of 50: the hit must exercise "the paper is not in the
+// loaded page", not merely "the paper is somewhere in `papers`".
+const SEARCH_HIT_PAPER_INDEX = 80;
 const evidence = Array.from({ length: TOTAL_EVIDENCE }, (_, index) => ({
   evidenceId: `ev-${String(index).padStart(3, "0")}`,
   paperId: papers[index % papers.length].paperId,
@@ -123,6 +133,20 @@ function answer(method, params) {
     }
     case "listAnnotations":
       return { annotations: [] };
+    case "search": {
+      // A query hit on a paper the CURRENT PAGE does not contain: search spans the
+      // whole library while the list holds one page (PT-015), which is exactly the
+      // case where a hit card lost its stored row.
+      const matched = papers[SEARCH_HIT_PAPER_INDEX];
+      return {
+        query: input.query,
+        hits: [
+          { paperId: matched.paperId, pageIndex: 3, snippet: "[hit] on page four", title: matched.title, year: matched.year, material: matched.material },
+          { paperId: matched.paperId, pageIndex: 7, snippet: "[hit] on page eight", title: matched.title, year: matched.year, material: matched.material },
+        ],
+        library: { papers: TOTAL_PAPERS, pages: 12, evidence: TOTAL_EVIDENCE },
+      };
+    }
     case "readPaper": {
       const found = papers.find((paper) => paper.paperId === input.paperId);
       // The full row has the abstract the list projection omits.
@@ -214,6 +238,91 @@ await settle();
     JSON.stringify(evidenceCalls[0]?.input));
   check("the first page of papers is rendered", paneText().includes(papers[0].title));
   check("the 51st paper is not rendered yet", !paneText().includes(papers[60].title));
+}
+
+// --- 1b. a hit outside the loaded page is still openable ----------------
+// Search covers the whole library; the list holds one page. Merging a hit with a
+// page-only map therefore produced a card with no `pdfPath` and no `numPages`, and
+// the card read that absence as 「无 PDF · 0 页」 — 阅读 and every page hit disabled,
+// on a paper the search had just matched inside its full text. This gate drives the
+// real search box and inspects the real card, because the defect lives in the merge
+// between two states, not in either one alone.
+{
+  const hitPaper = papers[SEARCH_HIT_PAPER_INDEX];
+  const searchBox = container.find((element) =>
+    element.localName === "input" && element.getAttribute("aria-label") === DICTS.zh.searchPlaceholder);
+  check("the search box is mounted", searchBox !== null, paneText().slice(0, 200));
+
+  if (searchBox !== null) {
+    const readPaperBefore = callsTo("readPaper").length;
+    typeInto(searchBox, "[hit]", DomEventClass);
+    await settle();
+    // Enter, not the button: this is the path a user takes, and it also covers the
+    // keydown handling the DOM stub has to be able to deliver.
+    searchBox.dispatchEvent(new DomEventClass("keydown", { bubbles: true, key: "Enter", keyCode: 13 }));
+    await settle();
+
+    const searchCalls = callsTo("search");
+    check("Enter in the search box issues a library search", searchCalls.length >= 1,
+      `${searchCalls.length} search call(s)`);
+
+    const card = container.find((element) =>
+      element.localName === "li" && element.textContent.includes(hitPaper.title));
+    check("the hit for a paper outside the loaded page is rendered", card !== null,
+      paneText().slice(0, 300));
+
+    const buttons = card === null ? [] : card.findAll((element) => element.localName === "button");
+    const openButton = buttons.find((element) => element.textContent.trim() === DICTS.zh.open);
+    check("the hit card does not claim it has no PDF", !(card?.textContent ?? "").includes(DICTS.zh.noPdf),
+      card?.textContent ?? "");
+    check("the hit card shows the paper's real page count",
+      (card?.textContent ?? "").includes(`${hitPaper.numPages} ${DICTS.zh.pages}`),
+      card?.textContent ?? "");
+    check("the hit card can be opened", openButton !== undefined && openButton.disabled === false,
+      `open button: ${openButton === undefined ? "missing" : `disabled=${openButton.disabled}`}`);
+
+    // The page hits are the whole point of a grouped card, and they share the same
+    // `hasPdf` gate — a fix that only re-enabled 阅读 would leave them dead.
+    const hitButtons = buttons.filter((element) => element.textContent.includes(DICTS.zh.hitOnPage.split("{")[0].trim()));
+    check("the page hits of the hit card are clickable too",
+      hitButtons.length === 2 && hitButtons.every((element) => element.disabled === false),
+      JSON.stringify(hitButtons.map((element) => ({ text: element.textContent.trim(), disabled: element.disabled }))));
+
+    // The row has to come from somewhere: the paper is not in `papers`, so the panel
+    // must have asked the Host for it. Without this the assertions above could pass
+    // by rendering a path the client made up.
+    const fetched = callsTo("readPaper").slice(readPaperBefore)
+      .filter((call) => call.input.paperId === hitPaper.paperId);
+    check("the missing row is fetched from the Host, not assumed", fetched.length >= 1,
+      JSON.stringify(callsTo("readPaper").slice(readPaperBefore).map((call) => call.input)));
+
+    // Clicking it must actually reach the reader. The reader is identified by its
+    // own class, not by a label: its close control is icon-only (`←`), so the
+    // dictionary string lives in `aria-label`.
+    openButton?.dispatchEvent(new DomEventClass("click", { bubbles: true }));
+    await settle();
+    check("opening a hit outside the loaded page mounts the reader",
+      container.find((element) => element.classList.contains("pt-reader")) !== null,
+      paneText().slice(0, 260));
+
+    const closeButton = container.find((element) =>
+      element.localName === "button" && element.getAttribute("aria-label") === DICTS.zh.closeReader);
+    if (closeButton !== null) {
+      closeButton.dispatchEvent(new DomEventClass("click", { bubbles: true }));
+      await settle();
+    }
+    check("the reader can be closed again", container.find((element) => element.classList.contains("pt-reader")) === null,
+      paneText().slice(0, 200));
+
+    // Back to the unfiltered list for the sections below, which assume it.
+    if (paneText().includes(DICTS.zh.clear)) {
+      clickText(container, DICTS.zh.clear);
+      await settle();
+    }
+    check("clearing the search restores the loaded page",
+      paneText().includes(papers[0].title) && paneText().includes(papers[PAGE - 1].title),
+      paneText().slice(0, 200));
+  }
 }
 
 // --- 2. "load more" sends the next offset -----------------------------

@@ -188,6 +188,38 @@ try {
 }
 check("empty sentences throws", emptyRefused !== null, "returned a result instead");
 
+// --- 12. cross-plan: a slotId must not identify different evidence ---------
+// Two single-evidence plans over two different evidence rows. If slotIds are only
+// positional (`s1`, `s2`, ... restarting inside every plan), both plans mint the
+// *same* id for different evidence — and a slotId taken from plan A is then a
+// perfectly valid slot in plan B. That is a cross-plan leak, not a hypothetical.
+const planA = await service.reviewBodyPlan(scope, { evidenceIds: [E1] });
+const planB = await service.reviewBodyPlan(scope, { evidenceIds: [E3] });
+check("single-evidence plan A has one slot", planA.ok === true && planA.slots.length === 1, JSON.stringify(planA.slots?.length));
+check("single-evidence plan B has one slot", planB.ok === true && planB.slots.length === 1, JSON.stringify(planB.slots?.length));
+check("plan A slot carries the evidence it was scoped to",
+  planA.slots[0]?.evidence?.[0]?.evidenceId === E1, JSON.stringify(planA.slots[0]?.evidence));
+check("plan B slot carries the evidence it was scoped to",
+  planB.slots[0]?.evidence?.[0]?.evidenceId === E3, JSON.stringify(planB.slots[0]?.evidence));
+const slotA = planA.slots[0]?.slotId;
+const slotB = planB.slots[0]?.slotId;
+check("plans over different evidence mint different slotIds", slotA !== slotB, `A=${slotA} B=${slotB}`);
+
+// The literal leak: plan A's slotId, no sentence.evidenceIds ("use the slot's
+// binding"), and plan B's evidence as the top-level render scope. If the rebuild
+// ignores that scope, the sentence is accepted and B's anchor is printed.
+const crossPlan = await service.renderBody(scope, {
+  section: "跨计划",
+  evidenceIds: [E3],
+  sentences: [{ slotId: slotA, text: "这句属于计划 A 的证据。" }],
+});
+const crossMarkdown = typeof crossPlan.markdown === "string" ? crossPlan.markdown : "";
+check("cross-plan sentence is accepted zero times", (crossPlan.summary?.accepted ?? 0) === 0,
+  JSON.stringify(crossPlan.summary ?? crossPlan));
+check("cross-plan render never emits plan B's evidence tag", !crossMarkdown.includes(`[E:${E3.slice(0, 8)}]`), crossMarkdown);
+check("cross-plan render never emits plan B's quote", !crossMarkdown.includes("Psychological ownership"), crossMarkdown);
+check("cross-plan render emits no anchors at all", !crossMarkdown.includes("[E:"), crossMarkdown);
+
 store.close?.();
 rmSync(dir, { recursive: true, force: true });
 

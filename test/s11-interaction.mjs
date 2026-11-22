@@ -11,7 +11,7 @@
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { join, sep } from "node:path";
-import { installDom, clickText } from "./dom-stub.mjs";
+import { installDom, clickText, typeInto } from "./dom-stub.mjs";
 
 const failures = [];
 function check(name, condition, detail = "") {
@@ -21,6 +21,13 @@ function check(name, condition, detail = "") {
     failures.push(`${name} ${detail}`);
   }
 }
+
+// --- DOM first -----------------------------------------------------------
+// react-dom decides at module load whether the environment has an `input` event
+// (`isEventSupported`). Requiring it before the DOM exists locks it onto the IE9
+// polyfill, which then reads a never-focused `activeElementInst` on every keydown
+// and throws. So the DOM goes in before the require, as in test/s16-typing.mjs.
+const { document, Event } = installDom({ width: 360, height: 640 });
 
 // --- React from the desktop profile --------------------------------------
 const ROOT = join(process.env.USERPROFILE ?? "", ".dsh", "profiles", "node_modules");
@@ -38,9 +45,6 @@ try {
   process.exit(2);
 }
 console.log(`INTERACTION: react ${React.version}`);
-
-// --- DOM before the bundle loads -----------------------------------------
-const { document } = installDom({ width: 360, height: 640 });
 
 // Surface every error a browser would report in the console instead of letting
 // the process die silently: a React render error and an unhandled rejection look
@@ -88,7 +92,6 @@ const papers = [
   },
 ];
 function answer(method, params) {
-  calls.push({ method, params });
   switch (method) {
     case "libraryStatus":
       return { library: { papers: papers.length, pages: 12, evidence: 0 } };
@@ -96,6 +99,10 @@ function answer(method, params) {
       return { papers };
     case "listEvidence":
       return { evidence: [] };
+    case "search":
+      return { hits: [], library: { papers: papers.length, pages: 12, evidence: 0 } };
+    case "searchExternal":
+      return { candidates: [{ title: "External-only candidate", source: "arxiv" }], failures: [{ source: "crossref", reason: "Fixture outage" }] };
     case "readPaperBytes":
       return { data: new Uint8Array([1, 2, 3]) };
     case "readPaper":
@@ -139,11 +146,21 @@ function makeT(dict) {
 }
 const t = makeT(DICTS.zh);
 
+// A library search can be held open on purpose: `busy` is only observable while a
+// search is still in flight, and a stand-in that always resolves cannot show it.
+const searchGate = { hold: false, pending: [] };
+
 const ctx = {
   connection: {
     rpc: {
       async call(_path, method, options) {
         const bare = String(method).replace(/^paperTool\//, "");
+        calls.push({ method: bare, params: options?.args });
+        if (bare === "search" && searchGate.hold) {
+          return new Promise((resolve) => {
+            searchGate.pending.push(() => resolve({ ok: true, value: answer(bare, options?.args) }));
+          });
+        }
         try {
           return { ok: true, value: answer(bare, options?.args) };
         } catch (error) {
@@ -187,6 +204,83 @@ check("the library tab is present", paneText().includes(DICTS.zh.library), paneT
 check("both papers are listed",
   paneText().includes(papers[0].title) && paneText().includes(papers[1].title),
   paneText().slice(0, 240));
+
+// --- the search box ------------------------------------------------------
+// Two Enter keys are not the same Enter: one commits an IME candidate, the other
+// submits. The box also has to stay inert while a search is still in flight, or
+// holding down Enter fires the same request once per keystroke.
+const searchBox = () => container.find((element) =>
+  element.localName === "input" && [DICTS.zh.searchPlaceholder, DICTS.zh.discoverPlaceholder].includes(element.getAttribute("aria-label")));
+const searchCalls = () => calls.filter((call) => call.method === "search").length;
+const enter = (target, init = {}) =>
+  target.dispatchEvent(new Event("keydown", { bubbles: true, key: "Enter", keyCode: 13, ...init }));
+
+if (searchBox() === null) {
+  check("the search box is mounted", false, paneText().slice(0, 200));
+} else {
+  typeInto(searchBox(), "\u65c5\u6e38", Event);
+  await settle();
+  check("typing reaches the search box", searchBox().value === "\u65c5\u6e38", searchBox().value);
+
+  const beforeIme = searchCalls();
+  enter(searchBox(), { isComposing: true });
+  await settle();
+  check("Enter during IME composition does not search", searchCalls() === beforeIme,
+    `search calls: ${beforeIme} -> ${searchCalls()}`);
+
+  // Hold the first search open so `busy` is observable: a stand-in that resolves
+  // immediately can never show the difference between "in flight" and "done".
+  searchGate.hold = true;
+  const beforeEnter = searchCalls();
+  enter(searchBox());
+  await settle();
+  check("a plain Enter searches exactly once", searchCalls() === beforeEnter + 1,
+    `search calls: ${beforeEnter} -> ${searchCalls()}`);
+  check("a search in flight is shown as busy", paneText().includes(DICTS.zh.searching),
+    paneText().slice(0, 240));
+
+  const beforeSecond = searchCalls();
+  enter(searchBox());
+  await settle();
+  check("Enter while a search is in flight does not search again",
+    searchCalls() === beforeSecond, `search calls: ${beforeSecond} -> ${searchCalls()}`);
+
+  for (const release of searchGate.pending.splice(0)) release();
+  searchGate.hold = false;
+  await settle();
+  check("the finished search stops being busy", !paneText().includes(DICTS.zh.searching),
+    paneText().slice(0, 240));
+
+  // Clear the box, or the filter it leaves behind would change what the reader
+  // checks below are looking at.
+  if (paneText().includes(DICTS.zh.clear)) {
+    clickText(container, DICTS.zh.clear);
+    await settle();
+  }
+  check("clearing the search restores the full list",
+    searchBox().value === "" && paneText().includes(papers[0].title) && paneText().includes(papers[1].title),
+    `value=${JSON.stringify(searchBox().value)} pane: ${paneText().slice(0, 240)}`);
+}
+
+// Each source owns its candidates and per-source failures.
+if (searchBox() !== null) {
+  check("ordinary library does not auto-open details", container.find((el) => el.classList.contains("pt-lib-inspector")) === null);
+  clickText(container, DICTS.zh.discoverPapers);
+  await settle();
+  check("discover view does not mix local rows with candidates", !paneText().includes(papers[0].title));
+  typeInto(searchBox(), "external fixture", Event);
+  await settle();
+  enter(searchBox());
+  await settle();
+  check("external search renders its own candidate and failure", paneText().includes("External-only candidate") && paneText().includes("Fixture outage"));
+  clickText(container, DICTS.zh.cnki);
+  await settle();
+  check("switching to CNKI clears external candidates and failures", !paneText().includes("External-only candidate") && !paneText().includes("Fixture outage"));
+  clickText(container, DICTS.zh.localLibrary);
+  await settle();
+  typeInto(searchBox(), "", Event);
+  await settle();
+}
 
 // --- the reported defect -------------------------------------------------
 // Open a paper. This mounts PdfReader, which starts loading PDF.js from the Host
@@ -268,6 +362,37 @@ check("rapid tab switching does not throw", seen.length === beforeRapid, seen.sl
 check("the pane survives rapid tab switching",
   container.childNodes.length > 0 && paneText().trim() !== "",
   `pane text: ${JSON.stringify(paneText().slice(0, 140))}`);
+
+const projectInput = (label) => container.find((element) =>
+  element.localName === "input" && element.getAttribute("aria-label") === label);
+clickText(container, DICTS.zh.newProject);
+await settle();
+const projectName = projectInput(DICTS.zh.projectNamePlaceholder);
+check("project name input opens", projectName !== null);
+if (projectName !== null) {
+  typeInto(projectName, "研究课题", Event);
+  await settle();
+  enter(projectName, { isComposing: true });
+  await settle();
+  check("IME Enter does not create a project", projectInput(DICTS.zh.projectNamePlaceholder) === projectName);
+  enter(projectName);
+  await settle();
+  check("ordinary Enter creates the project", projectInput(DICTS.zh.projectNamePlaceholder) === null && paneText().includes("研究课题"));
+  clickText(container, DICTS.zh.renameProject);
+  await settle();
+  const rename = projectInput(DICTS.zh.renameProject);
+  check("rename input opens", rename !== null);
+  if (rename !== null) {
+    typeInto(rename, "重命名课题", Event);
+    await settle();
+    enter(rename, { keyCode: 229 });
+    await settle();
+    check("IME Enter does not rename the project", projectInput(DICTS.zh.renameProject) === rename);
+    enter(rename);
+    await settle();
+    check("ordinary Enter renames the project", projectInput(DICTS.zh.renameProject) === null && paneText().includes("重命名课题"));
+  }
+}
 
 root.unmount();
 await settle(4);

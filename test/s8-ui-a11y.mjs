@@ -21,6 +21,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join, sep } from "node:path";
 import { pathToFileURL } from "node:url";
+import { installDom, DomEvent } from "./dom-stub.mjs";
 import { report } from "./report.mjs";
 
 const clientPath = join(process.cwd(), "client.js");
@@ -160,10 +161,14 @@ check("snippets never become HTML", () => {
 const REACT_ROOT = join(process.env.USERPROFILE ?? "", ".dsh", "profiles", "node_modules");
 const requireFromProfile = createRequire(join(REACT_ROOT, "noop.js"));
 let React;
+let createRoot;
 try {
   const domEntry = requireFromProfile.resolve("react-dom/server");
   const domRoot = domEntry.slice(0, domEntry.indexOf(`${sep}react-dom${sep}`));
-  React = createRequire(join(domRoot, "noop.js"))("react");
+  const requireFromDom = createRequire(join(domRoot, "noop.js"));
+  React = requireFromDom("react");
+  // Needed only by the hit-list section at the end, which mounts the real card.
+  ({ createRoot } = requireFromDom("react-dom/client"));
 } catch (error) {
   console.error(`UI-A11Y: react not resolvable: ${error.message}`);
   process.exit(2);
@@ -265,6 +270,234 @@ check("the confidence badge marks guesses and only guesses", () => {
   assert.deepEqual(guessedFields({ title: "T", authors: "A", metadataSource: "" }), [], "legacy row was marked");
   assert.deepEqual(guessedFields({ title: "T", authors: "A", metadataSource: "not json" }), [], "corrupt provenance was marked");
 });
+
+// --- 4. the page-hit list opens the page it names -----------------------
+// PaperCard is on __test, so this section mounts the real card over the DOM
+// stub and clicks the shipped handlers instead of grepping their source. A
+// grep cannot tell the two failure modes apart: a stable focus id, and a click
+// that forwards the *paper's* page instead of the hit's — the latter opens
+// page 1 for every row on the card, which the user reads as "the sidebar
+// ignored my click". The paper's own pageIndex is deliberately 0 while the
+// hits are on 3 and 7, so forwarding the wrong field cannot pass.
+//
+// The bundle is loaded above with a minimal document stand-in; the real DOM
+// stub replaces it here, after import, because the module only touches
+// `document` from inside the handlers this section exercises.
+const { PaperCard } = __test ?? {};
+const zhT = (key, params) => {
+  const raw = DICTS.zh[key];
+  if (raw === undefined) throw new Error(`missing translation key: ${key}`);
+  if (params === undefined) return raw;
+  return String(raw).replace(/\{(\w+)\}/g, (all, name) => (params[name] === undefined ? all : String(params[name])));
+};
+// React needs the task queue to drain before the DOM reflects the render.
+const settle = async (turns = 10) => {
+  for (let index = 0; index < turns; index += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+};
+
+installDom({ width: 360, height: 640 });
+const detailsOf = (root) => root.find((node) => node.localName === "details");
+const hitButtonsIn = (root) => root.findAll((node) => node.localName === "button" && node.id.startsWith("pt-hit-"));
+
+async function mountCard(props) {
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  root.render(React.createElement(PaperCard, { t: zhT, busy: null, ...props }));
+  await settle();
+  return { host, root };
+}
+
+const pageHits = [
+  { pageIndex: 3, snippet: "first [hit]" },
+  { pageIndex: 7, snippet: "second [hit]" },
+];
+const cardPaper = {
+  paperId: "p-hits",
+  title: "Grouped page hits",
+  material: "fulltext",
+  pdfPath: "/p.pdf",
+  numPages: 12,
+  pageIndex: 0,
+  pageHits,
+};
+
+try {
+  {
+    const opened = [];
+    const { host, root } = await mountCard({
+      paper: cardPaper,
+      hitPagesOpen: true,
+      onOpen: (target) => opened.push({ via: "open", pageIndex: target.pageIndex }),
+      onOpenHit: (target, id) => opened.push({ via: "hit", pageIndex: target.pageIndex, id }),
+      onHitPagesToggle() {},
+    });
+    const hitButtons = hitButtonsIn(host);
+
+    check("the card renders one button per page hit", () => {
+      assert.equal(
+        hitButtons.length,
+        pageHits.length,
+        `expected ${pageHits.length} hit button(s), found ${hitButtons.length}`,
+      );
+    });
+
+    hitButtons[1]?.dispatchEvent(new DomEvent("click", { bubbles: true }));
+    await settle();
+
+    check("a hit button opens its own page, not the paper's first page", () => {
+      assert.equal(opened.length, 1, `one click produced ${opened.length} open call(s)`);
+      assert.equal(opened[0].via, "hit", "the card fell back to onOpen instead of onOpenHit, losing focus restore");
+      assert.equal(
+        opened[0].pageIndex,
+        pageHits[1].pageIndex,
+        `clicking the hit on page ${pageHits[1].pageIndex + 1} asked for page ${opened[0].pageIndex + 1}`,
+      );
+      assert.notEqual(
+        opened[0].pageIndex,
+        cardPaper.pageIndex,
+        "the hit forwarded the paper's pageIndex — every row would open page 1",
+      );
+    });
+
+    check("a hit button names the control the panel refocuses", () => {
+      assert.equal(typeof opened[0].id, "string", "onOpenHit got no id, so focus cannot be restored");
+      assert.equal(opened[0].id, hitButtons[1].id, "the reported id does not match the clicked button");
+    });
+
+    check("the hit list expands when hitPagesOpen is true", () => {
+      const details = detailsOf(host);
+      assert.ok(details !== null, "no <details> for the page-hit list");
+      assert.ok(details.hasAttribute("open"), "hitPagesOpen:true left the list folded");
+    });
+
+    try { root.unmount(); } catch { /* the stub has no real unmount guarantees */ }
+
+    const collapsed = await mountCard({
+      paper: cardPaper,
+      hitPagesOpen: false,
+      onOpen() {},
+      onOpenHit() {},
+      onHitPagesToggle() {},
+    });
+    check("the hit list stays folded when hitPagesOpen is false", () => {
+      const details = detailsOf(collapsed.host);
+      assert.ok(details !== null, "no <details> for the page-hit list");
+      assert.ok(!details.hasAttribute("open"), "hitPagesOpen:false still opened the list");
+    });
+    try { collapsed.root.unmount(); } catch { /* ignore */ }
+
+    const tainted = await mountCard({
+      paper: {
+        ...cardPaper,
+        pageHits: [
+          { pageIndex: 2, snippet: '<img src=x onerror="alert(1)">' },
+          { pageIndex: 5, snippet: "[x]" },
+        ],
+      },
+      hitPagesOpen: true,
+      onOpen() {},
+      onOpenHit() {},
+      onHitPagesToggle() {},
+    });
+    check("a hit snippet is rendered as text, never as markup", () => {
+      assert.equal(
+        tainted.host.findAll((node) => node.localName === "img").length,
+        0,
+        "a snippet became a real <img> element",
+      );
+      assert.ok(
+        tainted.host.textContent.includes('<img src=x onerror="alert(1)">'),
+        "the snippet's text is missing — it was swallowed instead of escaped",
+      );
+    });
+    try { tainted.root.unmount(); } catch { /* ignore */ }
+  }
+} catch (error) {
+  failures += 1;
+  console.log(`FAIL page-hit buttons open the page they name\n     ${String(error?.message ?? error).split("\n")[0]}`);
+}
+
+// --- 5. a metadata-only card can attach its PDF -------------------------
+// A paper imported with metadata only has no text to open, so the card swaps
+// "Open" for "Attach PDF". That affordance has two halves and both can fail
+// quietly: the button can exist without pointing at a picker (a dead control),
+// and the picker can fire with the wrong payload — no files, or another card's
+// paperId — which attaches a PDF to the wrong entry. Neither is visible by
+// grepping markup, so the real card is mounted and the real change handler runs.
+const attachPaper = {
+  paperId: "p-attach",
+  title: "Metadata only",
+  material: "metadata",
+  pdfPath: "",
+  numPages: 0,
+};
+const attachButtonsIn = (root) => root.findAll((node) => node.localName === "button" && node.textContent.trim() === zhT("attachPdf"));
+const attachPickersIn = (root) => root.findAll((node) => node.localName === "input" && node.getAttribute("aria-label") === zhT("attachPdf"));
+
+try {
+  {
+    const attached = [];
+    const { host, root } = await mountCard({
+      paper: attachPaper,
+      onAttach: (files, paperId) => attached.push({ files, paperId }),
+    });
+
+    const pickers = attachPickersIn(host);
+    check("a metadata-only card offers exactly one single-file PDF picker", () => {
+      assert.equal(pickers.length, 1, `found ${pickers.length} picker(s)`);
+      assert.equal(pickers[0].getAttribute("type"), "file", "the picker is not a file input");
+      assert.equal(pickers[0].getAttribute("accept"), "application/pdf", "the picker accepts more than PDFs");
+      // No `multiple`: two PDFs would make "which one becomes the paper" ambiguous.
+      assert.ok(!pickers[0].hasAttribute("multiple"), "the picker allows a multi-file attach");
+    });
+
+    check("the Attach button opens that card's picker", () => {
+      const button = attachButtonsIn(host)[0];
+      assert.ok(button !== undefined, "the attach button is missing next to the picker");
+      let opened = 0;
+      pickers[0].click = () => { opened += 1; };
+      button.dispatchEvent(new DomEvent("click", { bubbles: true }));
+      assert.equal(opened, 1, "the Attach button did not open its picker");
+    });
+
+    // What the browser does after the user picks a file: `input.files` is filled
+    // and `change` fires. React reads the FileList off the input, not the event.
+    const picked = [{ name: "attach-me.pdf", size: 12 }];
+    Object.defineProperty(pickers[0], "files", { value: picked, configurable: true });
+    pickers[0].dispatchEvent(new DomEvent("change", { bubbles: true }));
+    await settle();
+
+    check("the picker forwards the chosen file together with this card's paperId", () => {
+      assert.equal(attached.length, 1, `one change produced ${attached.length} attach call(s)`);
+      assert.equal(attached[0].paperId, attachPaper.paperId, "the attach targeted the wrong paper");
+      assert.equal(attached[0].files.length, 1, "the callback received the wrong number of files");
+      assert.equal(attached[0].files[0].name, "attach-me.pdf", "the callback did not receive the chosen file");
+    });
+
+    try { root.unmount(); } catch { /* the stub has no real unmount guarantees */ }
+
+    // Same card, no handler: the Host cannot attach, so the control must not be
+    // offered at all rather than opening a picker whose result goes nowhere.
+    const plain = await mountCard({ paper: attachPaper });
+    check("without an attach handler the card offers neither picker nor button", () => {
+      assert.equal(attachPickersIn(plain.host).length, 0, "a picker appeared with no handler behind it");
+      assert.equal(attachButtonsIn(plain.host).length, 0, "an attach button appeared with no handler behind it");
+    });
+    try { plain.root.unmount(); } catch { /* ignore */ }
+
+    // A paper that already has its PDF needs no attach path even with a handler.
+    const hasPdf = await mountCard({ paper: { ...attachPaper, material: "fulltext", pdfPath: "/p.pdf", numPages: 3 }, onAttach() {} });
+    check("a card that already has a PDF offers no attach picker", () => {
+      assert.equal(attachPickersIn(hasPdf.host).length, 0, "a second PDF could be attached over the existing one");
+      assert.equal(attachButtonsIn(hasPdf.host).length, 0, "the attach button is offered on a paper that has its PDF");
+    });
+    try { hasPdf.root.unmount(); } catch { /* ignore */ }
+  }
+} catch (error) {
+  failures += 1;
+  console.log(`FAIL attaching a PDF to a metadata-only card\n     ${String(error?.message ?? error).split("\n")[0]}`);
+}
 
 console.log(failures === 0 ? "\nUI-A11Y PASS" : `\n${failures} FAILURE(S)`);
 process.exit(report({ failures }));

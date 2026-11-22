@@ -38,7 +38,9 @@ const ctx = {
   get: () => undefined,
 };
 
-const service = new PaperToolService(ctx, {});
+// A disposable `homeDir` keeps this gate off the profile-wide library, which is
+// the user's real data.
+const service = new PaperToolService(ctx, { homeDir: work });
 
 // Registration itself validates every schema, so a throw here is a real defect.
 try {
@@ -127,6 +129,40 @@ if (pdf) {
   const citations = await reviewTool.execute({ action: "citations", style: "gb-t-7714" }, exec);
   check("review citations renders GB/T", citations.text.includes("[1]"), citations.text.slice(0, 120));
 }
+
+// --- export boundary: what the tool ASKS the Host for, and what it SAYS -----
+// Small on purpose: `exportReview` is stubbed over a scripted answer, so the
+// anchor, the forwarded scope and the reported counters are checked without a
+// library, and the real method is back in place for everything after this.
+const exportTool = registered.find((tool) => tool.name === "paper_review");
+const originalExport = service.exportReview;
+const exportCalls = [];
+let scriptedExport = async () => ({ ok: false, reason: "not scripted", warnings: [], unanchoredCount: 0 });
+service.exportReview = async (paperToolScope, input) => {
+  exportCalls.push({ scope: paperToolScope, input });
+  return await scriptedExport(paperToolScope, input);
+};
+try {
+  scriptedExport = async () => ({
+    ok: true, evidenceCount: 3, paperCount: 2, warnings: [], unanchoredCount: 4,
+    paths: { dir: join(work, "export"), markdown: "review.md", bib: "references.bib" },
+  });
+  const okExport = await exportTool.execute({ action: "export" }, exec);
+  check("export passes the session scope through", exportCalls.at(-1).scope.sessionId === "session-tools-test");
+  check("export asks the Host for anchored evidence only", exportCalls.at(-1).input.anchor === "anchored");
+  check("export success text reports the counts and the excluded rows",
+    okExport.text.includes("已导出 3 条证据") && okExport.text.includes("2 篇论文") &&
+      okExport.text.includes("另有 4 条未定位证据无法引用，已排除"), okExport.text);
+
+  scriptedExport = async () => ({ ok: false, reason: "还没有证据条目", warnings: [], unanchoredCount: 6 });
+  const failedExport = await exportTool.execute({ action: "export", evidenceIds: ["e1", "e2"] }, exec);
+  check("export failure names the refusal, the searched set and the exclusions",
+    failedExport.text.includes("导出失败") && failedExport.text.includes("已按你指定的 2 条证据筛选") &&
+      failedExport.text.includes("另有 6 条未定位证据无法引用，已排除"), failedExport.text);
+} finally {
+  service.exportReview = originalExport;
+}
+check("the stubbed Host method is restored", service.exportReview === originalExport);
 
 // --- a missing session must fail loudly, not silently use some other workspace
 let sessionGuarded = false;

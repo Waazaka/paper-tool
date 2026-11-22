@@ -490,13 +490,19 @@ function seed(service, scope, extra = {}) {
     await settle();
 
     const buttons = () => [...host.querySelectorAll("button")];
+    const openBtn = buttons().find((button) => button.textContent.trim() === zh.open);
+    check("a paper can be opened in the reader", openBtn !== undefined,
+      JSON.stringify(buttons().map((b) => b.textContent.trim())));
+    openBtn?.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+    await settle();
+
     const tab = buttons().find((button) => button.textContent.trim().startsWith(zh.translateTab));
-    check("a translation tab exists in the panel", tab !== undefined,
+    check("a bilingual translation toggle exists inside the reader", tab !== undefined,
       JSON.stringify(buttons().map((b) => b.textContent.trim())));
     tab?.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
     await settle();
 
-    // Pick the paper and load segments through the real controls.
+    // The paper is auto-bound to the open reader; pick/confirm and load segments through the real controls.
     const select = [...host.querySelectorAll("select")].find((element) => element.getAttribute("aria-label") === zh.translatePaper);
     check("the paper picker is present", select !== undefined,
       JSON.stringify([...host.querySelectorAll("select")].map((element) => element.getAttribute("aria-label"))));
@@ -507,12 +513,14 @@ function seed(service, scope, extra = {}) {
       const load = buttons().find((button) => button.textContent.trim() === zh.loadSegments);
       check("there is a control to cut the page into segments", load !== undefined,
         JSON.stringify(buttons().map((b) => b.textContent.trim())));
+      const callsBeforeLoad = calls.length;
       load?.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
       await settle();
 
-      check("loading segments issues the RPC", calls.some((call) => call.method === "translateSegments"),
-        calls.map((call) => call.method).join(","));
-      const sent = calls.find((call) => call.method === "translateSegments")?.input ?? {};
+      const loadCalls = calls.slice(callsBeforeLoad);
+      check("loading segments issues the RPC", loadCalls.some((call) => call.method === "translateSegments"),
+        loadCalls.map((call) => call.method).join(","));
+      const sent = loadCalls.find((call) => call.method === "translateSegments")?.input ?? {};
       check("the RPC is told which paper", sent.paperId === "p1", JSON.stringify(sent.paperId));
 
       const bodyText = host.textContent;

@@ -90,6 +90,14 @@ const calls = [];
 // Every call ever made, for assertions about mount-time behaviour: `calls` is
 // cleared between sections, so a mount-time probe would otherwise be invisible.
 const allCalls = [];
+// Two filename-level rows the Host reports for a body it could not make fully
+// searchable. They ride along on the *first* import only: later sections count
+// the rows they sent, and a fixed pair on every call would change their totals.
+const FIRST_IMPORT_FIXTURES = [
+  { filename: "meta-only.pdf", material: "metadata", ocr: { skipped: true, reason: "no usable text layer" } },
+  { filename: "ocr-partial.pdf", material: "ocr", ocr: { pagesRecognised: 2, pagesFailed: 1 } },
+];
+let importCallCount = 0;
 function answer(method, params) {
   // The RPC envelope puts the arguments one level down, under `args`: reading
   // `params.input` directly finds nothing and made every assertion see an empty
@@ -110,8 +118,26 @@ function answer(method, params) {
     case "listAnnotations":
       return { annotations: [] };
     case "importPdf": {
-      const files = params?.input?.files ?? [];
-      return { imported: files.map((file) => ({ filename: file.name })), duplicates: [], failed: [], library: { papers: files.length }, remaining: 0, limit: HOST_LIMIT };
+      // `record.input` is the already-flattened payload: the envelope hides the
+      // files under `args.input`, so reading `params.input` here would find nothing
+      // and return zero imported rows while the request itself looked fine.
+      const files = record.input?.files ?? [];
+      importCallCount += 1;
+      // Name the fixtures after the files that were actually sent, so a reader can
+      // tell the two rows apart; the count still comes from the request.
+      const fixtures = importCallCount === 1
+        ? FIRST_IMPORT_FIXTURES.map((fixture, index) => ({ ...fixture, filename: files[index]?.name ?? fixture.filename }))
+        : [];
+      const byFilename = new Map(fixtures.map((fixture) => [fixture.filename, fixture]));
+      const imported = files.map((file) => {
+        const fixture = byFilename.get(file.name);
+        if (fixture === undefined) return { filename: file.name };
+        byFilename.delete(file.name);
+        return { ...fixture, filename: file.name };
+      });
+      // A fixture whose file never arrived still has to be reported, or the second
+      // coverage line would silently disappear from a one-file request.
+      return { imported: [...imported, ...byFilename.values()], duplicates: [], failed: [], library: { papers: files.length }, remaining: 0, limit: HOST_LIMIT };
     }
     case "watchStatus":
       return { watching: false, dir: null, imported: 0, duplicates: 0, failed: 0, lastError: null, pending: 0 };
@@ -230,6 +256,21 @@ await settle();
   check("the panel says how many files were left over",
     noteText.includes(String(12 - HOST_LIMIT)) || /另有/.test(noteText),
     noteText.slice(0, 200));
+
+  // Per-file coverage lines: "✓ 5" alone would claim five searchable papers while
+  // one is metadata-only and one was only partly recognised. The exact wording is
+  // the assertion, because a generic note would still satisfy "mentions the file".
+  const firstName = sent[0]?.name ?? "paper-0.pdf";
+  const secondName = sent[1]?.name ?? "paper-1.pdf";
+  const metaLine = `${firstName}: ${t("importNotSearchableReason", { reason: FIRST_IMPORT_FIXTURES[0].ocr.reason })}`;
+  const ocrLine = `${secondName}: ${t("importOcrSearchable", {
+    n: FIRST_IMPORT_FIXTURES[1].ocr.pagesRecognised,
+    m: FIRST_IMPORT_FIXTURES[1].ocr.pagesFailed,
+  })}`;
+  check("the panel shows why a metadata-only PDF is not searchable",
+    noteText.includes(metaLine), `missing ${JSON.stringify(metaLine)} in ${noteText.slice(0, 300)}`);
+  check("the panel shows how many OCR pages were recognised and how many failed",
+    noteText.includes(ocrLine), `missing ${JSON.stringify(ocrLine)} in ${noteText.slice(0, 300)}`);
 }
 
 // --- 3. drag and drop imports -----------------------------------------

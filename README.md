@@ -43,10 +43,7 @@ Concretely:
 | External | Search OpenAlex / Crossref / arXiv for new candidates |
 | CNKI | One manual login, then automated search and PDF download |
 
-The sidebar has three views: **文献库** (library), **证据** (evidence),
-**综述** (review). The reader keeps the PDF text layer over the canvas; when that
-layer cannot be created, it falls back to a selectable text panel instead of
-silently disabling selection.
+The sidebar is organized into three equal spaces: **文献** (Library, including local papers, Discover, and Topic exploration), **摘录** (Excerpts/Evidence), and **写作** (Writing/Review). The reader includes an inline **PDF / Bilingual** switcher and a contextual selection bar, keeping the PDF text layer over the canvas; when that layer cannot be created, it falls back to a selectable text panel instead of silently disabling selection.
 
 ## Requirements
 

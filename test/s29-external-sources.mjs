@@ -7,7 +7,7 @@
 // structural bias that looks like a working feature, which is why it needs assertions
 // about ordering rather than just about the presence of a `citations` field.
 import { readFileSync } from "node:fs";
-import { mergeCandidates, SOURCES } from "../lib/external-search.js";
+import { mergeCandidates, parseArxivXml, searchExternal, SOURCES } from "../lib/external-search.js";
 
 const failures = [];
 function check(name, ok, detail) {
@@ -51,6 +51,159 @@ function ok(sourceName, candidates) {
   // Semantic Scholar's whole reason for being here is extra citation signal.
   check("the Semantic Scholar runner asks for citationCount",
     /citationCount/.test(source.slice(source.indexOf("searchSemanticScholar"))));
+}
+
+// --- 1b. arXiv Atom: the DOI and the PDF link --------------------------
+// Both of these parsed to "" on every entry, which a test that only asked "did the entry
+// parse" could not see. arXiv does not use Atom's `<doi>` element — it sends the DOI as the
+// namespaced `<arxiv:doi>` — so a `<doi>` pattern matched nothing, and every preprint was
+// stored DOI-less: a preprint and its published version deduped as two different papers.
+//
+// The PDF link failed for a different reason: Atom says nothing about attribute order, and
+// the live feed sends href first. A pattern requiring `title="pdf"` before `href` never
+// matched, so the one source whose job is handing out direct PDF links always arrived
+// without one.
+//
+// The feed text below is the shape export.arxiv.org actually returned on 2026-11-18,
+// trimmed to the elements the parser reads.
+{
+  const entry = (inner) => `<feed xmlns:arxiv="http://arxiv.org/schemas/atom">\n<entry>\n${inner}\n</entry>\n</feed>`;
+  const base = `
+    <id>http://arxiv.org/abs/1904.08014v1</id>
+    <title>Fermions and bosons in nonsymmorphic PdSb2</title>
+    <link href="https://arxiv.org/abs/1904.08014v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1904.08014v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>PdSb2 is a candidate.</summary>
+    <published>2019-04-16T23:30:23Z</published>
+    <author><name>Ramakanta Chapai</name></author>
+    <author><name>Rongying Jin</name></author>`;
+
+  const [withDoi] = parseArxivXml(entry(`${base}
+    <arxiv:doi>10.1103/PhysRevB.99.161110</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1103/PhysRevB.99.161110" title="doi"/>`), 5);
+  check("the namespaced <arxiv:doi> is read", withDoi.doi === "10.1103/PhysRevB.99.161110", withDoi.doi);
+  check("the arXiv id is not mistaken for a DOI", !/arxiv\.org/i.test(withDoi.doi), withDoi.doi);
+  check("the DOI scheme prefix is stripped", !/^https?:/i.test(withDoi.doi), withDoi.doi);
+  // The prefixed element must win over the <link title="doi"> copy of the same value, but
+  // the link alone is still a DOI — a feed without the namespace is not "no DOI".
+  const [linkOnly] = parseArxivXml(entry(`${base}
+    <link rel="related" href="https://doi.org/10.1038/s41467-019-12784-4" title="doi"/>`), 5);
+  check("a DOI that only appears as a related link is still read",
+    linkOnly.doi === "10.1038/s41467-019-12784-4", linkOnly.doi);
+  const [noDoi] = parseArxivXml(entry(`${base}
+    <link rel="related" href="https://example.org/elsewhere" title="related"/>`), 5);
+  check("an entry without a DOI keeps an empty DOI", noDoi.doi === "", noDoi.doi);
+
+  check("the PDF link is read in the live attribute order (href first)",
+    withDoi.pdfUrl === "https://arxiv.org/pdf/1904.08014v1", withDoi.pdfUrl);
+  // The other order still has to work: a feed change in either direction must not silently
+  // disable the link again.
+  const [reordered] = parseArxivXml(entry(`
+    <id>http://arxiv.org/abs/1508.05555v2</id>
+    <title>New Parities</title>
+    <link title="pdf" rel="related" type="application/pdf" href="https://arxiv.org/pdf/1508.05555v2"/>
+    <summary>S.</summary>
+    <published>2015-08-23T01:45:14Z</published>`), 5);
+  check("the PDF link is read when title comes first too",
+    reordered.pdfUrl === "https://arxiv.org/pdf/1508.05555v2", reordered.pdfUrl);
+  // Every entry carries an abs URL and arXiv serves the PDF at the same path under /pdf/,
+  // so a missing link is recoverable rather than a missing PDF.
+  const [noLink] = parseArxivXml(entry(`
+    <id>http://arxiv.org/abs/1904.00001v1</id>
+    <title>No pdf link</title>
+    <summary>S.</summary>
+    <published>2019-04-16T12:43:38Z</published>
+    <arxiv:doi>10.1/x</arxiv:doi>`), 5);
+  check("a missing PDF link falls back to the abs URL",
+    noLink.pdfUrl === "http://arxiv.org/pdf/1904.00001v1", noLink.pdfUrl);
+
+  // The remaining fields still come through: a fix for the lookup must not break the parse.
+  check("the title, authors, year and abstract survive",
+    withDoi.title === "Fermions and bosons in nonsymmorphic PdSb2" &&
+    withDoi.authors === "Ramakanta Chapai; Rongying Jin" &&
+    withDoi.year === "2019" && withDoi.abstract === "PdSb2 is a candidate." &&
+    withDoi.url === "http://arxiv.org/abs/1904.08014v1",
+    JSON.stringify(withDoi));
+  check("the entry limit is still honoured", parseArxivXml(entry(base) + entry(base).replace("1904.08014", "1904.99999"), 1).length === 1);
+
+  // Source-shape assertions: the two broken patterns must not come back.
+  const atom = source.slice(source.indexOf("function arxivDoi"), source.indexOf("async function searchArxiv"));
+  check("the DOI lookup accepts the arxiv: prefix", /arxiv:/.test(atom));
+  check("the PDF lookup parses attributes instead of their order",
+    !/title="pdf"\[\^>\]\*href=/.test(source), "order-dependent PDF regex is back");
+}
+
+// --- 1c. the same Atom, end to end through searchExternal --------------
+// The block above feeds `parseArxivXml` in isolation, so it sees neither the wiring between
+// the runner and the parser nor the shape of the live feed. A stub here drives the public
+// entry point instead: `searchExternal({ sources: ["arxiv"] })` with `fetch` replaced, on
+// the Atom export.arxiv.org returned on 2026-11-18 — every <link> puts `href` before
+// `rel`/`title`, and the DOI is the namespaced <arxiv:doi>. Both defects this gate exists
+// for lived exactly in that gap.
+{
+  const entry = (inner) => `<entry>\n${inner}\n  </entry>`;
+  // The fields the parser reads, in the live order: href first on both <link> elements.
+  const live = entry(`    <id>http://arxiv.org/abs/1904.08014v1</id>
+    <title>Fermions and bosons in nonsymmorphic PdSb2 with sixfold degeneracy</title>
+    <link href="https://arxiv.org/abs/1904.08014v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1904.08014v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>PdSb2 is a candidate.</summary>
+    <published>2019-04-16T23:30:23Z</published>
+    <arxiv:doi>10.1103/PhysRevB.99.161110</arxiv:doi>
+    <author><name>Ramakanta Chapai</name></author>`);
+  // A second entry whose <arxiv:doi> start tag carries an attribute. That is legal Atom, and
+  // a DOI pattern anchored on `<arxiv:doi>` exactly would miss it.
+  const attributed = entry(`    <id>http://arxiv.org/abs/1508.05555v2</id>
+    <title>New Parities, and a DOI element with attributes</title>
+    <link href="https://arxiv.org/pdf/1508.05555v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>S.</summary>
+    <published>2015-08-23T01:45:14Z</published>
+    <arxiv:doi xmlns:arxiv="http://arxiv.org/schemas/atom">10.1038/s41467-019-12784-4</arxiv:doi>`);
+  const feed = `<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  ${live}
+  ${attributed}
+</feed>`;
+
+  // The fixture is the evidence that href-first order is exercised: if someone "tidies" it
+  // into the other order, the checks below would pass while testing nothing.
+  check("the fixture really puts href before title on the PDF link",
+    feed.indexOf('href="https://arxiv.org/pdf/1904.08014v1"') < feed.indexOf('title="pdf"'),
+    "fixture drifted away from the live attribute order");
+
+  const realFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), init });
+    return new Response(feed, { status: 200 });
+  };
+  let result = null;
+  let threw = null;
+  try {
+    result = await searchExternal("nonsymmorphic PdSb2", { sources: ["arxiv"], limit: 5 });
+  } catch (error) {
+    threw = error;
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  check("a stubbed arXiv feed does not throw out of searchExternal", threw === null, threw?.message);
+  const candidates = result?.candidates ?? [];
+  const byTitle = (needle) => candidates.find((c) => c.title.includes(needle));
+
+  check("searchExternal runs the arXiv runner it was asked for",
+    calls.length === 1 && /^https:\/\/export\.arxiv\.org\/api\/query\?search_query=all:/.test(calls[0]?.url),
+    JSON.stringify(calls.map((c) => c.url)));
+  check("both stubbed entries become candidates", candidates.length === 2, JSON.stringify(candidates.map((c) => c.title)));
+  check("the live entry keeps its DOI", byTitle("sixfold degeneracy")?.doi === "10.1103/PhysRevB.99.161110",
+    byTitle("sixfold degeneracy")?.doi);
+  check("the live entry keeps its PDF URL despite href coming first",
+    byTitle("sixfold degeneracy")?.pdfUrl === "https://arxiv.org/pdf/1904.08014v1",
+    byTitle("sixfold degeneracy")?.pdfUrl);
+  check("an <arxiv:doi> with attributes is still read",
+    byTitle("DOI element with attributes")?.doi === "10.1038/s41467-019-12784-4",
+    byTitle("DOI element with attributes")?.doi);
+  check("a valid feed reports no source failure",
+    JSON.stringify(result?.failures) === "[]", JSON.stringify(result?.failures));
 }
 
 // --- 2. citations are known-or-unknown, never silently zero ------------

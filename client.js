@@ -45,9 +45,9 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
       zh: {
         title: "论文",
         "guide.description": "导入 PDF、检索全文、按页码存证据，生成可回溯的引用与综述材料",
-        library: "文献库",
-        evidenceTab: "证据",
-        reviewTab: "综述",
+        library: "文献",
+        evidenceTab: "摘录",
+        reviewTab: "写作",
         papers: "篇",
         pagesLabel: "页",
         import: "导入 PDF",
@@ -59,7 +59,7 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         empty: "库是空的。点「导入 PDF」把论文放进来。",
         emptyHint: "也可以先「外部检索」找条目，或连接知网下载。",
         noResults: "没有匹配结果。",
-        noResultsHint: "换个词试试；中文支持任意长度，英文按整词匹配。",
+        noResultsHint: "支持空格或标点分隔多词组合检索（如「旅游 经济」）；英文按整词匹配。",
         fulltext: "全文",
         ocrText: "扫描识别",
         ocrHint: "该 PDF 没有文本层，正文由 OCR 识别，个别字可能不准。",
@@ -110,13 +110,13 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         fitWidth: "适宽",
         jump: "跳页",
         jumpPlaceholder: "页码",
-        ask: "就这段提问",
-        askPlaceholder: "就这段内容提问…",
+        ask: "问 AI",
+        askPlaceholder: "就这段内容向 AI 提问…",
         selected: "已选中",
-        noSelection: "在 PDF 里选中文字后，可以提问或存为证据",
-        askHint: "提问会带上论文、页码与引文",
-  annotate: "划线",
-  annotateNote: "笔记（可选）",
+        noSelection: "在 PDF 里选中文字后，可向 AI 提问、翻译或存为摘录",
+        askHint: "提问会自动附带论文、页码与原文引文",
+  annotate: "仅记笔记",
+  annotateNote: "可选备注…",
   annotationSaved: "已划线",
   annotationList: "标注",
   annotationNone: "这篇还没有标注",
@@ -149,6 +149,9 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
   answerPlaceholder: "把回答粘贴到这里，再选择存为笔记或证据",
   reocr: "重跑 OCR",
   reocrHint: "这篇还没有可搜索的文本。重新识别会把扫描页转成可搜索文本。",
+  attachPdf: "补传 PDF",
+  attachPdfDone: "已附加 PDF",
+  attachPdfUnavailable: "当前 Host 不支持给已有文献附加 PDF",
   reocrDone: "已识别 {pages} 页（{failed} 页失败）· 证据重新锚定 {moved} 条，失效 {lost} 条",
   reocrSkipped: "未执行：{reason}",
   citationCount: "{n} 次引用",
@@ -172,10 +175,10 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         venueLabel: "期刊/会议",
         doiLabel: "DOI",
         abstractLabel: "摘要",
-        evidence: "存为证据",
-        evidenceSaved: "已存为证据",
-        evidenceEmpty: "还没有证据。阅读时选中文字，或按主题收集。",
-        evidenceEmptyHint: "证据 = 论文 + 页码 + 原文引文，导出时逐条可回溯。",
+        evidence: "存为摘录",
+        evidenceSaved: "已存为摘录",
+        evidenceEmpty: "还没有摘录。阅读 PDF 时选中任意段落，即可一键存为可回溯摘录。",
+        evidenceEmptyHint: "每条摘录都自动绑定论文、页码与原文位置，写作与导出时逐条可回溯。",
         evidenceAnchored: "已定位原文",
         evidenceUnanchored: "仅记录页码",
         evidenceUnanchoredHint: "这段引文没能在该页文本中定位，跳转只到页码。",
@@ -212,11 +215,11 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         compareJumped: "已在 {count} 个面板中定位到对应证据",
         compareNoMatch: "这篇的同一论断在已加载证据里没找到对应段落，面板未移动。",
         compareRestored: "已恢复上次的比较组合",
-        topicsTab: "选题",
+        topicsTab: "探选题",
         topicRecommend: "生成素材",
         topicWorking: "检索中…",
         topicPlaceholder: "领域关键词，例如 deep learning in education",
-        topicIntro: "插件不替你选题：它检索外部源、统计年度分布与标题共现，把素材摆在下面，由你在对话里判断。",
+        topicIntro: "输入领域关键词，检索外部学术源并统计年度趋势与标题共现，把原始素材摆在这里供你在对话中判断（插件不替你做结论）。",
         topicDisclaimer: "下面的数字是标题词频与共现计数，不是研究结论。创新性与可行性需你自己判断。",
         topicSample: "有效样本",
         topicPapers: "篇",
@@ -238,15 +241,15 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         topicRepresentatives: "高引代表",
         topicFound: "已统计",
         topicSourceFailures: "失败的数据源",
-        translateTab: "对照",
-        translateIntro: "插件不翻译：它把原文切段并带上页码锚点，由对话里的 Agent 翻译，再把译文按锚点写回。",
+        translateTab: "双语对照",
+        translateIntro: "按页码与字符锚点切分原文段落，交由对话中的 AI 翻译后按锚点写回，确保双语逐段对齐（插件本身不直接翻译）。",
         translatePaper: "选择论文",
         translatePickPaper: "选择一篇论文",
         translateFrom: "从第",
         translateTo: "到第",
         translateInto: "译为",
-        loadSegments: "取分段",
-        loadingSegments: "取分段中…",
+        loadSegments: "加载段落",
+        loadingSegments: "加载段落中…",
         saveTranslation: "保存译文",
         saving: "保存中…",
         segmentCount: "段",
@@ -256,7 +259,7 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         translationSaved: "段译文已保存",
         translationRejected: "段被拒绝",
         noTranslationEntered: "没有填写任何译文",
-        translateEmpty: "先选一篇论文并点「取分段」",
+        translateEmpty: "点击「加载段落」切分当前论文段落，即可进行双语对照与 AI 翻译。",
         translateSourceCol: "原文（带锚点）",
         translateTargetCol: "译文",
         translateSegmentAria: "第 {page} 页 {start} 处的译文",
@@ -264,14 +267,17 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         alignedPartly: "还有 {n} 段未译",
         translateOcrNote: "{n} 页原文来自 OCR，译文会继承识别错误",
         translateOcrCaveat: "原文来自 OCR，译文可能继承识别错误",
-        importFolder: "选目录",
+        importFolder: "导入文件夹",
         noPdfFound: "没有找到 PDF 文件",
         dropToImport: "松开即入库",
         importLeftover: "另有 {n} 个文件超出单次上限 {limit}，未处理",
         importTooLargeSkipped: "{n} 个文件超过 {limit} MB，已跳过",
-        watch: "监目录",
-        watchOn: "监目录已开",
-        watchOff: "监目录已关",
+        importNotSearchable: "仅书目，正文不可检索",
+        importNotSearchableReason: "正文不可检索（{reason}）",
+        importOcrSearchable: "OCR 文本可检索 {n} 页，{m} 页未识别",
+        watch: "监听目录",
+        watchOn: "目录监听已开",
+        watchOff: "目录监听已关",
         watchPick: "选择监听目录",
         watchHint: "只在你开启后监听；新 PDF 掉进目录会自动入库",
         watchRoot: "监听中：{dir}",
@@ -374,7 +380,11 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         readerLoading: "正在加载 PDF…",
         pageCount: "共 {n} 页",
         searchScope: "检索范围",
-        localLibrary: "本地库",
+        localLibrary: "我的文献",
+        discoverPapers: "找新论文",
+        academicSources: "学术来源",
+        discoverPlaceholder: "输入题目或关键词找论文…",
+        discoverStart: "查找可以加入文献库的论文",
         statusLine: "{papers} 篇 · {pages} 页 · {evidence} 条证据",
         evidenceScopeHint: "共 {total} 条，本页显示 {shown} 条",
         filterAll: "全部",
@@ -388,13 +398,125 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         errorTitle: "出错了",
         dismiss: "知道了",
         selfCheck: "自检",
+        submittedToAgent: "已发送给对话中的 Agent",
+        backToEvidence: "↩ 返回证据",
+        backToReview: "↩ 返回综述",
+        annotateAndEvidence: "划线+存证据",
+        annotateAndEvidenceSaved: "已划线并存为证据",
+        aiTranslate: "AI 一键翻译",
+        refreshTranslations: "刷新译文",
+        aiTopicRecommend: "AI 深度推荐选题",
+        aiExpandTopic: "AI 展开此选题",
+        searchRelatedPapers: "去搜相关文献",
+        storedClaims: "已存论断",
+        saveClaim: "保存论断",
+        claimSaved: "已保存论断（关联 {evidence} 条证据）",
+        aiWriteReview: "AI 撰写可溯源综述",
+        exportPreview: "导出全文预览",
+        downloadMd: "下载 Markdown",
+        searchSyntaxHint: "支持空格或标点分隔多词组合检索（如「旅游 经济」）；英文按整词匹配",
+        selectAll: "全选",
+        clearWorkingSet: "清空",
+        workingSetBanner: "已选 {n} 篇文献",
+        workingSetScopeAll: "当前范围：全部文献",
+        selectPaperAria: "圈选文献：{title}",
+        focusReading: "🔍 专注阅读",
+        exitFocusReading: "↩ 退出专注",
+        companionPageTranslate: "🌐 本页双语对照",
+        companionReadingCard: "📇 六要素读书卡",
+        companionPaperMarks: "📌 本篇证据与批注 ({n})",
+        aiTranslatePage: "🌐 AI 翻译本页",
+        aiBuildReadingCard: "✨ AI 一键生成本篇读书卡",
+        readingCardEmpty: "还没有本篇读书卡，点击上方按钮由 AI 自动读取全文并生成。",
+        pageTranslateEmpty: "本页暂无分段译文，可点击「AI 翻译本页」或「刷新译文」。",
+        pageEvidenceSection: "本篇证据",
+        pageNotesSection: "本篇批注",
+        chipTranslateZh: "翻译",
+        chipExplainPlain: "解释",
+        chipExtractFinding: "提炼结论",
+        chipFindLimitation: "找局限",
+        crossPaperTitle: "跨文献同题拷问",
+        chipCompareMethods: "📋 对比各篇方法与样本",
+        chipCompareFindings: "⚡ 汇总各篇结论争议",
+        chipCompareLimitations: "🔍 扒出各篇局限性找空白",
+        oneClickImport: "保存书目",
+        sourcePdf: "打开 PDF 来源 ↗",
+        alreadyInLibrary: "✓ 已在库中",
+        findSimilarPapers: "🔍 搜相似文献",
+        toggleAbstract: "摘要",
+        hideAbstract: "收起摘要",
+        importedToLibrary: "已入库：《{title}》",
+        evidenceViewList: "📄 分组列表",
+        evidenceViewMatrix: "📊 按文献横向对比视图",
+        matrixColPaper: "文献",
+        matrixColCard: "读书卡摘要",
+        matrixColEvidence: "已摘录证据",
+        matrixColClaims: "关联论断",
+        rulePrecheckBadge: "规则初筛",
+        aiStanceCheck: "🤖 AI 语义深度核对立场",
+        unanchoredWarning: "提示：当前范围含 {n} 条未定位原文的证据（仅记录页码），导出时将被排除，建议在阅读器中重新划词锚定。",
+        reviewStep1Title: "本次写作材料",
+        reviewStep2Title: "大纲与草稿",
+        reviewStep3Title: "引用预览与导出",
+        reviewToolsTitle: "更多工具（导入书目 / 重叠检查）",
+        libToolsToggle: "··· 更多",
+        paperMoreTools: "···",
+        paperHideTools: "收起",
+        hitPagesToggle: "{n} 页命中 · 展开定位",
+        hitOnPage: "第 {page} 页",
+        reviewFlowProgress: "流程进度：文献 {papers} 篇 → 证据 {evidence} 条 → 论断 {claims} 条",
+        projectBarLabel: "📁 课题",
+        projectAll: "📚 全部文献 ({n})",
+        projectStarred: "⭐ 核心必引 ({n})",
+        projectUnassigned: "📥 未归类 ({n})",
+        newProject: "＋ 新建课题",
+        projectNamePlaceholder: "输入课题名称，回车创建…",
+        createProject: "创建",
+        renameProject: "✏️ 重命名",
+        deleteProject: "🗑️ 删除课题",
+        assignToProject: "📁 归入课题",
+        batchMarkStatus: "🏷️ 标为",
+        statusAll: "全部",
+        statusUnread: "📌 未读",
+        statusReading: "📖 在读",
+        statusRead: "✅ 已读",
+        sortRecent: "最新导入",
+        sortYearDesc: "发表年份",
+        sortTitleAsc: "标题排序",
+        starToggleAria: "标记或取消核心必引星标",
+        inspectorTitle: "📑 选中文献详情与速读台",
+        inspectorClose: "关闭详情",
+        inspectorAbstract: "📌 摘要全文",
+        inspectorAbstractNone: "暂无摘要（可点击「编辑题录」或通过 DOI 补全）。",
+        inspectorReadingCard: "📇 六要素读书卡",
+        inspectorMarks: "📝 本篇证据与批注 ({n})",
+        inspectorOpenReader: "📖 打开沉浸阅读",
+        inspectorProjects: "所属课题",
+        topicResearchGapTitle: "🎯 基于当前课题文献挖掘研究空白（Limitations & 争议）",
+        topicResearchGapDesc: "一键驱动 AI 汇总当前作用域文献的研究不足、方法瓶颈与结论冲突，直接提炼可发表切入点。",
+        topicResearchGapAction: "✨ AI 挖掘当前课题空白与争议",
+        topicShowGaps: "显示共现统计明细 ▾",
+        topicHideGaps: "收起共现统计明细 ▴",
+        topicNewProjectFrom: "📁 以此选题新建课题",
+        topicAddToProject: "➕ 加入当前课题",
+        reviewAdvancedTools: "更多工具（导入书目 / 重叠检查）",
+        reviewAdvancedShow: "更多工具（导入书目 / 重叠检查） ▾",
+        reviewAdvancedHide: "收起更多工具 ▴",
+        workingSetProjectBanner: "课题：{name}（{n} 篇）",
+        readerViewPdf: "原文",
+        continueReading: "继续阅读：《{title}》· 第 {page} 页",
+        goToLibrary: "去文献库打开一篇",
+        paperDetails: "查看详情",
+        selectionAddNote: "+ 备注",
+        matrixToggleShow: "展开论断核对 ▾",
+        matrixToggleHide: "收起 ▴",
       },
       en: {
         title: "Papers",
         "guide.description": "Import PDFs, search full text, save page-anchored evidence, and produce traceable citations",
         library: "Library",
-        evidenceTab: "Evidence",
-        reviewTab: "Review",
+        evidenceTab: "Excerpts",
+        reviewTab: "Writing",
         papers: "papers",
         pagesLabel: "pages",
         import: "Import PDF",
@@ -406,7 +528,7 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         empty: "Library is empty. Click “Import PDF” to add papers.",
         emptyHint: "Or use External search, or connect CNKI to download.",
         noResults: "No matches.",
-        noResultsHint: "Try another term. CJK matches any length; English matches whole words.",
+        noResultsHint: "Supports space/punctuation separated multi-term search; English matches whole words.",
         fulltext: "full text",
         ocrText: "scanned OCR",
         ocrHint: "This PDF has no text layer; the text was recognised by OCR and individual characters may be wrong.",
@@ -455,13 +577,13 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         fitWidth: "Fit width",
         jump: "Go",
         jumpPlaceholder: "page",
-        ask: "Ask about selection",
-        askPlaceholder: "Ask about this passage…",
+        ask: "Ask AI",
+        askPlaceholder: "Ask AI about this passage…",
         selected: "Selected",
-        noSelection: "Select text in the PDF to ask or save evidence",
-        askHint: "The question carries paper, page and quote",
-  annotate: "Highlight",
-  annotateNote: "Note (optional)",
+        noSelection: "Select text in the PDF to ask AI, translate, or save an excerpt",
+        askHint: "Questions automatically include paper, page, and quote",
+  annotate: "Note only",
+  annotateNote: "Optional note…",
   annotationSaved: "Highlighted",
   annotationList: "Annotations",
   annotationNone: "No annotations for this paper yet",
@@ -494,6 +616,9 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
   answerPlaceholder: "Paste the answer here, then choose note or evidence",
   reocr: "Re-run OCR",
   reocrHint: "This paper has no searchable text yet. Re-running recognition turns the scanned pages into searchable text.",
+  attachPdf: "Attach PDF",
+  attachPdfDone: "PDF attached",
+  attachPdfUnavailable: "attaching a PDF to an existing paper is not supported by this Host",
   reocrDone: "Recognised {pages} page(s) ({failed} failed) · {moved} evidence row(s) re-anchored, {lost} no longer locatable",
   reocrSkipped: "Not run: {reason}",
   citationCount: "{n} citations",
@@ -517,10 +642,10 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         venueLabel: "Journal / venue",
         doiLabel: "DOI",
         abstractLabel: "Abstract",
-        evidence: "Save as evidence",
-        evidenceSaved: "Evidence saved",
-        evidenceEmpty: "No evidence yet. Select text while reading, or collect by topic.",
-        evidenceEmptyHint: "Evidence = paper + page + exact quote; every export traces back.",
+        evidence: "Save excerpt",
+        evidenceSaved: "Excerpt saved",
+        evidenceEmpty: "No excerpts yet. Select any passage while reading a PDF to save a traceable excerpt.",
+        evidenceEmptyHint: "Every excerpt keeps paper, page, and exact source location for traceable writing.",
         evidenceAnchored: "located in source",
         evidenceUnanchored: "page only",
         evidenceUnanchoredHint: "This quote could not be located in the page text, so jumps land on the page.",
@@ -561,7 +686,7 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         topicRecommend: "Gather material",
         topicWorking: "Searching…",
         topicPlaceholder: "Field keywords, e.g. deep learning in education",
-        topicIntro: "The plugin does not pick your topic: it queries external sources, counts years and title co-occurrence, and lays the material out here for you to judge.",
+        topicIntro: "Enter field keywords to query external sources, count yearly trends and title co-occurrence, and inspect the raw material here (the plugin does not pick your topic).",
         topicDisclaimer: "The numbers below are title word counts and co-occurrence, not research conclusions. Judge novelty and feasibility yourself.",
         topicSample: "usable sample",
         topicPapers: "papers",
@@ -583,8 +708,8 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         topicRepresentatives: "Most cited",
         topicFound: "Counted",
         topicSourceFailures: "Failed sources",
-        translateTab: "Translation",
-        translateIntro: "The plugin does not translate: it cuts the page into anchored segments, the Agent translates them in conversation, and the result is written back by anchor.",
+        translateTab: "Bilingual",
+        translateIntro: "Splits pages into anchored segments for the chat AI to translate and write back by anchor, keeping source and translation aligned (the plugin itself does not translate).",
         translatePaper: "Paper",
         translatePickPaper: "Pick a paper",
         translateFrom: "From",
@@ -614,6 +739,9 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         dropToImport: "Drop to import",
         importLeftover: "{n} more file(s) exceed the {limit}-file limit and were not processed",
         importTooLargeSkipped: "{n} file(s) exceed {limit} MB and were skipped",
+        importNotSearchable: "metadata only, body text not searchable",
+        importNotSearchableReason: "body text not searchable ({reason})",
+        importOcrSearchable: "OCR text searchable on {n} page(s), {m} failed",
         watch: "Watch folder",
         watchOn: "Watching",
         watchOff: "Not watching",
@@ -718,7 +846,11 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         readerLoading: "Loading PDF…",
         pageCount: "{n} pages",
         searchScope: "Search in",
-        localLibrary: "Local library",
+        localLibrary: "My papers",
+        discoverPapers: "Find papers",
+        academicSources: "Academic sources",
+        discoverPlaceholder: "Find papers by topic or keyword…",
+        discoverStart: "Find papers to add to your library",
         statusLine: "{papers} papers · {pages} pages · {evidence} evidence",
         evidenceScopeHint: "{shown} of {total} shown",
         filterAll: "All",
@@ -732,6 +864,118 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
         errorTitle: "Something went wrong",
         dismiss: "Dismiss",
         selfCheck: "Self-check",
+        submittedToAgent: "Sent to the Agent in chat",
+        backToEvidence: "↩ Back to Evidence",
+        backToReview: "↩ Back to Review",
+        annotateAndEvidence: "Highlight + Evidence",
+        annotateAndEvidenceSaved: "Highlighted and saved as evidence",
+        aiTranslate: "AI Translate",
+        refreshTranslations: "Refresh translations",
+        aiTopicRecommend: "AI Topic Analysis",
+        aiExpandTopic: "AI Expand Topic",
+        searchRelatedPapers: "Search Literature",
+        storedClaims: "Stored claims",
+        saveClaim: "Save claim",
+        claimSaved: "Claim saved ({evidence} evidence linked)",
+        aiWriteReview: "AI Write Traceable Review",
+        exportPreview: "Export preview",
+        downloadMd: "Download Markdown",
+        searchSyntaxHint: "Supports space-separated multi-term queries (e.g. \"tourism economy\")",
+        selectAll: "Select all",
+        clearWorkingSet: "Clear",
+        workingSetBanner: "{n} paper(s) selected",
+        workingSetScopeAll: "Scope: all papers",
+        selectPaperAria: "Select paper: {title}",
+        focusReading: "🔍 Focus mode",
+        exitFocusReading: "↩ Exit focus",
+        companionPageTranslate: "🌐 Page translation",
+        companionReadingCard: "📇 Reading card",
+        companionPaperMarks: "📌 Evidence & notes ({n})",
+        aiTranslatePage: "🌐 AI translate page",
+        aiBuildReadingCard: "✨ AI Generate Reading Card",
+        readingCardEmpty: "No reading card yet. Click above to have the AI generate one.",
+        pageTranslateEmpty: "No translations on this page yet. Click AI translate or refresh.",
+        pageEvidenceSection: "Paper evidence",
+        pageNotesSection: "Paper annotations",
+        chipTranslateZh: "Translate",
+        chipExplainPlain: "Explain",
+        chipExtractFinding: "Key finding",
+        chipFindLimitation: "Limitations",
+        crossPaperTitle: "Cross-paper inquiry",
+        chipCompareMethods: "📋 Compare methods & samples",
+        chipCompareFindings: "⚡ Synthesize findings & debates",
+        chipCompareLimitations: "🔍 Find limitations & gaps",
+        oneClickImport: "Save record",
+        sourcePdf: "Open PDF source ↗",
+        alreadyInLibrary: "✓ In library",
+        findSimilarPapers: "🔍 Find similar",
+        toggleAbstract: "Abstract",
+        hideAbstract: "Hide abstract",
+        importedToLibrary: "Imported: {title}",
+        evidenceViewList: "📄 Grouped list",
+        evidenceViewMatrix: "📊 Cross-paper matrix",
+        matrixColPaper: "Paper",
+        matrixColCard: "Reading card",
+        matrixColEvidence: "Evidence",
+        matrixColClaims: "Linked claims",
+        rulePrecheckBadge: "Rule pre-check",
+        aiStanceCheck: "🤖 AI Semantic Stance Check",
+        unanchoredWarning: "Note: {n} evidence row(s) are page-only (unanchored) and excluded on export; re-select in reader to anchor.",
+        reviewStep1Title: "Writing materials",
+        reviewStep2Title: "Outline & draft",
+        reviewStep3Title: "Citations & export",
+        reviewToolsTitle: "More tools (import bibliography / overlap check)",
+        libToolsToggle: "··· More",
+        paperMoreTools: "···",
+        paperHideTools: "Less",
+        hitPagesToggle: "{n} page hits · show",
+        hitOnPage: "p. {page}",
+        reviewFlowProgress: "Flow: {papers} papers → {evidence} evidence → {claims} claims",
+        projectBarLabel: "📁 Project",
+        projectAll: "📚 All papers ({n})",
+        projectStarred: "⭐ Core starred ({n})",
+        projectUnassigned: "📥 Unassigned ({n})",
+        newProject: "+ New project",
+        projectNamePlaceholder: "Project name, press Enter…",
+        createProject: "Create",
+        renameProject: "✏️ Rename",
+        deleteProject: "🗑️ Delete",
+        assignToProject: "📁 Add to project",
+        batchMarkStatus: "🏷️ Mark as",
+        statusAll: "All",
+        statusUnread: "📌 Unread",
+        statusReading: "📖 Reading",
+        statusRead: "✅ Read",
+        sortRecent: "Recently added",
+        sortYearDesc: "Year",
+        sortTitleAsc: "Title",
+        starToggleAria: "Toggle core star",
+        inspectorTitle: "📑 Paper Inspector",
+        inspectorClose: "Close details",
+        inspectorAbstract: "📌 Abstract",
+        inspectorAbstractNone: "No abstract stored yet.",
+        inspectorReadingCard: "📇 Reading card",
+        inspectorMarks: "📝 Paper evidence & notes ({n})",
+        inspectorOpenReader: "📖 Focus reader",
+        inspectorProjects: "Projects",
+        topicResearchGapTitle: "🎯 Mine research gaps & debates in current project",
+        topicResearchGapDesc: "Ask AI to synthesize limitations, methodological bottlenecks and conflicting findings across current papers.",
+        topicResearchGapAction: "✨ AI Mine Gaps & Debates",
+        topicShowGaps: "Show co-occurrence stats ▾",
+        topicHideGaps: "Hide co-occurrence stats ▴",
+        topicNewProjectFrom: "📁 New project from topic",
+        topicAddToProject: "➕ Add to project",
+        reviewAdvancedTools: "More tools (import bibliography / overlap check)",
+        reviewAdvancedShow: "More tools (import / overlap) ▾",
+        reviewAdvancedHide: "Hide more tools ▴",
+        workingSetProjectBanner: "Project: {name} ({n})",
+        readerViewPdf: "Original",
+        continueReading: "Continue reading: {title} · p.{page}",
+        goToLibrary: "Open a paper in Library",
+        paperDetails: "Details",
+        selectionAddNote: "+ Note",
+        matrixToggleShow: "Check claim stance ▾",
+        matrixToggleHide: "Hide ▴",
       },
     };
 
@@ -779,6 +1023,8 @@ const MAX_IMPORT_FILES_FALLBACK = 32;
       "topicRecommend",
       // Writing assistance, also RPCs (D-014). All three take an input object.
       "sectionSkeleton", "importCitations", "similarityNotice",
+      // Claims & traceable review body RPCs.
+      "recordClaims", "listClaims", "reviewBodyPlan", "renderBody",
     ]);
 
     /** Typed transport failure. `code` drives the recovery the UI offers. */
@@ -846,6 +1092,21 @@ function describeError(error, t) {
         return error.message;
       }
       return error?.message ?? String(error);
+    }
+
+    /**
+     * Whether an Enter keydown is the event that COMMITS an IME candidate.
+     *
+     * A Chinese/Japanese/Korean input method delivers the Enter that accepts a
+     * candidate twice: first with `isComposing` true — or, on engines that report the
+     * process key instead, keyCode 229 — and then again as an ordinary Enter. Acting
+     * on the first one submits half-composed text before the user has chosen
+     * anything, and acting on both runs the action twice. Only the plain commit is a
+     * real Enter, so every Enter shortcut outside the search box asks this first.
+     */
+    function isImeCommit(event) {
+      if (event?.nativeEvent?.isComposing === true) return true;
+      return event?.keyCode === 229;
     }
 
     /**
@@ -1085,25 +1346,62 @@ function describeError(error, t) {
         border-color: var(--dsw-alias-brand-primary);
       }
 
-      /* Tabs: an underline rule, not a row of buttons that all look primary. */
-      .pt-tabs { display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--dsw-alias-border-l1); }
+      /* Tabs: calm 3-space segmented bar (Library · Excerpts · Writing). */
+      .pt-tabs {
+        display: flex; gap: 3px; margin: 6px 12px 4px; padding: 3px;
+        background: var(--dsw-alias-bg-layer-2);
+        border: 1px solid var(--dsw-alias-border-l1);
+        border-radius: var(--dsw-radius-md);
+      }
       .pt-tab {
-        position: relative; flex: 1 1 0; min-width: 0; min-height: 34px; padding: 6px 2px;
-        font: inherit; font-size: 12px; line-height: 18px;
-        color: var(--dsw-alias-label-tertiary); background: none; border: 0; cursor: pointer;
+        position: relative; flex: 1 1 0; min-width: 0; min-height: 30px; padding: 4px 6px;
+        display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+        font: inherit; font-size: 12px; line-height: 16px;
+        color: var(--dsw-alias-label-secondary); background: transparent;
+        border: 1px solid transparent; border-radius: var(--dsw-radius-sm); cursor: pointer;
       }
       .pt-tab:hover { color: var(--dsw-alias-label-primary); }
       .pt-tab:focus-visible { outline: 2px solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)); outline-offset: -2px; }
-      .pt-tab[aria-selected="true"] { color: var(--dsw-alias-label-primary); font-weight: 600; }
-      .pt-tab[aria-selected="true"]::after {
-        content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px;
-        background: var(--dsw-alias-brand-primary); border-radius: 2px;
+      .pt-tab[aria-selected="true"] {
+        background: var(--dsw-alias-bg-layer-1);
+        color: var(--dsw-alias-label-primary); font-weight: 600;
+        border-color: var(--dsw-alias-border-l2);
+        box-shadow: 0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent);
       }
       .pt-tab-count { color: var(--dsw-alias-label-caption); font-variant-numeric: tabular-nums; font-weight: 400; }
 
+      .pt-collapsed { display: none !important; }
+      .pt-seg {
+        display: inline-flex; align-items: center; gap: 2px; padding: 2px;
+        background: var(--dsw-alias-bg-layer-2);
+        border: 1px solid var(--dsw-alias-border-l1);
+        border-radius: var(--dsw-radius-sm);
+      }
+      .pt-card-accent {
+        display: flex; flex-direction: column; gap: 8px; padding: 10px;
+        border-radius: var(--dsw-radius-md);
+        background: var(--dsw-alias-bg-layer-2);
+        border: 1px solid var(--dsw-alias-border-l1);
+        border-left: 3px solid var(--dsw-alias-brand-primary);
+      }
+      .pt-step-pill {
+        display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 999px;
+        font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+        background: color-mix(in srgb, var(--dsw-alias-brand-primary) 14%, transparent);
+        color: var(--dsw-alias-brand-primary);
+        border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 35%, transparent);
+      }
+      .pt-flow-bar {
+        display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+        padding: 7px 10px; border-radius: var(--dsw-radius-md);
+        background: color-mix(in srgb, var(--dsw-alias-brand-primary) 8%, var(--dsw-alias-bg-layer-2));
+        border: 1px solid var(--dsw-alias-border-l1);
+        color: var(--dsw-alias-label-primary); font-size: 12px; font-weight: 500;
+      }
+
       /* Cards. */
       .pt-card {
-        padding: 9px 10px; border-radius: var(--dsw-radius-md);
+        padding: 7px 9px; border-radius: var(--dsw-radius-md);
         background: var(--dsw-alias-bg-layer-1);
         border: 1px solid var(--dsw-alias-border-l1);
         color: var(--dsw-alias-label-primary);
@@ -1161,7 +1459,7 @@ function describeError(error, t) {
         padding: 6px 0; border-bottom: 1px solid var(--dsw-alias-border-l1);
       }
       .pt-canvas-wrap {
-        flex: 1 1 auto; min-height: 180px; max-height: 62vh; overflow: auto;
+        flex: 1 1 auto; min-height: 360px; max-height: calc(100vh - 145px); overflow: auto;
         /* Overflow-safe centering: justify-content:center clips the START of an
            overflowing child, so the page's right side became unreachable in a narrow
            sidebar. auto margins centre when there is room and fall back to 0 when
@@ -1198,10 +1496,140 @@ function describeError(error, t) {
         border-radius: 2px;
       }
 
+      .pt-chip {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 2px 8px; min-height: 24px;
+        font: inherit; font-size: 11px; line-height: 16px;
+        color: var(--dsw-alias-label-primary);
+        background: var(--dsw-alias-bg-layer-2);
+        border: 1px solid var(--dsw-alias-border-l2);
+        border-radius: 999px;
+        cursor: pointer;
+      }
+      .pt-chip:hover:not(:disabled) {
+        background: var(--dsw-alias-interactive-bg-hover-accent);
+        border-color: var(--dsw-alias-brand-primary);
+      }
+      .pt-chip:disabled { opacity: .45; cursor: default; }
+
+      .pt-scope-bar {
+        display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+        padding: 6px 12px;
+        background: color-mix(in srgb, var(--dsw-alias-brand-primary) 10%, var(--dsw-alias-bg-layer-2));
+        border-bottom: 1px solid var(--dsw-alias-border-l1);
+        color: var(--dsw-alias-label-primary);
+        font-size: 12px;
+      }
+
+      .pt-wizard-step {
+        display: flex; flex-direction: column; gap: 8px;
+        padding: 10px;
+        border-radius: var(--dsw-radius-md);
+        border: 1px solid var(--dsw-alias-border-l1);
+        background: var(--dsw-alias-bg-layer-1);
+        color: var(--dsw-alias-label-primary);
+      }
+
+      .pt-companion {
+        display: flex; flex-direction: column; gap: 6px;
+        padding: 8px;
+        border-radius: var(--dsw-radius-md);
+        border: 1px solid var(--dsw-alias-border-l1);
+        background: var(--dsw-alias-bg-layer-2);
+        color: var(--dsw-alias-label-primary);
+      }
+
+      .pt-cmp-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+      .pt-cmp-table th, .pt-cmp-table td {
+        text-align: left; vertical-align: top; padding: 6px 8px;
+        border-top: 1px solid var(--dsw-alias-border-l1);
+        word-break: break-word;
+      }
+      .pt-cmp-table th { font-weight: 600; color: var(--dsw-alias-label-secondary); }
+
+      .pt-project-bar {
+        display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
+        padding: 4px 12px;
+        background: transparent;
+        border-bottom: 1px solid var(--dsw-alias-border-l1);
+        color: var(--dsw-alias-label-secondary);
+      }
+      .pt-continue-bar {
+        display: flex; gap: 6px; align-items: center;
+        padding: 5px 8px;
+        border-radius: var(--dsw-radius-sm);
+        background: color-mix(in srgb, var(--dsw-alias-brand-primary) 8%, var(--dsw-alias-bg-layer-2));
+        border: 1px solid var(--dsw-alias-border-l1);
+        color: var(--dsw-alias-label-primary);
+      }
+      .pt-status-bar { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+      .pt-star-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 22px; height: 22px; padding: 0; border: 0; border-radius: var(--dsw-radius-xs);
+        background: transparent; color: var(--dsw-alias-state-warn-primary);
+        font: inherit; font-size: 13px; cursor: pointer; flex: none;
+      }
+      .pt-star-btn:hover { background: var(--dsw-alias-interactive-bg-hover-accent); }
+      .pt-status-pill {
+        display: inline-flex; align-items: center; padding: 1px 6px; min-height: 22px;
+        font: inherit; font-size: 11px; line-height: 16px; border-radius: 999px; cursor: pointer;
+        border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-layer-2);
+        color: var(--dsw-alias-label-secondary); white-space: nowrap;
+      }
+      .pt-status-pill.pt-status-reading {
+        border-color: var(--dsw-alias-brand-primary);
+        color: var(--dsw-alias-brand-primary);
+      }
+      .pt-status-pill.pt-status-read {
+        border-color: var(--dsw-alias-state-success-secondary);
+        color: var(--dsw-alias-state-success-primary);
+      }
+      .pt-lib-split { display: flex; flex-direction: column; gap: 10px; }
+      .pt-lib-list { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+      .pt-lib-inspector {
+        min-width: 0; display: flex; flex-direction: column; gap: 8px;
+        padding: 10px; border-radius: var(--dsw-radius-md);
+        background: var(--dsw-alias-bg-layer-2);
+        border: 1px solid var(--dsw-alias-border-l1);
+        color: var(--dsw-alias-label-primary);
+      }
+      .pt-card-inspected {
+        border-color: var(--dsw-alias-brand-primary);
+        background: color-mix(in srgb, var(--dsw-alias-brand-primary) 5%, var(--dsw-alias-bg-layer-1));
+      }
+      .pt-reader-split { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; }
+      .pt-reader-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; flex: 1 1 auto; }
+      .pt-reader-right { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
       /* Row layouts collapse before they squeeze. */
       .pt-row { display: flex; gap: 8px; align-items: flex-start; }
       .pt-row-main { flex: 1 1 auto; min-width: 0; }
       .pt-row-aside { flex: none; display: flex; gap: 4px; align-items: center; }
+
+      @container pt (min-width: 600px) {
+        .pt-reader-split {
+          display: grid;
+          grid-template-columns: minmax(0, 56fr) minmax(0, 44fr);
+          gap: 10px;
+          align-items: stretch;
+        }
+        .pt-reader-right {
+          max-height: calc(100vh - 145px);
+          overflow-y: auto;
+        }
+      }
+      @container pt (min-width: 640px) {
+        .pt-pane-stack {
+          flex-direction: row !important;
+          height: 76vh !important;
+        }
+        .pt-pane-stack > div[data-compare-pane] {
+          flex: 1 1 0;
+          min-width: 0;
+          height: 100%;
+          overflow-y: auto;
+        }
+      }
 
       @container pt (max-width: 340px) {
         .pt-btn-label { display: none; }
@@ -1674,7 +2102,144 @@ function describeError(error, t) {
       return match === null ? "" : `${match[1]}-${match[2]}`;
     }
 
-    function PaperCard({ paper, t, onOpen, onCompare, onEdit, onReextract, onEnrich, onReocr, onConfirm, onDelete, busy }) {
+    function shortAuthorName(authors) {
+      const raw = String(authors ?? "").trim();
+      if (raw === "") return "";
+      const first = raw.split(/[;；、]/)[0].trim();
+      return first.length > 18 ? `${first.slice(0, 17)}…` : first;
+    }
+
+    function formatPaperLocator(paper, pageIndex, fallbackTitle = "") {
+      const author = shortAuthorName(paper?.authors);
+      const year = String(paper?.year ?? "").trim();
+      const pagePart = Number.isInteger(pageIndex) && pageIndex >= 0 ? `p.${pageIndex + 1}` : "";
+      const head = [author, year, pagePart].filter(Boolean).join(", ");
+      const rawTitle = String(paper?.title ?? fallbackTitle ?? "").trim();
+      const shortTitle = rawTitle.length > 36 ? `${rawTitle.slice(0, 35)}…` : rawTitle;
+      if (head !== "" && shortTitle !== "") return `[${head}] · ${shortTitle}`;
+      if (head !== "") return `[${head}]`;
+      return shortTitle;
+    }
+
+    function findLibraryPaper(item, papers) {
+      const itemDoi = String(item?.doi ?? "").trim().toLowerCase();
+      const itemTitle = String(item?.title ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+      return (papers ?? []).find((p) => {
+        const pDoi = String(p?.doi ?? "").trim().toLowerCase();
+        if (itemDoi !== "" && pDoi !== "" && itemDoi === pDoi) return true;
+        const pTitle = String(p?.title ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+        return itemTitle !== "" && pTitle !== "" && itemTitle === pTitle;
+      });
+    }
+
+    function buildBibtexForCandidate(item) {
+      const esc = (v) => String(v ?? "").replace(/[{}]/g, "").replace(/\s+/g, " ").trim();
+      const year = esc(item?.year);
+      const title = esc(item?.title || "Untitled");
+      const authors = esc(item?.authors);
+      const venue = esc(item?.venue);
+      const doi = esc(item?.doi);
+      const abstract = esc(item?.abstract);
+      const url = esc(item?.href || item?.url);
+      const keyBase = (shortAuthorName(authors) || "ref").replace(/[^a-zA-Z0-9]/g, "") || "ref";
+      const citeKey = `${keyBase}${year || "nd"}${Math.abs(title.length * 31)}`;
+      const lines = [`@article{${citeKey},`, `  title = {${title}},`];
+      if (authors) lines.push(`  author = {${authors}},`);
+      if (year) lines.push(`  year = {${year}},`);
+      if (venue) lines.push(`  journal = {${venue}},`);
+      if (doi) lines.push(`  doi = {${doi}},`);
+      if (abstract) lines.push(`  abstract = {${abstract}},`);
+      if (url) lines.push(`  url = {${url}},`);
+      lines.push("}");
+      return lines.join("\n");
+    }
+
+    function isReadingCardAnnotation(annotation) {
+      const note = String(annotation?.note ?? "");
+      if (/读书卡|研究问题|研究方法|核心结论|核心发现|局限性/.test(note)) return true;
+      return Array.isArray(annotation?.tags) && annotation.tags.includes("读书卡");
+    }
+
+    const PROJECT_STORE_KEY = "dsh-paper-tool-projects-v1";
+    const STATUS_ORDER = ["unread", "reading", "read"];
+
+    function loadProjectStore() {
+      const fallback = { projects: [], activeProjectId: "all", paperMeta: {} };
+      try {
+        if (typeof localStorage === "undefined") return fallback;
+        const raw = localStorage.getItem(PROJECT_STORE_KEY);
+        if (!raw) return fallback;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object") return fallback;
+        const projects = Array.isArray(parsed.projects)
+          ? parsed.projects.filter((p) => p && typeof p.id === "string" && typeof p.name === "string")
+          : [];
+        const rawActive = typeof parsed.activeProjectId === "string" ? parsed.activeProjectId : "all";
+        const activeValid = rawActive === "all" || rawActive === "starred" || rawActive === "unassigned" || projects.some((p) => p.id === rawActive);
+        const paperMeta = parsed.paperMeta && typeof parsed.paperMeta === "object" ? parsed.paperMeta : {};
+        return { projects, activeProjectId: activeValid ? rawActive : "all", paperMeta };
+      } catch {
+        return fallback;
+      }
+    }
+
+    function saveProjectStore(store) {
+      try {
+        if (typeof localStorage !== "undefined") {
+          localStorage.setItem(PROJECT_STORE_KEY, JSON.stringify(store));
+        }
+      } catch {
+        /* ignore storage quota or restricted context */
+      }
+    }
+
+    function getPaperMeta(paperMeta, paperId) {
+      const entry = paperMeta?.[paperId];
+      return {
+        projects: Array.isArray(entry?.projects) ? entry.projects : [],
+        status: entry?.status === "reading" || entry?.status === "read" ? entry.status : "unread",
+        starred: Boolean(entry?.starred),
+      };
+    }
+
+    function isPaperInProject(paperId, projectId, paperMeta) {
+      if (projectId === "all") return true;
+      const meta = getPaperMeta(paperMeta, paperId);
+      if (projectId === "starred") return meta.starred;
+      if (projectId === "unassigned") return meta.projects.length === 0;
+      return meta.projects.includes(projectId);
+    }
+
+    // Stable DOM id for one page-hit button: closing the reader must be able to
+    // hand focus back to the exact hit that opened it, and the list has been
+    // remounted by then. Paper ids are opaque, so encode them into the id; the
+    // position is used rather than the page number because one page can be hit
+    // twice and duplicate ids are invalid.
+    function hitButtonId(paperId, index) {
+      return `pt-hit-${encodeURIComponent(String(paperId ?? ""))}-${Number.isInteger(index) ? index : 0}`;
+    }
+
+    // Focus by id on the next frame, once React has re-mounted the list. A
+    // missing node is not an error: the paper may have left the result set.
+    function restoreHitFocus(id) {
+      if (typeof document === "undefined" || !id) return;
+      const run = () => {
+        const node = document.getElementById(id);
+        if (node && typeof node.focus === "function") node.focus({ preventScroll: true });
+      };
+      if (typeof requestAnimationFrame === "function") requestAnimationFrame(run);
+      else setTimeout(run, 0);
+    }
+
+    function PaperCard({
+      paper, t, selected, onToggleSelect,
+      starred, readStatus, projectNames, inspected, onToggleStar, onCycleStatus, onInspect,
+      onOpen, onCompare, onEdit, onReextract, onEnrich, onReocr, onConfirm, onDelete, busy, onAttach,
+      // Whether the ±hit-page list is expanded, and callbacks that report a
+      // toggle / an open from one of the hits. The panel owns this, because
+      // opening the PDF unmounts this card.
+      hitPagesOpen, onHitPagesToggle, onOpenHit,
+    }) {
       // Three states, three different claims. Folding OCR into "full text"
       // would present guessed characters as if they were the PDF's own text,
       // and folding it into "metadata only" would deny that the paper is
@@ -1690,9 +2255,21 @@ function describeError(error, t) {
         : h("svg", { width: 12, height: 12, viewBox: "0 0 24 24", fill: "currentColor", stroke: "none", style: { marginRight: 4 } },
             h("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
             h("path", { d: "M14 2v6h6" }));
-      const hasPdf = typeof paper.pdfPath === "string" && paper.pdfPath !== "";
+      const hasPdf = typeof paper.pdfPath === "string" && paper.pdfPath !== ""
+        // A search hit can reach the card before its stored row has been fetched
+        // (`hitRowUnknown`), and a missing `pdfPath` then means "not known yet",
+        // not "no PDF". Full-text and OCR papers have a stored PDF by construction,
+        // and the reader resolves it by paper id, so the honest answer there is
+        // "openable" — the old reading disabled 阅读 on a paper the search had just
+        // matched inside its full text.
+        || (paper.hitRowUnknown === true && (isFulltext || isOcr));
       const hasDoi = typeof paper.doi === "string" && paper.doi.trim() !== "";
+      const [expandedTools, setExpandedTools] = useState(false);
       const [confirming, setConfirming] = useState(false);
+      // Always allocated, never inside the conditional below: a hook order that
+      // changes when a paper gains its PDF would crash the whole list. One input
+      // per card, so two cards never share a file dialog target.
+      const attachInputRef = useRef(null);
       // Outcome of the last re-extraction, shown next to the buttons that caused
       // it. A silent success would leave the user unsure whether the repaired
       // fields are actually new.
@@ -1715,153 +2292,273 @@ function describeError(error, t) {
       // between "the app claims this is the journal" and "the app is asking".
       const guessed = guessedFields(paper);
       const fromCrossref = crossrefFields(paper);
-      return h("li", { className: "pt-card" },
+      const activeStatus = readStatus === "reading" || readStatus === "read" ? readStatus : "unread";
+      const statusPillLabel = activeStatus === "read" ? t("statusRead") : activeStatus === "reading" ? t("statusReading") : t("statusUnread");
+      // A metadata-only paper has no text to read, so "Open" is dead on it. The
+      // useful action there is supplying the PDF, but only when the Host says it
+      // can attach one to an existing paper — otherwise the click would silently
+      // create a second entry instead.
+      const canAttach = !hasPdf && isMetadata && typeof onAttach === "function";
+      return h("li", { className: inspected ? "pt-card pt-card-inspected" : "pt-card" },
         h("div", { className: "pt-row" },
           h("div", { className: "pt-row-main" },
-            h("div", { style: { display: "flex", gap: 6, alignItems: "baseline" } },
-              h("span", {
-                className: "pt-h2",
-                style: { flex: 1, minWidth: 0, fontWeight: 600, color: "var(--dsw-alias-label-primary)", wordBreak: "break-word" },
-              }, paper.title || t("unknownPaper")),
+            h("div", { style: { display: "flex", gap: 6, alignItems: "flex-start" } },
+              typeof onToggleSelect === "function"
+                ? h("input", {
+                  type: "checkbox",
+                  checked: Boolean(selected),
+                  "aria-label": t("selectPaperAria", { title: paper.title || paper.paperId }),
+                  style: { flex: "none", marginTop: 3, cursor: "pointer" },
+                  onChange: () => onToggleSelect(paper.paperId),
+                })
+                : null,
+              typeof onToggleStar === "function"
+                ? h("button", {
+                  type: "button",
+                  className: "pt-star-btn",
+                  "aria-label": t("starToggleAria"),
+                  title: t("starToggleAria"),
+                  onClick: (event) => { event?.stopPropagation?.(); onToggleStar(paper.paperId); },
+                }, starred ? "★" : "☆")
+                : null,
+              (hasPdf || typeof onInspect === "function")
+                ? h("button", {
+                  type: "button",
+                  className: "pt-h2", id: `pt-inspect-${paper.paperId}`,
+                  style: {
+                    flex: 1, minWidth: 0, textAlign: "left", background: "none", border: 0, padding: 0,
+                    font: "inherit", fontWeight: 600, color: "var(--dsw-alias-label-primary)",
+                    wordBreak: "break-word", cursor: "pointer",
+                  },
+                  onClick: () => {
+                    if (hasPdf) {
+                      onOpen({
+                        paperId: paper.paperId,
+                        title: paper.title,
+                        pageIndex: Number.isInteger(paper.pageIndex) ? paper.pageIndex : 0,
+                        quote: null,
+                        paper,
+                      });
+                    } else if (typeof onInspect === "function") {
+                      onInspect(paper);
+                    }
+                  },
+                }, paper.title || t("unknownPaper"))
+                : h("span", {
+                  className: "pt-h2",
+                  style: { flex: 1, minWidth: 0, fontWeight: 600, color: "var(--dsw-alias-label-primary)", wordBreak: "break-word" },
+                }, paper.title || t("unknownPaper")),
+              h("div", { className: "pt-row-aside", style: { flexDirection: "row", alignItems: "center" } },
+                hasPdf ? h(Button, {
+                  variant: "primary",
+                  disabled: busy === "open",
+                  title: t("open"),
+                  onClick: () => onOpen({
+                    paperId: paper.paperId,
+                    title: paper.title,
+                    pageIndex: Number.isInteger(paper.pageIndex) ? paper.pageIndex : 0,
+                    quote: paper.snippet ? null : null,
+                    paper,
+                  }),
+                }, t("open")) : null,
+                canAttach
+                  ? h(Button, {
+                    variant: "primary",
+                    disabled: busy !== null,
+                    title: t("attachPdf"),
+                    onClick: () => attachInputRef.current?.click(),
+                  }, t("attachPdf"))
+                  : null,
+                h("button", {
+                  type: "button",
+                  className: "pt-btn pt-btn-ghost",
+                  "aria-expanded": expandedTools ? "true" : "false",
+                  onClick: () => setExpandedTools((current) => !current),
+                }, expandedTools ? t("paperHideTools") : t("paperMoreTools")),
+              ),
             ),
-            meta ? h("div", { className: "pt-meta", style: { marginTop: 2, wordBreak: "break-word" } }, meta) : null,
-            h("div", { style: { display: "flex", gap: 4, alignItems: "center", marginTop: 4, flexWrap: "wrap" } },
+            h("div", { style: { display: "flex", gap: 6, alignItems: "center", marginTop: 4, flexWrap: "wrap" } },
+              meta ? h("span", { className: "pt-meta", style: { wordBreak: "break-word" } }, meta) : null,
               h(Badge, { tone: isFulltext ? "info" : isOcr ? "warn" : undefined, title: isOcr ? t("ocrHint") : undefined },
                 materialIcon,
                 materialLabel),
               hasPdf ? null : h(Badge, { tone: "quiet", title: t("noPdfForPaper") }, t("noPdf")),
-              guessed.length > 0
-                ? h(Badge, { tone: "warn", title: t("guessHint") }, t("guessBadge", { fields: guessed.map((field) => t(fieldLabelKey(field))).join(t("listSep")) }))
-                : null,
-              // The badge says "check this" but offered no way to answer it. Without this
-              // button the only exit was retyping every value, so the warning became
-              // background noise. Shown only while there is something to confirm.
-              guessed.length > 0 && onConfirm
+              // A page count of 0 is a claim about the paper ("it has no pages").
+              // While the stored row for a search hit is still being fetched the
+              // count is unknown, so print nothing rather than 0.
+              paper.hitRowUnknown === true && !Number.isFinite(paper.numPages)
+                ? null
+                : h("span", { className: "pt-caption pt-num" },
+                  `${paper.numPages || 0} ${t("pages")}${paper.hitCount > 1 ? ` · ${paper.hitCount} ${t("total")}` : ""}`),
+              typeof onCycleStatus === "function"
                 ? h("button", {
                   type: "button",
-                  className: "pt-btn pt-btn-ghost",
-                  disabled: busy !== null,
-                  title: t("confirmHint"),
-                  onClick: async () => {
-                    const result = await onConfirm(paper);
-                    if (result !== null) setConfirmResult(result);
-                  },
-                }, t("confirmAction"))
+                  className: `pt-status-pill pt-status-${activeStatus}`,
+                  onClick: (event) => { event?.stopPropagation?.(); onCycleStatus(paper.paperId); },
+                }, statusPillLabel)
                 : null,
-              // A field filled from Crossref is not a guess — it was confirmed
-              // against the publisher's own record for that DOI. Saying so is the
-              // point of keeping per-field provenance: the user can trust those
-              // values without re-checking them by hand.
-              fromCrossref.length > 0
-                ? h(Badge, { tone: "info", title: t("crossrefHint") }, t("crossrefBadge", { fields: fromCrossref.map((field) => t(fieldLabelKey(field))).join(t("listSep")) }))
-                : null,
-              h("span", { className: "pt-caption pt-num" },
-                `${paper.numPages || 0} ${t("pages")}${paper.hitCount > 1 ? ` · ${paper.hitCount} ${t("total")}` : ""}`),
               shortImportDate(paper.indexedAt)
                 ? h("span", { className: "pt-caption pt-num", title: t("importedOn") },
                   `${t("importedOnShort")} ${shortImportDate(paper.indexedAt)}`)
                 : null,
+              ...(projectNames ?? []).map((name) => h(Badge, { key: name, tone: "info" }, `📁 ${name}`)),
             ),
-            // Where the readable text came from, in words rather than a glyph.
-            // The OCR badge above says "scanned", but the consequence — that
-            // quotes taken from it may carry misread characters — is what the
-            // user needs before citing, and a title tooltip needs a hover to
-            // discover. This line is always visible. The label goes through the
-            // dictionary with a placeholder so the colon is localised too.
-            h("div", { className: "pt-caption", style: { marginTop: 3 } },
-              t("sourceLine", {
-                source: isOcr ? t("sourceOcr") : isFulltext ? t("sourceTextLayer") : t("sourceNone"),
-              })),
             paper.snippet
-              ? h("p", { className: "pt-meta pt-snippet", style: { margin: "6px 0 0", wordBreak: "break-word" } },
+              ? h("p", { className: "pt-meta pt-snippet", style: { margin: "5px 0 0", wordBreak: "break-word" } },
                 snippetNodes(paper.snippet))
+              : null,
+            // A grouped card collapses several page hits into one title, so the
+            // first snippet above is only one of the places the query matched.
+            // Folded by default: a long hit list must not push the card's buttons
+            // down the column.
+            Array.isArray(paper.pageHits) && paper.pageHits.length > 1
+              ? h("details", {
+                // Controlled from the panel's ref so the expansion survives the
+                // list unmounting while the reader is open. React only re-applies
+                // `open` when this card re-renders, so the user's own toggle is
+                // not fought mid-interaction.
+                open: hitPagesOpen === true,
+                style: { marginTop: 4 },
+                onToggle: (event) => {
+                  // Recorded, never compared against the prop: the prop is the
+                  // value from the last render, which this very toggle has made
+                  // stale. Adding/removing is idempotent, so a spurious mount
+                  // event (React re-applying `open`) is harmless.
+                  if (typeof onHitPagesToggle === "function") {
+                    onHitPagesToggle(paper.paperId, Boolean(event?.currentTarget?.open));
+                  }
+                },
+              },
+                h("summary", { className: "pt-caption", style: { cursor: "pointer" } },
+                  t("hitPagesToggle", { n: paper.pageHits.length })),
+                h("div", { style: { display: "flex", flexDirection: "column", gap: 2, marginTop: 4 } },
+                  paper.pageHits.map((hit, index) => h("button", {
+                    // `type` first: the a11y gate matches props up to the first
+                    // closing brace, and the template literal in `key` contains one.
+                    type: "button",
+                    key: `hit-${index}`,
+                    className: "pt-btn pt-btn-ghost",
+                    // Stable identity so the panel can hand focus back to this
+                    // exact hit after the reader closes.
+                    id: hitButtonId(paper.paperId, index),
+                    disabled: !hasPdf || busy === "open",
+                    // One hit per line: a ghost button sized to its text would
+                    // overflow the narrow sidebar column.
+                    style: { display: "block", width: "100%", textAlign: "left", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere" },
+                    onClick: () => {
+                      const target = {
+                        paperId: paper.paperId,
+                        title: paper.title,
+                        pageIndex: hit.pageIndex,
+                        quote: null,
+                        paper,
+                      };
+                      // The panel remembers which hit opened the reader, so
+                      // closing it can put focus back here. Falls back to a plain
+                      // open when the card is rendered outside the panel.
+                      if (typeof onOpenHit === "function") onOpenHit(target, hitButtonId(paper.paperId, index));
+                      else onOpen(target);
+                    },
+                  }, `${t("hitOnPage", { page: (hit.pageIndex ?? 0) + 1 })} · `,
+                  snippetNodes(hit.snippet))),
+                ),
+              )
               : null,
           ),
         ),
-        h("div", { style: { display: "flex", gap: 4, marginTop: 8, flexWrap: "wrap" } },
-          h(Button, {
-            variant: "primary",
-            disabled: !hasPdf || busy === "open",
-            title: hasPdf ? t("open") : t("noPdfForPaper"),
-            onClick: () => onOpen({
-              paperId: paper.paperId,
-              title: paper.title,
-              pageIndex: Number.isInteger(paper.pageIndex) ? paper.pageIndex : 0,
-              quote: paper.snippet ? null : null,
-              paper,
-            }),
-          }, t("open")),
-          // Compare needs a PDF for the same reason reading does: the panes render
-          // pages, and a metadata-only entry would open an empty pane.
-          hasPdf
-            ? h(Button, {
-              variant: "ghost",
-              disabled: busy !== null,
-              title: t("compareHint"),
-              onClick: () => onCompare({
-                paperId: paper.paperId,
-                title: paper.title,
-                pageIndex: Number.isInteger(paper.pageIndex) ? paper.pageIndex : 0,
-                quote: null,
-                paper,
-              }),
-            }, t("compareAdd"))
-            : null,
-          h(Button, { onClick: () => onEdit(paper), disabled: busy !== null }, t("editMeta")),
-          // Only for a paper with no usable text. On a `fulltext` paper OCR would replace
-          // correct text with guesses (the Host refuses it too); on an `ocr` paper there is
-          // nothing new to recognise. Showing it everywhere would invite a click that can
-          // only be refused, which reads as a bug.
-          paper.material === "metadata" && hasPdf
-            ? h(Button, {
-              variant: "ghost",
-              disabled: busy !== null,
-              title: t("reocrHint"),
-              onClick: async () => {
-                const result = await onReocr(paper);
-                if (result === null) return;
-                setReocrResult(result);
-              },
-            }, busy === "reocr" ? t("working") : t("reocr"))
-            : null,
-          // Offered only when a DOI exists: without one there is nothing to look
-          // up, and a button that must refuse is worse than no button. Independent
-          // of `hasPdf` because a metadata-only entry (added from a search result)
-          // can still have a DOI and benefit from enrichment.
-          hasDoi
-            ? h(Button, {
-              variant: "ghost",
-              disabled: busy !== null,
-              title: t("enrichHint"),
-              onClick: async () => {
-                const result = await onEnrich(paper);
-                if (result === null) return;
-                setEnrichResult(result);
-              },
-            }, busy === "enrich" ? t("working") : t("enrich"))
-            : null,
-          // Only offered when there is a PDF to re-read. Showing it on a
-          // metadata-only entry would promise an action that must fail.
-          hasPdf
-            ? h(Button, {
-              variant: "ghost",
-              disabled: busy !== null,
-              title: t("reextractHint"),
-              onClick: async () => {
-                const result = await onReextract(paper);
-                if (result === null) return;
-                setReextractResult(result);
-              },
-            }, busy === "reextract" ? t("working") : t("reextract"))
-            : null,
-          confirming
-            ? h(React.Fragment, null,
-              h(Button, { variant: "danger", onClick: () => { setConfirming(false); onDelete(paper.paperId); }, disabled: busy !== null },
-                t("confirm")),
-              h(Button, { variant: "ghost", onClick: () => setConfirming(false) }, t("cancel")),
-            )
-            : h(Button, { variant: "ghost", onClick: () => setConfirming(true), disabled: busy !== null },
-              t("delete")),
+        h("div", {
+          className: expandedTools ? undefined : "pt-collapsed",
+          style: { display: "flex", flexDirection: "column", gap: 6, marginTop: 8, paddingTop: 6, borderTop: "1px dashed var(--dsw-alias-border-l1)" },
+        },
+          h("div", { style: { display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" } },
+            guessed.length > 0
+              ? h(Badge, { tone: "warn", title: t("guessHint") }, t("guessBadge", { fields: guessed.map((field) => t(fieldLabelKey(field))).join(t("listSep")) }))
+              : null,
+            guessed.length > 0 && onConfirm
+              ? h("button", {
+                type: "button",
+                className: "pt-btn pt-btn-ghost",
+                disabled: busy !== null,
+                title: t("confirmHint"),
+                onClick: async () => {
+                  const result = await onConfirm(paper);
+                  if (result !== null) setConfirmResult(result);
+                },
+              }, t("confirmAction"))
+              : null,
+            fromCrossref.length > 0
+              ? h(Badge, { tone: "info", title: t("crossrefHint") }, t("crossrefBadge", { fields: fromCrossref.map((field) => t(fieldLabelKey(field))).join(t("listSep")) }))
+              : null,
+            h("span", { className: "pt-caption" },
+              t("sourceLine", {
+                source: isOcr ? t("sourceOcr") : isFulltext ? t("sourceTextLayer") : t("sourceNone"),
+              })),
+          ),
+          h("div", { style: { display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" } },
+            hasPdf
+              ? h(Button, {
+                variant: "ghost",
+                disabled: busy !== null,
+                title: t("compareHint"),
+                onClick: () => onCompare({
+                  paperId: paper.paperId,
+                  title: paper.title,
+                  pageIndex: Number.isInteger(paper.pageIndex) ? paper.pageIndex : 0,
+                  quote: null,
+                  paper,
+                }),
+              }, t("compareAdd"))
+              : null,
+            typeof onInspect === "function"
+              ? h(Button, { variant: "ghost", onClick: () => onInspect(paper), disabled: busy !== null }, t("paperDetails"))
+              : null,
+            h(Button, { onClick: () => onEdit(paper), disabled: busy !== null }, t("editMeta")),
+            paper.material === "metadata" && hasPdf
+              ? h(Button, {
+                variant: "ghost",
+                disabled: busy !== null,
+                title: t("reocrHint"),
+                onClick: async () => {
+                  const result = await onReocr(paper);
+                  if (result === null) return;
+                  setReocrResult(result);
+                },
+              }, busy === "reocr" ? t("working") : t("reocr"))
+              : null,
+            hasDoi
+              ? h(Button, {
+                variant: "ghost",
+                disabled: busy !== null,
+                title: t("enrichHint"),
+                onClick: async () => {
+                  const result = await onEnrich(paper);
+                  if (result === null) return;
+                  setEnrichResult(result);
+                },
+              }, busy === "enrich" ? t("working") : t("enrich"))
+              : null,
+            hasPdf
+              ? h(Button, {
+                variant: "ghost",
+                disabled: busy !== null,
+                title: t("reextractHint"),
+                onClick: async () => {
+                  const result = await onReextract(paper);
+                  if (result === null) return;
+                  setReextractResult(result);
+                },
+              }, busy === "reextract" ? t("working") : t("reextract"))
+              : null,
+            h("div", { className: "pt-spacer" }),
+            confirming
+              ? h(React.Fragment, null,
+                h(Button, { variant: "danger", onClick: () => { setConfirming(false); onDelete(paper.paperId); }, disabled: busy !== null },
+                  t("confirm")),
+                h(Button, { variant: "ghost", onClick: () => setConfirming(false) }, t("cancel")),
+              )
+              : h(Button, { variant: "ghost", onClick: () => setConfirming(true), disabled: busy !== null },
+                t("delete")),
+          ),
         ),
         confirmResult !== null
           ? h("p", { className: "pt-caption", role: "status", style: { margin: "6px 0 0" } },
@@ -1914,6 +2611,26 @@ function describeError(error, t) {
                 moved: reocrResult.reanchored?.evidence?.relocated ?? 0,
                 lost: reocrResult.reanchored?.evidence?.lost ?? 0,
               }))
+          : null,
+        canAttach
+          ? h("input", {
+            ref: attachInputRef,
+            type: "file",
+            accept: "application/pdf",
+            // No `multiple`: attaching two PDFs to one paper is not a thing, and
+            // a single file keeps the change handler's target unambiguous.
+            "aria-label": t("attachPdf"),
+            style: { display: "none" },
+            onChange: (event) => {
+              const input = event.currentTarget;
+              // Snapshot before clearing: `input.files` is live, and resetting
+              // `value` empties it, so handing doImport the FileList itself
+              // would pass an empty list.
+              const picked = Array.from(input.files ?? []);
+              input.value = "";
+              if (picked.length > 0) onAttach(picked, paper.paperId);
+            },
+          })
           : null,
       );
     }
@@ -2034,6 +2751,39 @@ function describeError(error, t) {
       } catch { /* layout state is not worth failing a render over */ }
     }
 
+    const LAST_READ_STORAGE_KEY = "paper-tool.lastRead";
+
+    /** Read the last-opened paper + page for the Library "Continue reading" strip. */
+    function readLastRead() {
+      try {
+        if (typeof localStorage === "undefined") return null;
+        const raw = localStorage.getItem(LAST_READ_STORAGE_KEY);
+        if (typeof raw !== "string" || raw === "") return null;
+        const parsed = JSON.parse(raw);
+        if (typeof parsed?.paperId !== "string" || parsed.paperId === "") return null;
+        return {
+          paperId: parsed.paperId,
+          title: typeof parsed.title === "string" ? parsed.title : parsed.paperId,
+          pageIndex: Number.isInteger(parsed.pageIndex) && parsed.pageIndex >= 0 ? parsed.pageIndex : 0,
+        };
+      } catch {
+        return null;
+      }
+    }
+
+    /** Persist the last-opened paper + page, ignoring storage failures. */
+    function writeLastRead(entry) {
+      try {
+        if (typeof localStorage === "undefined") return;
+        if (!entry || typeof entry.paperId !== "string" || entry.paperId === "") return;
+        localStorage.setItem(LAST_READ_STORAGE_KEY, JSON.stringify({
+          paperId: entry.paperId,
+          title: typeof entry.title === "string" ? entry.title : entry.paperId,
+          pageIndex: Number.isInteger(entry.pageIndex) && entry.pageIndex >= 0 ? entry.pageIndex : 0,
+        }));
+      } catch { /* non-fatal */ }
+    }
+
     /**
      * Decide which panes a cross-paper jump would move, and where to.
      *
@@ -2065,7 +2815,7 @@ function describeError(error, t) {
       return { moved, panes: next };
     }
 
-    function PdfReader({ sessionId, paper, initialPage, highlight, jumpToken, annotations, t, onSelectionChange, onClose }) {
+    function PdfReader({ sessionId, paper, initialPage, highlight, jumpToken, annotations, t, onSelectionChange, onClose, origin, focusMode, onToggleFocus, onPageChange, companionSlot, viewMode = "pdf", onViewModeChange, bilingualSlot }) {
       const canvasRef = useRef(null);
       const textLayerRef = useRef(null);
       const pageWrapRef = useRef(null);
@@ -2111,6 +2861,10 @@ function describeError(error, t) {
         if (jumpToken === undefined) return;
         setPageNumber(Math.max(1, (initialPage ?? 0) + 1));
       }, [jumpToken]);
+
+      useEffect(() => {
+        if (typeof onPageChange === "function") onPageChange(Math.max(0, pageNumber - 1));
+      }, [pageNumber, onPageChange]);
 
       useEffect(() => {
         let cancelled = false;
@@ -2358,76 +3112,123 @@ function describeError(error, t) {
         setScale((current) => Math.max(0.3, Math.min(3, +(current + delta).toFixed(2))));
       }, []);
 
+      const isBilingual = viewMode === "bilingual" && bilingualSlot !== undefined && bilingualSlot !== null;
+
       return h("div", { className: "pt-reader" },
         h("div", { className: "pt-reader-bar" },
           h(Button, { variant: "ghost", onClick: onClose, icon: true, label: t("closeReader") }, "←"),
-          h("span", { className: "pt-meta pt-num", style: { marginLeft: 2 } },
+          origin === "evidence" || origin === "review"
+            ? h(Button, {
+              variant: "ghost",
+              onClick: onClose,
+              title: origin === "review" ? t("backToReview") : t("backToEvidence"),
+            }, origin === "review" ? t("backToReview") : t("backToEvidence"))
+            : null,
+          typeof onViewModeChange === "function"
+            ? h("div", { className: "pt-seg", role: "group", "aria-label": t("translateTab") },
+              h("button", {
+                type: "button",
+                className: `pt-btn ${!isBilingual ? "pt-btn-primary" : "pt-btn-ghost"}`,
+                "aria-pressed": !isBilingual ? "true" : "false",
+                onClick: () => onViewModeChange("pdf"),
+              }, t("readerViewPdf")),
+              h("button", {
+                type: "button",
+                className: `pt-btn ${isBilingual ? "pt-btn-primary" : "pt-btn-ghost"}`,
+                "aria-pressed": isBilingual ? "true" : "false",
+                onClick: () => onViewModeChange("bilingual"),
+              }, t("translateTab")),
+            )
+            : null,
+          typeof onToggleFocus === "function"
+            ? h(Button, {
+              variant: focusMode ? "primary" : "ghost",
+              onClick: onToggleFocus,
+            }, focusMode ? t("exitFocusReading") : t("focusReading"))
+            : null,
+          isBilingual ? null : h("span", { className: "pt-meta pt-num", style: { marginLeft: 2 } },
             `${pageNumber} ${t("of")} ${numPages || "?"}`),
           h("div", { className: "pt-spacer" }),
-          h(Button, {
-            icon: true, label: t("prevPage"), disabled: pageNumber <= 1,
-            onClick: () => { setPageNumber((n) => Math.max(1, n - 1)); setSelected(null); onSelectionChange(null); },
-          }, "‹"),
-          h(Button, {
-            icon: true, label: t("nextPage"), disabled: pageNumber >= numPages,
-            onClick: () => { setPageNumber((n) => Math.min(numPages, n + 1)); setSelected(null); onSelectionChange(null); },
-          }, "›"),
-          h("input", {
-            className: "pt-input", style: { width: 52, minHeight: 26, padding: "2px 6px" },
-            value: pageInput, placeholder: t("jumpPlaceholder"), "aria-label": t("jumpPlaceholder"),
-            onChange: (event) => setPageInput(event.target.value),
-            onKeyDown: (event) => { if (event.key === "Enter") goToPage(); },
-          }),
-          h(Button, {
-            className: "pt-btn", icon: true, label: t("jump"),
-            onClick: goToPage, disabled: pageInput.trim() === "",
-          }, "↵"),
-          h(Button, { icon: true, label: t("zoomOut"), disabled: scale <= 0.3, onClick: () => step(-0.15) }, "−"),
-          h(Button, {
-            icon: true, label: t("fitWidth"), title: t("fitWidth"),
-            onClick: () => setAutoFit((current) => !current),
-            variant: autoFit ? "primary" : undefined,
-          }, "⤢"),
-          h(Button, { icon: true, label: t("zoomIn"), disabled: scale >= 3, onClick: () => step(0.15) }, "+"),
+          isBilingual ? null : h(React.Fragment, null,
+            h(Button, {
+              icon: true, label: t("prevPage"), disabled: pageNumber <= 1,
+              onClick: () => { setPageNumber((n) => Math.max(1, n - 1)); setSelected(null); onSelectionChange(null); },
+            }, "‹"),
+            h(Button, {
+              icon: true, label: t("nextPage"), disabled: pageNumber >= numPages,
+              onClick: () => { setPageNumber((n) => Math.min(numPages, n + 1)); setSelected(null); onSelectionChange(null); },
+            }, "›"),
+            h("input", {
+              className: "pt-input", style: { width: 52, minHeight: 26, padding: "2px 6px" },
+              value: pageInput, placeholder: t("jumpPlaceholder"), "aria-label": t("jumpPlaceholder"),
+              onChange: (event) => setPageInput(event.target.value),
+              onKeyDown: (event) => {
+                if (event.key !== "Enter" || isImeCommit(event)) return;
+                goToPage();
+              },
+            }),
+            h(Button, {
+              className: "pt-btn", icon: true, label: t("jump"),
+              onClick: goToPage, disabled: pageInput.trim() === "",
+            }, "↵"),
+            h(Button, { icon: true, label: t("zoomOut"), disabled: scale <= 0.3, onClick: () => step(-0.15) }, "−"),
+            h(Button, {
+              icon: true, label: t("fitWidth"), title: t("fitWidth"),
+              onClick: () => setAutoFit((current) => !current),
+              variant: autoFit ? "primary" : undefined,
+            }, "⤢"),
+            h(Button, { icon: true, label: t("zoomIn"), disabled: scale >= 3, onClick: () => step(0.15) }, "+"),
+          ),
         ),
         h("div", { className: "pt-caption", style: { wordBreak: "break-word" } },
           paper.title || paper.paperId),
-        highlightMissed ? h("p", { className: "pt-meta", style: { margin: 0 } }, t("highlightMissed")) : null,
-        // Annotations exist for this page but the text was not found where the stored
-        // quote says it should be. That is a drifted anchor, not an empty page, and
-        // silently showing nothing would make the user think their highlight was lost.
-        annotationsOnPage > annotationsPainted
-          ? h("p", { className: "pt-meta", style: { margin: 0 } },
-            `${t("annotationAnchorMissed")} (${annotationsPainted}/${annotationsOnPage})`)
-          : null,
-        loading ? h("p", { className: "pt-meta", style: { margin: 0 } }, t("readerLoading")) : null,
-        error ? h(Banner, { tone: "error" }, error) : null,
-        h("div", { className: "pt-canvas-wrap" },
-          h("div", { ref: pageWrapRef, className: "pt-page" },
-            h("canvas", { ref: canvasRef, style: { display: "block" } }),
-            h("div", { ref: textLayerRef, className: "pt-textLayer", onMouseUp }),
-          ),
+        isBilingual ? bilingualSlot : h(React.Fragment, null,
+          highlightMissed ? h("p", { className: "pt-meta", style: { margin: 0 } }, t("highlightMissed")) : null,
+          // Annotations exist for this page but the text was not found where the stored
+          // quote says it should be. That is a drifted anchor, not an empty page, and
+          // silently showing nothing would make the user think their highlight was lost.
+          annotationsOnPage > annotationsPainted
+            ? h("p", { className: "pt-meta", style: { margin: 0 } },
+              `${t("annotationAnchorMissed")} (${annotationsPainted}/${annotationsOnPage})`)
+            : null,
+          loading ? h("p", { className: "pt-meta", style: { margin: 0 } }, t("readerLoading")) : null,
+          error ? h(Banner, { tone: "error" }, error) : null,
+          (() => {
+            const readerLeft = h("div", { className: "pt-reader-left" },
+              h("div", { className: "pt-canvas-wrap" },
+                h("div", { ref: pageWrapRef, className: "pt-page" },
+                  h("canvas", { ref: canvasRef, style: { display: "block" } }),
+                  h("div", { ref: textLayerRef, className: "pt-textLayer", onMouseUp }),
+                ),
+              ),
+              textFallback !== null
+                ? h("div", null,
+                  h("p", { className: "pt-caption", style: { margin: "0 0 4px" } }, t("textFallbackNote")),
+                  h("pre", {
+                    className: "pt-pre",
+                    style: { maxHeight: "26vh" },
+                    onMouseUp: () => {
+                      const text = normalizeSelection(window.getSelection()?.toString() ?? "");
+                      if (text === "") return;
+                      const next = { text: text.slice(0, MAX_QUOTE_CHARS), pageIndex: pageNumber - 1 };
+                      setSelected(next);
+                      onSelectionChange(next);
+                    },
+                  }, textFallback),
+                )
+                : null,
+              selected
+                ? h("p", { className: "pt-caption", style: { margin: 0 } },
+                  `${t("selected")} · ${selected.text.length} / ${MAX_QUOTE_CHARS}`)
+                : h("p", { className: "pt-caption", style: { margin: 0 } }, t("noSelection")),
+            );
+            return companionSlot
+              ? h("div", { className: "pt-reader-split" },
+                readerLeft,
+                h("div", { className: "pt-reader-right" }, companionSlot))
+              : readerLeft;
+          })(),
         ),
-        textFallback !== null
-          ? h("div", null,
-            h("p", { className: "pt-caption", style: { margin: "0 0 4px" } }, t("textFallbackNote")),
-            h("pre", {
-              className: "pt-pre",
-              style: { maxHeight: "26vh" },
-              onMouseUp: () => {
-                const text = normalizeSelection(window.getSelection()?.toString() ?? "");
-                if (text === "") return;
-                const next = { text: text.slice(0, MAX_QUOTE_CHARS), pageIndex: pageNumber - 1 };
-                setSelected(next);
-                onSelectionChange(next);
-              },
-            }, textFallback),
-          )
-          : null,
-        selected
-          ? h("p", { className: "pt-caption", style: { margin: 0 } },
-            `${t("selected")} · ${selected.text.length} / ${MAX_QUOTE_CHARS}`)
-          : h("p", { className: "pt-caption", style: { margin: 0 } }, t("noSelection")),
       );
     }
 
@@ -2465,17 +3266,19 @@ function describeError(error, t) {
       return h(Badge, { tone: STANCE_TONE[stance] }, grade === "" ? label : `${label}·${grade}`);
     }
 
-    function EvidenceRow({ row, t, onJump, onDelete, busy }) {
+    function EvidenceRow({ row, paper, t, onJump, onDelete, busy }) {
       const anchored = Number.isInteger(row.charStart) && row.charStart >= 0;
       // A quote from OCR text may contain misread characters. Saying so here is
       // the difference between "I can cite this" and "I should re-read the page".
       const fromOcr = row.paperTextSource === "ocr";
+      const locator = formatPaperLocator(paper ?? { title: row.paperTitle }, row.pageIndex, row.paperId);
       return h("div", { style: { display: "flex", gap: 8, alignItems: "flex-start", padding: "7px 0" } },
         h("div", { className: "pt-row-main" },
           h("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 3, flexWrap: "wrap" } },
             h(Badge, { tone: anchored ? "info" : "warn" }, anchored ? t("evidenceAnchored") : t("evidenceUnanchored")),
             fromOcr ? h(Badge, { tone: "warn", title: t("ocrHint") }, t("ocrText")) : null,
             h("span", { className: "pt-caption pt-num" }, `${t("page")} ${row.pageIndex + 1}`),
+            paper ? h("span", { className: "pt-caption" }, locator) : null,
           ),
           h("p", { className: "pt-body", style: { margin: 0, wordBreak: "break-word" } }, row.quote),
           anchored ? null : h("p", { className: "pt-caption", style: { margin: "3px 0 0" } }, t("evidenceUnanchoredHint")),
@@ -2501,12 +3304,57 @@ function describeError(error, t) {
       const [query, setQuery] = useState("");
       const [papers, setPapers] = useState([]);
       const [hits, setHits] = useState(null);
+      // Stored rows for hit papers the loaded list page does not cover. Search
+      // spans the whole library while `papers` holds one page (PT-015), so a hit
+      // used to be merged over nothing and reached the card without `pdfPath` /
+      // `numPages` — which the card rendered as 「无 PDF · 0 页」 with 阅读
+      // disabled, for a paper whose full text the search had just matched.
+      const [hitRows, setHitRows] = useState({});
+      const hitRowsRef = useRef(hitRows);
+      hitRowsRef.current = hitRows;
+      // Which cards have their ±hit-page list open. Kept in a ref, not state:
+      // opening the PDF unmounts the list, and a toggle must not re-render the
+      // whole panel. `hits` is carried along so a new result set starts folded
+      // (the open ids belonged to the previous result identity), while closing
+      // the reader leaves this untouched.
+      const hitPagesRef = useRef({ hits: null, ids: new Set(), focus: null });
+      if (hitPagesRef.current.hits !== hits) hitPagesRef.current = { hits, ids: new Set(), focus: null };
       const [candidates, setCandidates] = useState(null);
       const [picked, setPicked] = useState({});
       const [status, setStatus] = useState(null);
       const [failures, setFailures] = useState([]);
       const [cnki, setCnki] = useState(null);
       const [reader, setReader] = useState(null);
+      const [readerOrigin, setReaderOrigin] = useState(null);
+      const [focusMode, setFocusMode] = useState(false);
+      const [showLibTools, setShowLibTools] = useState(false);
+      const [readerPage, setReaderPage] = useState(0);
+      const [readerViewMode, setReaderViewMode] = useState("pdf");
+      const [lastRead, setLastRead] = useState(() => readLastRead());
+      const [lastReadDismissed, setLastReadDismissed] = useState(false);
+      const [showSelectionNote, setShowSelectionNote] = useState(false);
+      const [showMatrixTools, setShowMatrixTools] = useState(false);
+      const [companionTab, setCompanionTab] = useState("pageTranslate");
+      const [companionData, setCompanionData] = useState({ pageIndex: -1, paperId: "", segments: [], translations: [], loading: false });
+      const [selectedPaperIds, setSelectedPaperIds] = useState([]);
+      const [expandedAbstracts, setExpandedAbstracts] = useState({});
+      const [evidenceViewMode, setEvidenceViewMode] = useState("matrix");
+      const [autoSearchToken, setAutoSearchToken] = useState(0);
+      const [projectStore, setProjectStore] = useState(() => loadProjectStore());
+      const [newProjectOpen, setNewProjectOpen] = useState(false);
+      const [newProjectName, setNewProjectName] = useState("");
+      const [renamingProject, setRenamingProject] = useState(false);
+      const [renameProjectName, setRenameProjectName] = useState("");
+      const [statusFilter, setStatusFilter] = useState("all");
+      const [sortOrder, setSortOrder] = useState("recent");
+      const [inspectedPaperId, setInspectedPaperId] = useState(null);
+      const [inspectedDetailCache, setInspectedDetailCache] = useState({});
+      const [inspectedAnnotationsCache, setInspectedAnnotationsCache] = useState({});
+      const [showTopicGaps, setShowTopicGaps] = useState(false);
+      const [showReviewAdvanced, setShowReviewAdvanced] = useState(false);
+      const syncTimersRef = useRef([]);
+      const silentSyncRef = useRef(null);
+      const lastFocusSyncRef = useRef(0);
       // Compare set. The single-reader model above is kept as-is: the ordinary case
       // is reading one paper, and rebuilding that path to be a list would put the
       // lifecycle guarantees in s12/s14/s15 at risk for a feature used occasionally.
@@ -2549,7 +3397,7 @@ function describeError(error, t) {
       // How much evidence is loaded, and how much exists. Kept apart from
       // `evidence.length` because a full page of rows is ambiguous: it looks the
       // same whether the library has exactly one page or many.
-      const [evidencePaging, setEvidencePaging] = useState({ total: 0, hasMore: false, anchoredTotal: 0, allTotal: 0 });
+      const [evidencePaging, setEvidencePaging] = useState({ total: 0, hasMore: false, anchoredTotal: 0, allTotal: 0, unanchoredCount: 0 });
       // Same idea for the paper list: the sidebar asks for one page and grows it,
       // instead of requesting the 500-row ceiling and being unable to see row 501.
       // Host-declared import limits. Held in state rather than read from a
@@ -2572,6 +3420,9 @@ function describeError(error, t) {
       const [similarText, setSimilarText] = useState("");
       const [similar, setSimilar] = useState(null);
       const citeImportRef = useRef(null);
+      const libCiteImportRef = useRef(null);
+      const [claims, setClaims] = useState([]);
+      const [claimsSummary, setClaimsSummary] = useState(null);
       const [citationStyle, setCitationStyle] = useState("apa");
       const [citationLocale, setCitationLocale] = useState("zh-CN");
       const [citation, setCitation] = useState(null);
@@ -2611,14 +3462,43 @@ function describeError(error, t) {
       const [topicResult, setTopicResult] = useState(null);
       const [topicBusy, setTopicBusy] = useState(false);
 
-      const openReader = useCallback((target) => {
+      const openReader = useCallback((target, origin = null) => {
+        // Any open forgets a stale hit target; `openReaderFromHit` sets it again
+        // immediately afterwards, so only a hit-opened reader gets focus back.
+        hitPagesRef.current.focus = null;
+        const pageIdx = Math.max(0, Number.isInteger(target?.pageIndex) ? target.pageIndex : 0);
+        setReaderOrigin(origin === "evidence" || origin === "review" ? origin : null);
+        setReaderPage(pageIdx);
+        setReaderViewMode("pdf");
         setReader(target);
+        setFocusMode(true);
         setSelection(null);
+        // Auto-bind bilingual translation to the paper being read.
+        if (typeof target?.paperId === "string" && target.paperId !== "") {
+          setTranslatePaperId(target.paperId);
+          setTranslateFrom(0);
+          setTranslateTo(Math.max(0, (Number(target?.paper?.numPages) || 1) - 1));
+          setTranslateResult(null);
+          setTranslationRows([]);
+          setTranslateDraft({});
+          const entry = { paperId: target.paperId, title: target.title || target.paperId, pageIndex: pageIdx };
+          setLastRead(entry);
+          setLastReadDismissed(false);
+          writeLastRead(entry);
+        }
         setView("library");
         // Same reason as the tab buttons: a note from whatever view the user was on
         // would otherwise sit above the library list.
         setNote("");
       }, []);
+
+      // Keep "Continue reading" in sync as the user turns pages inside the Reader.
+      useEffect(() => {
+        if (!reader?.paperId) return;
+        const entry = { paperId: reader.paperId, title: reader.title || reader.paperId, pageIndex: readerPage };
+        setLastRead(entry);
+        writeLastRead(entry);
+      }, [reader?.paperId, reader?.title, readerPage]);
 
       /**
        * Add a paper to the compare set, or focus it if already there.
@@ -2635,7 +3515,9 @@ function describeError(error, t) {
           return [...current, target];
         });
         setCompareFocus(target.paperId);
+        setReaderOrigin(null);
         setReader(null);
+        setFocusMode(false);
         setSelection(null);
         setView("library");
         setNote("");
@@ -2703,8 +3585,14 @@ function describeError(error, t) {
         try {
           return await work(controller.signal);
         } finally {
-          if (abortRef.current === controller) abortRef.current = null;
-          setBusyStage("");
+          // Snapshot the slot once: a newer run may already have taken it, and the
+          // busy row belongs to whoever owns `abortRef` now, not to this finishing
+          // job. Clear the stage only when this run still owns the slot (or a
+          // cancel already emptied it); otherwise a stale job would erase the
+          // loading state of the one the user is actually waiting on.
+          const current = abortRef.current;
+          if (current === controller) abortRef.current = null;
+          if (current === controller || current === null) setBusyStage("");
         }
       }, []);
 
@@ -2732,21 +3620,40 @@ function describeError(error, t) {
        * the paper list and annotations too — three requests to answer one click.
        * The dedicated effect below owns the filter-change refetch instead.
        */
+      const projectScopedPaperIds = useMemo(() => {
+        if (projectStore.activeProjectId === "all") return undefined;
+        const matched = papers
+          .filter((paper) => isPaperInProject(paper.paperId, projectStore.activeProjectId, projectStore.paperMeta))
+          .map((paper) => paper.paperId);
+        return matched.length > 0 ? matched : ["__empty_project__"];
+      }, [papers, projectStore.activeProjectId, projectStore.paperMeta]);
+
+      const activeWorkingSetPaperIds = selectedPaperIds.length > 0
+        ? selectedPaperIds
+        : projectScopedPaperIds;
+
       const evidenceFilterRef = useRef(evidenceFilter);
       evidenceFilterRef.current = evidenceFilter;
+      const selectedPaperIdsRef = useRef(activeWorkingSetPaperIds);
+      selectedPaperIdsRef.current = activeWorkingSetPaperIds;
       const loadEvidence = useCallback(async () => {
         if (!sessionId) return [];
+        const activeIds = selectedPaperIdsRef.current;
         const result = await callRemote(sessionId, "listEvidence", {
           limit: EVIDENCE_PAGE_SIZE,
           anchor: evidenceFilterRef.current,
+          ...(Array.isArray(activeIds) && activeIds.length > 0 ? { paperIds: activeIds } : {}),
         });
         const rows = result.evidence ?? [];
+        const anchoredTotal = result.paging?.anchoredTotal ?? rows.filter((row) => row.charStart >= 0).length;
+        const allTotal = result.paging?.allTotal ?? rows.length;
         setEvidence(rows);
         setEvidencePaging({
           total: result.paging?.total ?? rows.length,
           hasMore: result.paging?.hasMore === true,
-          anchoredTotal: result.paging?.anchoredTotal ?? rows.filter((row) => row.charStart >= 0).length,
-          allTotal: result.paging?.allTotal ?? rows.length,
+          anchoredTotal,
+          allTotal,
+          unanchoredCount: result.unanchoredCount ?? Math.max(0, allTotal - anchoredTotal),
         });
         return rows;
       }, [sessionId]);
@@ -2756,10 +3663,12 @@ function describeError(error, t) {
         if (!sessionId) return;
         setBusy("evidenceMore");
         try {
+          const activeIds = selectedPaperIdsRef.current;
           const result = await callRemote(sessionId, "listEvidence", {
             limit: EVIDENCE_PAGE_SIZE,
             offset: evidence.length,
             anchor: evidenceFilterRef.current,
+            ...(Array.isArray(activeIds) && activeIds.length > 0 ? { paperIds: activeIds } : {}),
           });
           const rows = result.evidence ?? [];
           // Replace rather than blindly append: a row may have been deleted
@@ -2770,11 +3679,14 @@ function describeError(error, t) {
             const seen = new Set(current.map((row) => row.evidenceId));
             return [...current, ...rows.filter((row) => !seen.has(row.evidenceId))];
           });
+          const anchoredTotal = result.paging?.anchoredTotal ?? evidencePaging.anchoredTotal;
+          const allTotal = result.paging?.allTotal ?? evidencePaging.allTotal;
           setEvidencePaging({
             total: result.paging?.total ?? evidence.length + rows.length,
             hasMore: result.paging?.hasMore === true,
-            anchoredTotal: result.paging?.anchoredTotal ?? evidencePaging.anchoredTotal,
-            allTotal: result.paging?.allTotal ?? evidencePaging.allTotal,
+            anchoredTotal,
+            allTotal,
+            unanchoredCount: result.unanchoredCount ?? Math.max(0, allTotal - anchoredTotal),
           });
         } catch (evidenceError) {
           setError(describeError(evidenceError, t));
@@ -2800,6 +3712,161 @@ function describeError(error, t) {
         void loadEvidence();
       }, [evidenceFilter, loadEvidence]);
 
+      const workingSetKey = activeWorkingSetPaperIds ? activeWorkingSetPaperIds.join(",") : "";
+      const workingSetMounted = useRef(false);
+      useEffect(() => {
+        if (!workingSetMounted.current) { workingSetMounted.current = true; return; }
+        void loadEvidence();
+      }, [workingSetKey, loadEvidence]);
+
+      const updateProjectStore = useCallback((updater) => {
+        setProjectStore((current) => {
+          const next = typeof updater === "function" ? updater(current) : updater;
+          saveProjectStore(next);
+          return next;
+        });
+      }, []);
+
+      const autoAssignImported = useCallback((importedRows) => {
+        const ids = (importedRows ?? [])
+          .map((row) => (typeof row === "string" ? row : row?.paperId))
+          .filter((id) => typeof id === "string" && id !== "");
+        if (ids.length === 0) return;
+        updateProjectStore((current) => {
+          const activeId = current.activeProjectId;
+          const isCustomProject = activeId !== "all" && activeId !== "starred" && activeId !== "unassigned";
+          const nextMeta = { ...current.paperMeta };
+          for (const id of ids) {
+            const prev = getPaperMeta(nextMeta, id);
+            const nextProjects = isCustomProject && !prev.projects.includes(activeId)
+              ? [...prev.projects, activeId]
+              : prev.projects;
+            nextMeta[id] = { ...prev, projects: nextProjects };
+          }
+          return { ...current, paperMeta: nextMeta };
+        });
+      }, [updateProjectStore]);
+
+      const createProject = useCallback((rawName, switchTo = true) => {
+        const name = String(rawName ?? "").trim();
+        if (name === "") return null;
+        const id = `proj-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+        const entry = { id, name, createdAt: new Date().toISOString() };
+        updateProjectStore((current) => ({
+          ...current,
+          projects: [...current.projects, entry],
+          activeProjectId: switchTo ? id : current.activeProjectId,
+        }));
+        return id;
+      }, [updateProjectStore]);
+
+      const renameActiveProject = useCallback((rawName) => {
+        const name = String(rawName ?? "").trim();
+        if (name === "") return;
+        updateProjectStore((current) => ({
+          ...current,
+          projects: current.projects.map((p) => (p.id === current.activeProjectId ? { ...p, name } : p)),
+        }));
+      }, [updateProjectStore]);
+
+      const deleteActiveProject = useCallback(() => {
+        updateProjectStore((current) => {
+          const targetId = current.activeProjectId;
+          if (targetId === "all" || targetId === "starred" || targetId === "unassigned") return current;
+          const nextMeta = {};
+          for (const [pid, meta] of Object.entries(current.paperMeta ?? {})) {
+            const cleaned = Array.isArray(meta?.projects) ? meta.projects.filter((id) => id !== targetId) : [];
+            nextMeta[pid] = { ...meta, projects: cleaned };
+          }
+          return {
+            projects: current.projects.filter((p) => p.id !== targetId),
+            activeProjectId: "all",
+            paperMeta: nextMeta,
+          };
+        });
+      }, [updateProjectStore]);
+
+      const togglePaperStar = useCallback((paperId) => {
+        updateProjectStore((current) => {
+          const prev = getPaperMeta(current.paperMeta, paperId);
+          return {
+            ...current,
+            paperMeta: { ...current.paperMeta, [paperId]: { ...prev, starred: !prev.starred } },
+          };
+        });
+      }, [updateProjectStore]);
+
+      const cyclePaperStatus = useCallback((paperId) => {
+        updateProjectStore((current) => {
+          const prev = getPaperMeta(current.paperMeta, paperId);
+          const idx = STATUS_ORDER.indexOf(prev.status);
+          const nextStatus = STATUS_ORDER[(idx + 1) % STATUS_ORDER.length];
+          return {
+            ...current,
+            paperMeta: { ...current.paperMeta, [paperId]: { ...prev, status: nextStatus } },
+          };
+        });
+      }, [updateProjectStore]);
+
+      const assignPaperProject = useCallback((paperId, projectId, include = true) => {
+        if (!paperId || !projectId || projectId === "all" || projectId === "starred" || projectId === "unassigned") return;
+        updateProjectStore((current) => {
+          const prev = getPaperMeta(current.paperMeta, paperId);
+          const nextProjects = include
+            ? (prev.projects.includes(projectId) ? prev.projects : [...prev.projects, projectId])
+            : prev.projects.filter((id) => id !== projectId);
+          return {
+            ...current,
+            paperMeta: { ...current.paperMeta, [paperId]: { ...prev, projects: nextProjects } },
+          };
+        });
+      }, [updateProjectStore]);
+
+      const batchAssignProject = useCallback((projectId) => {
+        if (!projectId || selectedPaperIds.length === 0) return;
+        updateProjectStore((current) => {
+          const nextMeta = { ...current.paperMeta };
+          for (const pid of selectedPaperIds) {
+            const prev = getPaperMeta(nextMeta, pid);
+            if (!prev.projects.includes(projectId)) {
+              nextMeta[pid] = { ...prev, projects: [...prev.projects, projectId] };
+            }
+          }
+          return { ...current, paperMeta: nextMeta };
+        });
+      }, [selectedPaperIds, updateProjectStore]);
+
+      const batchSetStatus = useCallback((status) => {
+        if (selectedPaperIds.length === 0) return;
+        updateProjectStore((current) => {
+          const nextMeta = { ...current.paperMeta };
+          for (const pid of selectedPaperIds) {
+            const prev = getPaperMeta(nextMeta, pid);
+            if (status === "starred") nextMeta[pid] = { ...prev, starred: true };
+            else nextMeta[pid] = { ...prev, status };
+          }
+          return { ...current, paperMeta: nextMeta };
+        });
+      }, [selectedPaperIds, updateProjectStore]);
+
+      const inspectPaper = useCallback(async (paper) => {
+        if (!paper?.paperId) return;
+        setInspectedPaperId(paper.paperId);
+        if (!sessionId) return;
+        if (!inspectedDetailCache[paper.paperId]) {
+          const full = await callRemote(sessionId, "readPaper", { paperId: paper.paperId, fromPage: 0, toPage: 0 }).catch(() => null);
+          if (full?.paper) {
+            setInspectedDetailCache((prev) => ({ ...prev, [paper.paperId]: full.paper }));
+          }
+        }
+        if (!inspectedAnnotationsCache[paper.paperId]) {
+          const ann = await callRemote(sessionId, "listAnnotations", { paperId: paper.paperId, limit: 200 }).catch(() => null);
+          if (ann?.annotations) {
+            setInspectedAnnotationsCache((prev) => ({ ...prev, [paper.paperId]: ann.annotations }));
+          }
+        }
+      }, [sessionId, inspectedDetailCache, inspectedAnnotationsCache]);
+
       /**
        * Load this paper's annotations from the host.
        *
@@ -2821,10 +3888,11 @@ function describeError(error, t) {
 
       /** Save the current selection as an annotation, or update one by id. */
       const saveAnnotation = useCallback(
-        async ({ quote, note, tags, color, annotationId, pageIndex, charStart, charEnd }) => {
-          if (!sessionId || !reader?.paperId) return null;
+        async ({ quote, note, tags, color, annotationId, pageIndex, charStart, charEnd, kind, alsoEvidence }) => {
+          const targetPaperId = reader?.paperId ?? compareFocus;
+          if (!sessionId || !targetPaperId) return null;
           const result = await callRemote(sessionId, "saveAnnotation", {
-            paperId: reader.paperId,
+            paperId: targetPaperId,
             annotationId,
             pageIndex: pageIndex ?? (selection?.pageIndex ?? 0),
             charStart: charStart ?? -1,
@@ -2833,11 +3901,16 @@ function describeError(error, t) {
             note: note ?? "",
             tags: tags ?? [],
             color: color ?? "yellow",
+            ...(kind !== undefined ? { kind } : {}),
+            ...(alsoEvidence !== undefined ? { alsoEvidence } : {}),
           }).catch((saveError) => ({ ok: false, reason: saveError?.message ?? String(saveError) }));
-          if (result?.ok) await loadAnnotations();
+          if (result?.ok) {
+            await loadAnnotations();
+            if (alsoEvidence) await loadEvidence();
+          }
           return result;
         },
-        [sessionId, reader?.paperId, selection, loadAnnotations],
+        [sessionId, reader?.paperId, compareFocus, selection, loadAnnotations, loadEvidence],
       );
 
       const removeAnnotation = useCallback(
@@ -2874,6 +3947,15 @@ function describeError(error, t) {
         }
       }, [sessionId, t]);
 
+      const loadClaims = useCallback(async () => {
+        if (!sessionId) return [];
+        const result = await callRemote(sessionId, "listClaims", { limit: 500 }).catch(() => null);
+        const rows = result?.claims ?? [];
+        setClaims(rows);
+        if (result?.summary) setClaimsSummary(result.summary);
+        return rows;
+      }, [sessionId]);
+
       const refresh = useCallback(async () => {
         if (!sessionId) return;
         try {
@@ -2896,6 +3978,7 @@ function describeError(error, t) {
           });
           setError(null);
           await loadEvidence();
+          await loadClaims();
           // Annotations load alongside evidence but from their own endpoint: they are
           // a different table with a different meaning, and a failure here must not
           // take down the evidence list.
@@ -2903,7 +3986,7 @@ function describeError(error, t) {
         } catch (statusError) {
           setError(describeError(statusError, t));
         }
-      }, [sessionId, loadEvidence, loadAnnotations, t, materialFilter]);
+      }, [sessionId, loadEvidence, loadClaims, loadAnnotations, t, materialFilter]);
 
       /**
        * Append the next page of papers.
@@ -2956,8 +4039,65 @@ function describeError(error, t) {
         return () => { cancelled = true; };
       }, [mode, sessionId]);
 
+      /**
+       * Fill in the stored row for hit papers the loaded list page does not cover.
+       *
+       * Search spans the whole library while `papers` holds one page of it
+       * (PT-015). A hit for an older paper therefore had no row to merge, and the
+       * card lost `pdfPath` and `numPages` — it drew 「无 PDF · 0 页」 and disabled
+       * 阅读 and every page-hit button, for a paper whose full text the search had
+       * just matched. `readPaper` with an empty page window is the cheap way to get
+       * that row: the metadata with no page text.
+       *
+       * Cached per paper id, so paging the list later or repeating a search does not
+       * fetch the same rows again. A failed fetch is left uncached and simply retried
+       * on the next search — the card then still says "no PDF", which is wrong, but
+       * the alternative (guessing a path) would be worse.
+       */
+      useEffect(() => {
+        if (hits === null || !sessionId) return undefined;
+        const loaded = new Set(papers.map((paper) => paper.paperId));
+        const missing = [...new Set(hits.map((hit) => hit.paperId))]
+          .filter((paperId) => !loaded.has(paperId) && hitRowsRef.current[paperId] === undefined);
+        if (missing.length === 0) return undefined;
+        let cancelled = false;
+        (async () => {
+          const found = {};
+          for (const paperId of missing) {
+            const full = await callRemote(sessionId, "readPaper", { paperId, fromPage: 0, toPage: 0 })
+              .catch(() => null);
+            if (full?.paper) found[paperId] = full.paper;
+          }
+          if (cancelled || Object.keys(found).length === 0) return;
+          setHitRows((current) => ({ ...current, ...found }));
+        })();
+        return () => { cancelled = true; };
+      }, [hits, papers, sessionId]);
+
+      // Every search owns a sequence number. Two searches can overlap: the Enter
+      // path is gated by `busy`, but a topic jump fires through `autoSearchToken`
+      // and is not, so it can start while the previous source's request is still
+      // open. The older answer arriving last used to overwrite the newer set, and
+      // one source's rows then rendered under another source's heading. Writes
+      // below are gated on the number still being the newest; a source switch or
+      // topic jump bumps it, which drops the stale response instead of letting it
+      // land in a panel it no longer belongs to.
+      const searchSeqRef = useRef(0);
+      // How many searches are actually running. `busy` is shared with every other
+      // job and a superseded search normally skips its writes, so it cannot decide
+      // on its own: clearing there would wipe the state of the search that replaced
+      // it, while not clearing would leave the button disabled forever when the
+      // superseded run is the last one alive (a topic jump bumps the number and the
+      // previous request finishes after it). The last one out clears, and only if
+      // `busy` is still "search".
+      const searchesInFlightRef = useRef(0);
+
       const doSearch = useCallback(async () => {
         if (!sessionId || query.trim() === "") { setHits(null); return; }
+        const seq = searchSeqRef.current + 1;
+        searchSeqRef.current = seq;
+        searchesInFlightRef.current += 1;
+        const stillCurrent = () => searchSeqRef.current === seq;
         setBusy("search");
         setNote("");
         setError(null);
@@ -2968,6 +4108,7 @@ function describeError(error, t) {
             const result = await runCancellable(t("busyStageSearch"), (signal) =>
               callRemote(sessionId, "searchExternal", { query, limit: 10, sort: sortMode }, signal),
             );
+            if (!stillCurrent()) return;
             setCandidates(result.candidates ?? []);
             setFailures(result.failures ?? []);
             setHits(null);
@@ -2976,6 +4117,7 @@ function describeError(error, t) {
             const result = await runCancellable(t("busyStageSearch"), (signal) =>
               callRemote(sessionId, "cnkiSearch", { query, limit: 20 }, signal),
             );
+            if (!stillCurrent()) return;
             if (result.ok !== true) {
               setCandidates([]);
               setFailures([{ source: "cnki", reason: result.reason ?? "unavailable" }]);
@@ -2995,26 +4137,92 @@ function describeError(error, t) {
             setPicked({});
           } else {
             const result = await callRemote(sessionId, "search", { query, limit: 50 });
+            if (!stillCurrent()) return;
             setHits(result.hits ?? []);
             setStatus((current) => (current === null ? current : { ...current, library: result.library }));
             setCandidates(null);
             setFailures([]);
+            setPicked({});
           }
         } catch (searchError) {
           // A cancelled search must not leave the panel in a loading state: the
           // candidates array is cleared so the "no results" path renders instead of a
           // spinner, and the reason is stated in neutral text rather than as an error.
+          if (!stillCurrent()) return;
           if (isAbortError(searchError)) {
             setCandidates(null);
             setHits(null);
             setFailures([]);
+            setPicked({});
           } else {
             setError(describeError(searchError, t));
           }
         } finally {
-          setBusy(null);
+          // A superseded search must not clear the busy state of the one that
+          // replaced it, but the last one out must clear it even when it is itself
+          // superseded — otherwise a topic jump would leave the Search button
+          // disabled until the panel was remounted. Clearing only when `busy` is
+          // still this search keeps a late completion from resetting another job.
+          searchesInFlightRef.current = Math.max(0, searchesInFlightRef.current - 1);
+          if (searchesInFlightRef.current === 0) {
+            setBusy((current) => (current === "search" ? null : current));
+          }
         }
       }, [sessionId, query, mode, sortMode, t, runCancellable]);
+
+      /**
+       * Switch the search source.
+       *
+       * The three sources produce three different result shapes in the same four
+       * state slots, so switching without clearing them renders one source's data
+       * under another source's heading — a CNKI failure banner over external
+       * results, and `picked`, which is keyed by index, ticking boxes against the
+       * wrong rows. All four are cleared, and the sequence number is bumped so a
+       * response already in flight is discarded rather than re-populating the
+       * list the user just left. Re-clicking the active source is not a switch and
+       * leaves the results alone.
+       */
+      const switchMode = useCallback((nextMode) => {
+        if (nextMode === mode) return;
+        searchSeqRef.current += 1;
+        setReader(null);
+        setReaderOrigin(null);
+        setFocusMode(false);
+        setSelection(null);
+        setLastAsk(null);
+        setMode(nextMode);
+        setCandidates(null);
+        setFailures([]);
+        setPicked({});
+        setHits(null);
+      }, [mode]);
+
+      useEffect(() => {
+        if (autoSearchToken === 0) return;
+        void doSearch();
+      }, [autoSearchToken]);
+
+      const jumpToSearchFromTopic = useCallback((nextQuery, targetMode = "external") => {
+        const q = String(nextQuery ?? "").trim();
+        if (q === "") return;
+        // The jump changes both the query and the source, so any search already in
+        // flight belongs to neither: bumping the sequence number drops its response
+        // instead of letting it land under the new heading. The auto-search below
+        // then takes the next number.
+        searchSeqRef.current += 1;
+        setReader(null);
+        setReaderOrigin(null);
+        setSelection(null);
+        setQuery(q);
+        setMode(targetMode);
+        setView("library");
+        setNote("");
+        setHits(null);
+        setCandidates(null);
+        setFailures([]);
+        setPicked({});
+        setAutoSearchToken((n) => n + 1);
+      }, []);
 
       const addPicked = useCallback(async () => {
         if (!sessionId || !candidates) return;
@@ -3026,6 +4234,7 @@ function describeError(error, t) {
         try {
           if (mode === "cnki") {
             let added = 0;
+            const importedRows = [];
             const problems = [];
             for (let index = 0; index < chosen.length; index += 1) {
               const candidate = chosen[index];
@@ -3042,17 +4251,21 @@ function describeError(error, t) {
                   year: candidate.year,
                   venue: candidate.venue,
                 });
-                if (result.ok === true && (result.imported?.length ?? 0) > 0) added += 1;
-                else problems.push(`${candidate.title}: ${result.reason ?? "download failed"}`);
+                if (result.ok === true && (result.imported?.length ?? 0) > 0) {
+                  added += 1;
+                  importedRows.push(...result.imported);
+                } else problems.push(`${candidate.title}: ${result.reason ?? "download failed"}`);
               } catch (downloadError) {
                 problems.push(`${candidate.title}: ${describeError(downloadError, t)}`);
               }
             }
+            autoAssignImported(importedRows);
             setNote(`${t("added")} ${added}${problems.length > 0 ? ` · ${problems.length} ✕` : ""}`);
             if (problems.length > 0) setError(problems.slice(0, 3).join("; "));
             setPicked({});
           } else {
             const result = await callRemote(sessionId, "addCandidates", { candidates: chosen });
+            autoAssignImported(result.imported);
             const skipped = result.duplicates?.length ?? 0;
             setNote(`${t("added")} ${result.imported?.length ?? 0}${skipped > 0 ? ` · ${skipped} ${t("skipped")}` : ""} · ${t("metadataOnlyNote")}`);
             setPicked({});
@@ -3064,10 +4277,18 @@ function describeError(error, t) {
         } finally {
           setBusy(null);
         }
-      }, [sessionId, candidates, picked, mode, t, refresh]);
+      }, [sessionId, candidates, picked, mode, t, refresh, autoAssignImported]);
 
-      const doImport = useCallback(async (fileList) => {
+      const doImport = useCallback(async (fileList, targetPaperId = null) => {
         if (!sessionId || !fileList || fileList.length === 0) return;
+        // Attaching a PDF to an existing paper is a different operation from
+        // importing one. An older Host has no attach capability and would create
+        // a second paper instead, so the request is refused here rather than sent.
+        const attachTarget = typeof targetPaperId === "string" && targetPaperId !== "" ? targetPaperId : null;
+        if (attachTarget !== null && status?.limits?.attachPdf !== true) {
+          setError(t("attachPdfUnavailable"));
+          return;
+        }
         setBusy("import");
         setNote("");
         setError(null);
@@ -3111,17 +4332,49 @@ function describeError(error, t) {
             return;
           }
           const result = await runCancellable(t("busyStageImport"), (signal) =>
-            callRemote(sessionId, "importPdf", { files }, signal),
+            callRemote(
+              sessionId,
+              "importPdf",
+              // The target field is sent only when attaching: an older Host ignores
+              // unknown fields, but sending `targetPaperId: null` on a plain import
+              // would say "attach to nothing" rather than "create a new paper".
+              attachTarget === null ? { files } : { files, targetPaperId: attachTarget },
+              signal,
+            ),
           );
+          // An attach belongs to one existing paper; autoAssignImported would pick a
+          // reader/compare paper out of the imports and move the selection there.
+          if (attachTarget === null) autoAssignImported(result.imported);
           const okCount = result.imported?.length ?? 0;
           const dupCount = result.duplicates?.length ?? 0;
           const failCount = result.failed?.length ?? 0;
           // Files the Host did not take because a caller sent more than the cap.
           const hostLeft = result.remaining ?? 0;
           const notHandled = leftover + hostLeft;
+          // Per-file status for imports whose body text is not ordinary full text:
+          // `metadata` has no searchable body at all, and `ocr` text is machine-guessed
+          // (or partially missing). Saying only "✓ 3" would imply all three are searchable.
+          const coverageNotes = (result.imported ?? [])
+            .filter((item) => item.material === "metadata" || item.material === "ocr")
+            .map((item) => {
+              const name = item.filename ?? item.title ?? "?";
+              const detail = item.material === "ocr"
+                ? t("importOcrSearchable", {
+                  n: item.ocr?.pagesRecognised ?? 0,
+                  m: item.ocr?.pagesFailed ?? 0,
+                })
+                : item.ocr?.skipped === true && item.ocr.reason
+                  ? t("importNotSearchableReason", { reason: item.ocr.reason })
+                  : t("importNotSearchable");
+              return `${name}: ${detail}`;
+            });
           await refresh();
+          // An attach reports the paper it was attached to, not a count: "✓ 1"
+          // next to a paper that already existed reads like a brand-new import.
+          const attachedToTarget = attachTarget !== null
+            && (result.imported ?? []).some((item) => item.attached === true && item.paperId === attachTarget);
           setNote([
-            okCount > 0 ? `✓ ${okCount}` : "",
+            attachedToTarget ? t("attachPdfDone") : okCount > 0 ? `✓ ${okCount}` : "",
             dupCount > 0 ? `= ${dupCount}` : "",
             failCount > 0 ? `✕ ${failCount}` : "",
             // A cancelled import keeps what finished and says how much was dropped;
@@ -3133,6 +4386,7 @@ function describeError(error, t) {
             tooLarge.length > 0
               ? t("importTooLargeSkipped", { n: tooLarge.length, limit: Math.round(maxBytes / 1024 / 1024) })
               : "",
+            ...coverageNotes,
           ].filter(Boolean).join(" · "));
           setHits(null);
           setError(failCount > 0 ? result.failed.map((item) => `${item.filename}: ${item.reason}`).join("; ") : null);
@@ -3149,7 +4403,7 @@ function describeError(error, t) {
           setBusy(null);
           if (fileInputRef.current) fileInputRef.current.value = "";
         }
-      }, [sessionId, t, refresh, runCancellable, importLimits]);
+      }, [sessionId, t, refresh, runCancellable, importLimits, status]);
 
       /**
        * Collect the files from a drop, walking directories.
@@ -3404,7 +4658,7 @@ function describeError(error, t) {
       }, [sessionId, topicQuery, t]);
 
       const loadSegments = useCallback(async () => {
-        if (!sessionId || translatePaperId === "") return;
+        if (!sessionId || translatePaperId === "") return null;
         setTranslateBusy("segments");
         setError(null);
         try {
@@ -3424,6 +4678,7 @@ function describeError(error, t) {
           const seed = {};
           for (const row of stored.translations ?? []) seed[`${row.pageIndex}:${row.charStart}:${row.charEnd}`] = row.text;
           setTranslateDraft(seed);
+          return result;
           // No setNote here on purpose. The segment count is already shown inside the
           // translate view ("45 段 · 0 已译 · 45 未译") and in the list header, and the
           // note banner renders ABOVE the view switch — so setting it here left
@@ -3432,6 +4687,7 @@ function describeError(error, t) {
           // A confirmation that follows you to unrelated screens is not a confirmation.
         } catch (loadError) {
           setError(describeError(loadError, t));
+          return null;
         } finally {
           setTranslateBusy(null);
         }
@@ -3653,6 +4909,306 @@ function describeError(error, t) {
         }
       }, [inputActions, t]);
 
+      const workingSetPaperIds = activeWorkingSetPaperIds;
+
+      const togglePaperSelection = useCallback((paperId) => {
+        setSelectedPaperIds((current) => (
+          current.includes(paperId)
+            ? current.filter((id) => id !== paperId)
+            : [...current, paperId]
+        ));
+      }, []);
+
+      const clearPaperSelection = useCallback(() => {
+        setSelectedPaperIds([]);
+      }, []);
+
+      const loadCompanionPage = useCallback(async (paperId, pageIndex) => {
+        if (!sessionId || !paperId) return;
+        setCompanionData((prev) => ({ ...prev, paperId, pageIndex, loading: true }));
+        try {
+          const [segRes, transRes] = await Promise.all([
+            callRemote(sessionId, "translateSegments", {
+              paperId,
+              fromPage: pageIndex,
+              toPage: pageIndex,
+              targetLang: translateTarget,
+            }).catch(() => null),
+            callRemote(sessionId, "listTranslations", {
+              paperId,
+              targetLang: translateTarget,
+            }).catch(() => null),
+          ]);
+          const segments = segRes?.segments ?? [];
+          const translations = (transRes?.translations ?? []).filter((row) => row.pageIndex === pageIndex);
+          setCompanionData({ pageIndex, paperId, segments, translations, loading: false });
+        } catch {
+          setCompanionData((prev) => ({ ...prev, loading: false }));
+        }
+      }, [sessionId, translateTarget]);
+
+      useEffect(() => {
+        if (!reader?.paperId || companionTab !== "pageTranslate") return;
+        void loadCompanionPage(reader.paperId, readerPage);
+      }, [reader?.paperId, readerPage, companionTab, loadCompanionPage]);
+
+      const silentSync = useCallback(async () => {
+        if (!sessionId) return;
+        try {
+          await refresh();
+          if (reader?.paperId && companionTab === "pageTranslate") {
+            await loadCompanionPage(reader.paperId, readerPage);
+          }
+          if (translatePaperId !== "" && translateResult !== null) {
+            const stored = await callRemote(sessionId, "listTranslations", {
+              paperId: translatePaperId,
+              targetLang: translateTarget,
+            }).catch(() => null);
+            if (stored?.translations) {
+              setTranslationRows(stored.translations);
+              const seed = {};
+              for (const row of stored.translations) seed[`${row.pageIndex}:${row.charStart}:${row.charEnd}`] = row.text;
+              setTranslateDraft(seed);
+            }
+          }
+        } catch {
+          /* silent background sync never flashes errors */
+        }
+      }, [sessionId, refresh, reader?.paperId, companionTab, readerPage, loadCompanionPage, translatePaperId, translateTarget, translateResult]);
+
+      silentSyncRef.current = silentSync;
+
+      useEffect(() => {
+        const onFocus = () => {
+          const now = Date.now();
+          if (now - lastFocusSyncRef.current < 1500) return;
+          lastFocusSyncRef.current = now;
+          void silentSyncRef.current?.();
+        };
+        if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+          window.addEventListener("focus", onFocus);
+        }
+        return () => {
+          if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
+            window.removeEventListener("focus", onFocus);
+          }
+          for (const timer of syncTimersRef.current) clearTimeout(timer);
+          syncTimersRef.current = [];
+        };
+      }, []);
+
+      const sendToAgent = useCallback((text) => {
+        if (!insertToChat(text)) return false;
+        if (typeof inputActions?.submit === "function") {
+          try {
+            const res = inputActions.submit();
+            if (res && typeof res.then === "function") {
+              res.then(
+                () => setNote(t("submittedToAgent")),
+                () => setNote(t("sentToChat")),
+              );
+            } else if (res !== false) {
+              setNote(t("submittedToAgent"));
+            }
+          } catch {
+            setNote(t("sentToChat"));
+          }
+        }
+        for (const delayMs of [2500, 6000, 12000]) {
+          const timer = setTimeout(() => {
+            syncTimersRef.current = syncTimersRef.current.filter((id) => id !== timer);
+            void silentSyncRef.current?.();
+          }, delayMs);
+          timer?.unref?.();
+          syncTimersRef.current.push(timer);
+        }
+        return true;
+      }, [insertToChat, inputActions, t]);
+
+      const quickImportCandidate = useCallback(async (item) => {
+        if (!sessionId || !item?.title) return;
+        setBusy("cite-import");
+        setError(null);
+        try {
+          const bibtex = buildBibtexForCandidate(item);
+          const importedRes = await callRemote(sessionId, "importCitations", {
+            fileName: "candidate.bib",
+            text: bibtex,
+          });
+          autoAssignImported(importedRes?.imported);
+          await refresh();
+          setNote(t("importedToLibrary", { title: item.title }));
+        } catch (importErr) {
+          setError(describeError(importErr, t));
+        } finally {
+          setBusy(null);
+        }
+      }, [sessionId, refresh, autoAssignImported, t]);
+
+      const askSelectionChip = useCallback(async (chipQuestion) => {
+        const targetPaperId = reader?.paperId ?? compareFocus;
+        if (!selection || !targetPaperId || !sessionId) return;
+        setBusy("ask");
+        setError(null);
+        try {
+          const packet = await callRemote(sessionId, "askContext", {
+            paperId: targetPaperId,
+            question: chipQuestion,
+            selectionText: selection.text,
+            pageIndex: selection.pageIndex,
+          });
+          const where = packet.selection.anchored
+            ? `${t("askPage")} ${packet.selection.pageIndex + 1} · ${t("askChars")} ${packet.selection.charStart}-${packet.selection.charEnd}`
+            : `${t("askPage")} ${packet.selection.pageIndex + 1} · ${t("askAnchorMissing")}`;
+          const composed = [
+            `[paper] ${packet.title} (${packet.paperId})`,
+            `[${t("askAnchor")}] ${where}`,
+            `[${t("askSelection")}] ${packet.selection.text}`,
+            `[${t("askQuestion")}] ${packet.question}`,
+            packet.selection.anchored ? "" : `[!] ${t("askAnchorMissingHint")}`,
+          ].filter((line) => line !== "").join("\n");
+          if (sendToAgent(composed)) setLastAsk(packet);
+        } catch (askError) {
+          setError(describeError(askError, t));
+        } finally {
+          setBusy(null);
+        }
+      }, [selection, reader?.paperId, compareFocus, sessionId, sendToAgent, t]);
+
+      const askCrossPaperChip = useCallback((chipPrompt) => {
+        const scopeIds = workingSetPaperIds ?? papers.map((p) => p.paperId);
+        const scopedPapers = papers.filter((p) => scopeIds.includes(p.paperId));
+        const listLines = scopedPapers.slice(0, 20).map((p, idx) =>
+          `${idx + 1}. ${p.title || p.paperId} (${p.authors || "-"}, ${p.year || "-"}, paperId="${p.paperId}")`);
+        const prompt = [
+          chipPrompt,
+          workingSetPaperIds
+            ? `【作用范围：当前工作集已圈选 ${workingSetPaperIds.length} 篇文献】\npaperIds=${JSON.stringify(workingSetPaperIds)}`
+            : `【作用范围：全库文献（共 ${papers.length} 篇）】`,
+          listLines.length > 0 ? listLines.join("\n") : "",
+          `请调用 paper_evidence（action="list"${workingSetPaperIds ? `, paperIds=${JSON.stringify(workingSetPaperIds)}` : ""}）和 paper_read 核对原文后再输出对比表与可溯源引用。`,
+        ].filter(Boolean).join("\n\n");
+        sendToAgent(prompt);
+      }, [workingSetPaperIds, papers, sendToAgent]);
+
+      const aiTranslateReaderPage = useCallback((paper, pageIndex) => {
+        if (!paper?.paperId) return;
+        const targetLabel = translateTarget === "zh" ? "中文" : "English";
+        const prompt = [
+          `请将论文《${paper.title || paper.paperId}》(paperId="${paper.paperId}") 第 ${pageIndex + 1} 页翻译为${targetLabel}（targetLang="${translateTarget}"）。`,
+          `请先调用 paper_evidence 工具（action="segments", paperId="${paper.paperId}", fromPage=${pageIndex}, toPage=${pageIndex}, targetLang="${translateTarget}"）读取带锚点分段原文，`,
+          `逐段翻译后调用 paper_evidence 工具（action="save_segments", paperId="${paper.paperId}", targetLang="${translateTarget}", items=[{pageIndex, charStart, charEnd, text}]）写回译文。`,
+        ].join("\n");
+        sendToAgent(prompt);
+      }, [translateTarget, sendToAgent]);
+
+      const aiGenerateReadingCard = useCallback((paper) => {
+        if (!paper?.paperId) return;
+        const prompt = [
+          `请为论文《${paper.title || paper.paperId}》(paperId="${paper.paperId}") 生成一份结构化六要素读书卡：`,
+          `1) 研究问题；2) 理论框架；3) 研究方法与样本；4) 核心结论；5) 局限性与不足；6) 关键可引原话（含页码）。`,
+          `请先用 paper_read（action="pages", paperId="${paper.paperId}", fromPage=0, toPage=10）阅读全文（必要时翻看后续页），`,
+          `然后调用 paper_evidence（action="save_answer", paperId="${paper.paperId}", kind="note", question="读书卡", pageIndex=0, answer="整理好的六要素读书卡内容"）写回本地库。`,
+        ].join("\n");
+        sendToAgent(prompt);
+      }, [sendToAgent]);
+
+      const aiSemanticStanceCheck = useCallback(() => {
+        const claim = matrixClaim.trim();
+        if (claim === "") return;
+        const scopeText = workingSetPaperIds ? `paperIds=${JSON.stringify(workingSetPaperIds)}` : "全库证据";
+        const prompt = [
+          `请对论断「${claim}」执行深度语义立场核对（作用范围：${scopeText}）：`,
+          `1. 调用 paper_evidence（action="list"${workingSetPaperIds ? `, paperIds=${JSON.stringify(workingSetPaperIds)}` : ""}）读取已收集证据原文（必要时用 paper_read 核对上下文）。`,
+          `2. 逐条在语义层面判断各篇证据对该论断是支持（support）、冲突（conflict）还是未提及（not_found）及强度（high/medium/low）。`,
+          `3. 调用 paper_review（action="record_claims", claims=[{ text: ${JSON.stringify(claim)}, section: "正文", evidence: [{ evidenceId, stance, strength }] }]）持久化核对结果。`,
+        ].join("\n");
+        sendToAgent(prompt);
+      }, [matrixClaim, workingSetPaperIds, sendToAgent]);
+
+      const aiTranslateSegments = useCallback(async () => {
+        if (!sessionId || translatePaperId === "") return;
+        let data = translateResult;
+        if (
+          data === null ||
+          data.paperId !== translatePaperId ||
+          data.fromPage !== translateFrom ||
+          data.toPage !== translateTo ||
+          data.targetLang !== translateTarget
+        ) {
+          data = await loadSegments();
+        }
+        const segs = data?.segments ?? [];
+        if (segs.length === 0) return;
+        const paperTitle = papers.find((p) => p.paperId === translatePaperId)?.title || data?.title || translatePaperId;
+        const targetLabel = translateTarget === "zh" ? "中文" : "English";
+        const prompt = [
+          `请将论文《${paperTitle}》(paperId="${translatePaperId}") 第 ${translateFrom + 1}-${translateTo + 1} 页翻译为${targetLabel}（targetLang="${translateTarget}"）。`,
+          `请先调用 paper_evidence 工具（action="segments", paperId="${translatePaperId}", fromPage=${translateFrom}, toPage=${translateTo}, targetLang="${translateTarget}"）读取带精确字符锚点（pageIndex, charStart, charEnd, source）的分段原文，`,
+          `逐段翻译后，再调用 paper_evidence 工具（action="save_segments", paperId="${translatePaperId}", targetLang="${translateTarget}", items=[{pageIndex, charStart, charEnd, text}]）按原锚点写回译文。`,
+          `不要修改或省略 pageIndex / charStart / charEnd，完成后请简述翻译结果，提示我在插件「对照」页点击「刷新译文」查看对齐译文。`,
+        ].join("\n");
+        sendToAgent(prompt);
+      }, [sessionId, translatePaperId, translateFrom, translateTo, translateTarget, translateResult, loadSegments, papers, sendToAgent]);
+
+      const refreshTranslations = useCallback(async () => {
+        if (!sessionId || translatePaperId === "") return;
+        setTranslateBusy("refresh");
+        setError(null);
+        try {
+          const stored = await callRemote(sessionId, "listTranslations", {
+            paperId: translatePaperId,
+            targetLang: translateTarget,
+          });
+          const rows = stored.translations ?? [];
+          setTranslationRows(rows);
+          const seed = {};
+          for (const row of rows) seed[`${row.pageIndex}:${row.charStart}:${row.charEnd}`] = row.text;
+          setTranslateDraft(seed);
+          if (translateResult !== null) {
+            const refreshed = await callRemote(sessionId, "translateSegments", {
+              paperId: translatePaperId,
+              fromPage: translateFrom,
+              toPage: translateTo,
+              targetLang: translateTarget,
+            });
+            setTranslateResult(refreshed);
+          }
+        } catch (refreshError) {
+          setError(describeError(refreshError, t));
+        } finally {
+          setTranslateBusy(null);
+        }
+      }, [sessionId, translatePaperId, translateFrom, translateTo, translateTarget, translateResult, t]);
+
+      const aiRecommendTopics = useCallback(() => {
+        const q = topicQuery.trim();
+        const gapHint = (topicResult?.gaps ?? []).slice(0, 4)
+          .map((g) => `- ${g.terms.join(" × ")}（共现 ${g.coOccurrences}，独立 ${g.independentA}/${g.independentB}）`)
+          .join("\n");
+        const prompt = [
+          q !== ""
+            ? `请围绕领域关键词「${q}」做深度选题分析与推荐。`
+            : `请结合我当前文献库的研究积累，做深度选题分析与方向推荐。`,
+          `请调用 paper_review（action="direction", query=${JSON.stringify(q || "research frontier")}）以及 paper_status / paper_search 获取外部与本地文献分布，`,
+          gapHint ? `目前已统计到的共现缺口素材：\n${gapHint}` : "",
+          `请输出 3-5 个可落地的具体研究选题（包含研究问题、理论/方法切入点、数据可行性与建议检索词）。`,
+        ].filter(Boolean).join("\n\n");
+        sendToAgent(prompt);
+      }, [topicQuery, topicResult, sendToAgent]);
+
+      const aiExpandTopic = useCallback((candidate) => {
+        const prompt = [
+          `请深度展开以下候选研究选题：`,
+          `- 选题方向：${candidate.title}`,
+          `- 研究问题：${candidate.researchQuestion}`,
+          `- 可行性依据：${candidate.feasibility?.note ?? ""}`,
+          `- 缺口依据：${candidate.innovation?.note ?? ""}`,
+          `请调用 paper_review（action="direction"）与 paper_search 核查库内外相关研究，给出：1) 核心研究假设；2) 研究设计与变量/方法方案；3) 建议优先精读与检索的关键词。`,
+        ].join("\n");
+        sendToAgent(prompt);
+      }, [sendToAgent]);
+
       /**
        * Ask about the selected passage.
        *
@@ -3696,7 +5252,7 @@ function describeError(error, t) {
               ? ""
               : `[!] ${t("askAnchorMissingHint")}`,
           ].filter((line) => line !== "").join("\n");
-          if (insertToChat(composed)) {
+          if (sendToAgent(composed)) {
             setQuestion("");
             // Remember the packet so the answer can be written back to the same anchor
             // without asking the Host to re-locate it.
@@ -3707,7 +5263,7 @@ function describeError(error, t) {
         } finally {
           setBusy(null);
         }
-      }, [selection, reader, question, insertToChat, sessionId, t]);
+      }, [selection, reader, question, sendToAgent, sessionId, t]);
 
       /**
        * Write the answer back to the anchor it came from.
@@ -3778,7 +5334,11 @@ function describeError(error, t) {
         setBusy("collect");
         setError(null);
         try {
-          const result = await callRemote(sessionId, "collectEvidence", { query: collectQuery.trim(), limit: 20 });
+          const result = await callRemote(sessionId, "collectEvidence", {
+            query: collectQuery.trim(),
+            limit: 20,
+            ...(workingSetPaperIds ? { paperIds: workingSetPaperIds } : {}),
+          });
           setNote(`${t("added")} ${result.evidence?.length ?? 0} ${t("evidenceCount")}`);
           await refresh();
         } catch (collectError) {
@@ -3786,7 +5346,7 @@ function describeError(error, t) {
         } finally {
           setBusy(null);
         }
-      }, [sessionId, collectQuery, t, refresh]);
+      }, [sessionId, collectQuery, workingSetPaperIds, t, refresh]);
 
       const removeEvidence = useCallback(async (evidenceId) => {
         if (!sessionId) return;
@@ -3800,31 +5360,85 @@ function describeError(error, t) {
 
       const checkMatrix = useCallback(async (claim) => {
         if (!sessionId) return;
+        const normalized = typeof claim === "string" ? claim.trim() : "";
         setBusy("matrix");
         setError(null);
         try {
-          const result = await callRemote(sessionId, "reviewMatrix", { claim });
-          setMatrix(result);
+          const result = await callRemote(sessionId, "reviewMatrix", {
+            claim: normalized,
+            ...(workingSetPaperIds ? { paperIds: workingSetPaperIds } : {}),
+          });
+          setMatrix(result && typeof result === "object" ? { ...result, claim: normalized } : result);
         } catch (matrixError) {
           setError(describeError(matrixError, t));
         } finally {
           setBusy(null);
         }
-      }, [sessionId, t]);
+      }, [sessionId, workingSetPaperIds, t]);
+
+      const saveClaim = useCallback(async () => {
+        const typed = matrixClaim.trim();
+        const checked = (matrix?.claim ?? "").trim();
+        const claimText = typed !== "" ? typed : checked;
+        if (!sessionId || claimText === "") return;
+        setBusy("claim");
+        setError(null);
+        try {
+          const links = [];
+          const seenEv = new Set();
+          if (matrix && checked === claimText) {
+            for (const row of matrix.rows ?? []) {
+              if (row.stance !== "support" && row.stance !== "conflict") continue;
+              const judgements = Array.isArray(row.judgements) ? row.judgements : [];
+              if (judgements.length > 0) {
+                for (const j of judgements) {
+                  if (!j.evidenceId || seenEv.has(j.evidenceId)) continue;
+                  if (j.stance !== "support" && j.stance !== "conflict") continue;
+                  seenEv.add(j.evidenceId);
+                  links.push({
+                    evidenceId: j.evidenceId,
+                    stance: j.stance,
+                    strength: j.strength === "strong" ? "high" : j.strength === "weak" ? "low" : "medium",
+                  });
+                }
+              } else {
+                for (const eid of row.evidenceIds ?? []) {
+                  if (!eid || seenEv.has(eid)) continue;
+                  seenEv.add(eid);
+                  links.push({
+                    evidenceId: eid,
+                    stance: row.stance,
+                    strength: row.strength === "strong" ? "high" : row.strength === "weak" ? "low" : "medium",
+                  });
+                }
+              }
+            }
+          }
+          await callRemote(sessionId, "recordClaims", {
+            claims: [{ text: claimText, section: "正文", evidence: links }],
+          });
+          await loadClaims();
+          setNote(t("claimSaved", { evidence: links.length }));
+        } catch (claimError) {
+          setError(describeError(claimError, t));
+        } finally {
+          setBusy(null);
+        }
+      }, [sessionId, matrix, matrixClaim, loadClaims, t]);
 
       const buildOutline = useCallback(async () => {
         if (!sessionId) return;
         setBusy("outline");
         setError(null);
         try {
-          const result = await callRemote(sessionId, "reviewOutline");
+          const result = await callRemote(sessionId, "reviewOutline", workingSetPaperIds ? { paperIds: workingSetPaperIds } : {});
           setOutline(result);
         } catch (outlineError) {
           setError(describeError(outlineError, t));
         } finally {
           setBusy(null);
         }
-      }, [sessionId, t]);
+      }, [sessionId, workingSetPaperIds, t]);
 
       /**
        * Section skeleton — a structure proposal built from stored evidence.
@@ -3839,18 +5453,74 @@ function describeError(error, t) {
         setBusy("skeleton");
         setError(null);
         try {
-          setSkeleton(await callRemote(sessionId, "sectionSkeleton"));
+          setSkeleton(await callRemote(sessionId, "sectionSkeleton", workingSetPaperIds ? { paperIds: workingSetPaperIds } : {}));
         } catch (skeletonError) {
           setError(describeError(skeletonError, t));
         } finally {
           setBusy(null);
         }
-      }, [sessionId, t]);
+      }, [sessionId, workingSetPaperIds, t]);
 
       const sendSkeleton = useCallback(() => {
         if (!inputActions || !skeleton?.text) return;
-        inputActions.insertText(skeleton.text);
-      }, [inputActions, skeleton]);
+        sendToAgent(skeleton.text);
+      }, [inputActions, skeleton, sendToAgent]);
+
+      const writeTraceableReview = useCallback(async () => {
+        if (!sessionId) return;
+        setBusy("bodyplan");
+        setError(null);
+        try {
+          const scopeInput = workingSetPaperIds ? { paperIds: workingSetPaperIds } : {};
+          const [plan, currentClaims, skel] = await Promise.all([
+            callRemote(sessionId, "reviewBodyPlan", { limit: 200, ...scopeInput }),
+            callRemote(sessionId, "listClaims", { limit: 500 }).catch(() => null),
+            skeleton ? Promise.resolve(skeleton) : callRemote(sessionId, "sectionSkeleton", scopeInput).catch(() => null),
+          ]);
+          if (skel && !skeleton) setSkeleton(skel);
+          const claimRows = currentClaims?.claims ?? claims;
+          if (currentClaims?.claims) {
+            setClaims(currentClaims.claims);
+            if (currentClaims.summary) setClaimsSummary(currentClaims.summary);
+          }
+          if (!plan?.ok) {
+            setError(plan?.reason ?? t("noEvidence"));
+            return;
+          }
+          const claimLines = claimRows.length > 0
+            ? claimRows.map((c, i) => `${i + 1}. [${c.section || "正文"}] ${c.text}（${(c.evidence ?? []).length} 条证据）`).join("\n")
+            : "（暂无已存论断，请基于槽位证据提炼论断并可用 paper_review action=\"record_claims\" 保存）";
+          const skelLines = (skel?.sections ?? []).length > 0
+            ? skel.sections.map((s, i) => `${i + 1}. ${s.title}：${s.purpose}（${s.evidenceIds.length} 条证据）`).join("\n")
+            : "（按默认综述结构组织）";
+          const paperIdsLine = workingSetPaperIds
+            ? `【工作集限定】paperIds=${JSON.stringify(workingSetPaperIds)}`
+            : "";
+          const prompt = [
+            "请为当前文献库撰写可溯源综述正文，并确保每句陈述都绑定真实证据锚点：",
+            paperIdsLine,
+            "",
+            "【已存论断】",
+            claimLines,
+            "",
+            "【章节骨架】",
+            skelLines,
+            "",
+            "【正文槽位与绑定证据】",
+            plan.text,
+            "",
+            "【执行步骤】",
+            `1. 如需完整槽位 JSON，先调用 paper_review（action="bodyplan"${workingSetPaperIds ? `, paperIds=${JSON.stringify(workingSetPaperIds)}` : ""}）读取每个 slotId 与绑定的 evidenceId。`,
+            `2. 按章节骨架与已存论断逐槽位撰写学术综述句，调用 paper_review（action="body", sentences=[{slotId, text, evidenceIds}]）校验锚点并生成带 [E:xxxxxxxx] 溯源标记的正文。`,
+            `3. 最后调用 paper_review（action="export", includeStoredClaims=true${workingSetPaperIds ? `, paperIds=${JSON.stringify(workingSetPaperIds)}` : ""}, sentences=...）导出包含正文、论断与参考文献的完整综述。`,
+          ].filter((line, idx, arr) => !(line === "" && (idx === 0 || arr[idx - 1] === ""))).join("\n");
+          sendToAgent(prompt);
+        } catch (planError) {
+          setError(describeError(planError, t));
+        } finally {
+          setBusy(null);
+        }
+      }, [sessionId, skeleton, claims, workingSetPaperIds, sendToAgent, t]);
 
       /**
        * Import a .bib / .ris file into the library.
@@ -3870,11 +5540,13 @@ function describeError(error, t) {
             fileName: String(file.name ?? ""),
             text,
           });
+          autoAssignImported(result?.imported);
           setCiteImport(result);
           // An import changes the library, so the list and the counts have to be
           // refreshed; without this the new entries exist but the panel still shows the
           // old library and the import looks like it did nothing.
           await refresh();
+          if (result?.text) setNote(result.text);
         } catch (citeError) {
           // A cancelled import is not a failed import: showing "AbortError: The
           // operation was aborted" in a red banner reports the user's own cancel as a
@@ -3950,17 +5622,20 @@ function describeError(error, t) {
         [reader?.quote, reader?.pageIndex],
       );
 
-      // Citations pass `anchoredOnly`, not an id list. The Host then filters in SQL
-      // over the whole library. Passing the ids of the loaded page would have
-      // produced a bibliography that silently omitted every unloaded row — the
-      // failure mode is invisible, which is the worst kind for a citation tool.
+      // Citations pass `anchor: "anchored"` (and optional `paperIds` when scoped to a
+      // project or working set), never a loaded-page `evidenceIds` list. The Host then
+      // filters in SQL over the full scoped set so unloaded evidence rows are never
+      // silently omitted from the bibliography.
       const renderCitations = useCallback(async () => {
         if (!sessionId) return;
         setBusy("citations");
         setError(null);
         try {
           const result = await callRemote(sessionId, "formatCitations", {
-            style: citationStyle, locale: citationLocale, anchor: "anchored",
+            style: citationStyle,
+            locale: citationLocale,
+            anchor: "anchored",
+            ...(workingSetPaperIds && workingSetPaperIds.length > 0 ? { paperIds: workingSetPaperIds } : {}),
           });
           setCitation(result);
         } catch (citationError) {
@@ -3968,7 +5643,7 @@ function describeError(error, t) {
         } finally {
           setBusy(null);
         }
-      }, [sessionId, citationStyle, citationLocale, t]);
+      }, [sessionId, citationStyle, citationLocale, workingSetPaperIds, t]);
 
       const doExport = useCallback(async () => {
         if (!sessionId) return;
@@ -3979,6 +5654,8 @@ function describeError(error, t) {
             style: citationStyle,
             locale: citationLocale,
             anchor: "anchored",
+            includeStoredClaims: true,
+            ...(workingSetPaperIds ? { paperIds: workingSetPaperIds } : {}),
           });
           setExported(result);
           if (result.ok !== true) setError(result.reason ?? "export failed");
@@ -3994,7 +5671,7 @@ function describeError(error, t) {
         } finally {
           setBusy(null);
         }
-      }, [sessionId, citationStyle, citationLocale, t]);
+      }, [sessionId, citationStyle, citationLocale, workingSetPaperIds, t]);
 
       const copyMarkdown = useCallback(async () => {
         const text = exported?.markdown ?? citation?.bibliography;
@@ -4007,14 +5684,32 @@ function describeError(error, t) {
         }
       }, [exported, citation, t]);
 
+      const downloadMarkdown = useCallback(() => {
+        const text = exported?.markdown;
+        if (!text || typeof document === "undefined" || typeof URL === "undefined") return;
+        try {
+          const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "review.md";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+        } catch {
+          setError("download unavailable");
+        }
+      }, [exported]);
+
       const sendOutline = useCallback(() => {
         if (!outline?.text) return;
-        insertToChat([
+        sendToAgent([
           "【研究材料】以下是从本地文献库收集的、带页码定位的证据。",
           outline.text,
           "【任务】请基于以上证据写综述；每句需要证据时标注 [E:证据id前8位]。不要引入材料之外的事实。",
         ].join("\n\n"));
-      }, [outline, insertToChat]);
+      }, [outline, sendToAgent]);
 
       // Search hits carry only display fields; merge in the stored row so the
       // card knows whether a PDF exists. Group multiple page hits of the same
@@ -4024,13 +5719,29 @@ function describeError(error, t) {
         const paperById = new Map(papers.map((paper) => [paper.paperId, paper]));
         const grouped = new Map();
         for (const hit of hits) {
-          const merged = { ...(paperById.get(hit.paperId) ?? {}), ...hit };
+          // Three sources, in order of authority: the loaded page, then the row
+          // fetched for this hit, then the hit itself (display fields only).
+          const stored = paperById.get(hit.paperId) ?? hitRows[hit.paperId] ?? null;
+          const merged = { ...(stored ?? {}), ...hit };
+          // Keep every page hit, not just the first: the card lets the user jump
+          // to each page, and `hitCount` alone would say "3 hits" without saying where.
+          const pageHit = { pageIndex: hit.pageIndex, snippet: hit.snippet };
           const existing = grouped.get(hit.paperId);
-          if (existing === undefined) grouped.set(hit.paperId, { ...merged, hitCount: 1 });
-          else existing.hitCount += 1;
+          if (existing === undefined) {
+            grouped.set(hit.paperId, {
+              ...merged,
+              hitCount: 1,
+              pageHits: [pageHit],
+              // The card must not read "no stored row yet" as "no PDF": see PaperCard.
+              hitRowUnknown: stored === null,
+            });
+          } else {
+            existing.hitCount += 1;
+            existing.pageHits.push(pageHit);
+          }
         }
         return [...grouped.values()];
-      }, [hits, papers]);
+      }, [hits, papers, hitRows]);
 
       // Grouping only. The anchored/unanchored filter is applied by the Host now
       // (see `loadEvidence`), because it has to select across the whole library
@@ -4045,14 +5756,46 @@ function describeError(error, t) {
         return [...grouped.entries()];
       }, [evidence]);
 
-      const jumpToEvidence = useCallback((row) => {
+      const jumpToEvidence = useCallback((row, origin) => {
+        const from = origin === "evidence" || origin === "review"
+          ? origin
+          : (view === "evidence" || view === "review" ? view : "evidence");
         openReader({
           paperId: row.paperId,
           title: row.paperTitle,
           pageIndex: row.pageIndex,
           quote: row.quote,
           paper: { paperId: row.paperId, title: row.paperTitle },
-        });
+        }, from);
+      }, [openReader, view]);
+
+      const closeReader = useCallback(() => {
+        const backTo = readerOrigin;
+        // Only the reader is cleared. The hit-page expansion lives in
+        // `hitPagesRef` and is deliberately left alone: the list is about to
+        // re-mount beneath the user, and collapsing everything would lose the
+        // place they were reading.
+        const refocus = hitPagesRef.current.focus;
+        hitPagesRef.current.focus = null;
+        setReader(null);
+        setSelection(null);
+        setReaderOrigin(null);
+        setFocusMode(false);
+        if (backTo === "evidence" || backTo === "review") {
+          setView(backTo);
+          setNote("");
+        }
+        // Focus is handed back only in the library view; in the other views the
+        // list is gone, so the node lookup simply finds nothing.
+        if (refocus) restoreHitFocus(refocus);
+      }, [readerOrigin]);
+
+      // Opening a page hit also records which button did it, so closing the
+      // reader can restore focus to that exact hit. Set after `openReader`,
+      // which clears the previous target.
+      const openReaderFromHit = useCallback((target, focusId) => {
+        openReader(target);
+        hitPagesRef.current.focus = focusId ?? null;
       }, [openReader]);
 
       const failureText = failures.map((failure) => `${failure.source} (${failure.reason})`).join(", ");
@@ -4063,7 +5806,173 @@ function describeError(error, t) {
         evidence: evidence.length,
       };
 
+      const paperById = useMemo(
+        () => new Map(papers.map((paper) => [paper.paperId, paper])),
+        [papers],
+      );
+
       // --- views ----------------------------------------------------------
+
+      const renderCrossPaperBar = () => {
+        if (papers.length === 0) return null;
+        return h("div", {
+          className: "pt-well",
+          style: { padding: "8px 10px", display: "flex", flexDirection: "column", gap: 6 },
+        },
+          h("div", { className: "pt-toolbar" },
+            h("span", { className: "pt-caption" }, t("crossPaperTitle")),
+            h("div", { className: "pt-spacer" }),
+            h(Badge, { tone: workingSetPaperIds ? "info" : undefined },
+              workingSetPaperIds ? `${workingSetPaperIds.length} ${t("paperCount")}` : t("workingSetScopeAll")),
+          ),
+          h("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
+            h("button", {
+              type: "button",
+              className: "pt-chip",
+              disabled: !inputActions || busy !== null,
+              onClick: () => askCrossPaperChip("请对比这些文献的研究方法、数据来源、样本规模与识别策略，梳理成横向对比表并附页码出处。"),
+            }, t("chipCompareMethods")),
+            h("button", {
+              type: "button",
+              className: "pt-chip",
+              disabled: !inputActions || busy !== null,
+              onClick: () => askCrossPaperChip("请汇总这些文献的核心实证结论，重点标注彼此支持、补充或相互冲突的观点及页码出处。"),
+            }, t("chipCompareFindings")),
+            h("button", {
+              type: "button",
+              className: "pt-chip",
+              disabled: !inputActions || busy !== null,
+              onClick: () => askCrossPaperChip("请深挖这些文献各自承认或隐含的方法局限性、样本偏误与尚未解决的研究空白，帮我提炼可切入的研究问题。"),
+            }, t("chipCompareLimitations")),
+          ),
+        );
+      };
+
+      const renderCompanionWorkbench = () => {
+        if (!reader || comparePapers.length > 0) return null;
+        const paperEvidence = evidence.filter((row) => row.paperId === reader.paperId);
+        const paperAnnotations = annotations.filter((row) => row.paperId === reader.paperId);
+        const cardNotes = paperAnnotations.filter(isReadingCardAnnotation);
+        const pageTransMap = new Map(
+          (companionData.translations ?? []).map((row) => [`${row.pageIndex}:${row.charStart}:${row.charEnd}`, row.text]),
+        );
+        const segmentsForPage = companionData.paperId === reader.paperId && companionData.pageIndex === readerPage
+          ? (companionData.segments ?? [])
+          : [];
+
+        return h("div", { className: "pt-companion" },
+          h("div", { className: "pt-tabs", role: "tablist" },
+            [
+              ["pageTranslate", t("companionPageTranslate")],
+              ["readingCard", t("companionReadingCard")],
+              ["paperMarks", t("companionPaperMarks", { n: paperEvidence.length + paperAnnotations.length })],
+            ].map(([tabId, label]) => h("button", {
+              key: tabId,
+              type: "button",
+              role: "tab",
+              className: "pt-tab",
+              "aria-selected": companionTab === tabId ? "true" : "false",
+              onClick: () => setCompanionTab(tabId),
+            }, label)),
+          ),
+          companionTab === "pageTranslate"
+            ? h("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
+              h("div", { className: "pt-toolbar" },
+                h("span", { className: "pt-caption pt-num" }, `${t("page")} ${readerPage + 1}`),
+                h("div", { className: "pt-spacer" }),
+                h(Button, {
+                  variant: "ghost",
+                  onClick: () => { void loadCompanionPage(reader.paperId, readerPage); },
+                  disabled: companionData.loading || busy !== null,
+                }, t("refreshTranslations")),
+                h(Button, {
+                  variant: "primary",
+                  onClick: () => aiTranslateReaderPage(reader, readerPage),
+                  disabled: !inputActions || busy !== null,
+                }, t("aiTranslatePage")),
+              ),
+              companionData.loading
+                ? h("span", { className: "pt-caption" }, t("working"))
+                : segmentsForPage.length === 0
+                  ? h("p", { className: "pt-caption", style: { margin: 0 } }, t("pageTranslateEmpty"))
+                  : h("div", { style: { display: "flex", flexDirection: "column", gap: 6, maxHeight: "34vh", overflow: "auto" } },
+                    segmentsForPage.map((seg, idx) => {
+                      const key = `${seg.pageIndex}:${seg.charStart}:${seg.charEnd}`;
+                      const zhText = pageTransMap.get(key) || seg.translation || "";
+                      return h("div", { key: `${key}-${idx}`, className: "pt-card", style: { padding: "6px 8px" } },
+                        h("p", { className: "pt-caption", style: { margin: 0, wordBreak: "break-word" } }, seg.source),
+                        zhText !== ""
+                          ? h("p", { className: "pt-body", style: { margin: "4px 0 0", wordBreak: "break-word" } }, zhText)
+                          : h("p", { className: "pt-caption", style: { margin: "4px 0 0", fontStyle: "italic" } }, t("pageTranslateEmpty")),
+                      );
+                    }),
+                  ),
+            )
+            : companionTab === "readingCard"
+              ? h("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
+                h("div", { className: "pt-toolbar" },
+                  h("span", { className: "pt-caption" }, reader.title || reader.paperId),
+                  h("div", { className: "pt-spacer" }),
+                  h(Button, {
+                    variant: "primary",
+                    onClick: () => aiGenerateReadingCard(reader),
+                    disabled: !inputActions || busy !== null,
+                  }, t("aiBuildReadingCard")),
+                ),
+                cardNotes.length === 0
+                  ? h("p", { className: "pt-caption", style: { margin: 0 } }, t("readingCardEmpty"))
+                  : h("div", { style: { display: "flex", flexDirection: "column", gap: 6, maxHeight: "34vh", overflow: "auto" } },
+                    cardNotes.map((item) => h("div", { key: item.annotationId, className: "pt-card", style: { padding: "8px 10px" } },
+                      h("div", { className: "pt-body", style: { whiteSpace: "pre-wrap", wordBreak: "break-word" } }, item.note),
+                    )),
+                  ),
+              )
+              : h("div", { style: { display: "flex", flexDirection: "column", gap: 8, maxHeight: "34vh", overflow: "auto" } },
+                paperEvidence.length === 0 && paperAnnotations.length === 0
+                  ? h("p", { className: "pt-caption", style: { margin: 0 } }, t("noResults"))
+                  : null,
+                paperEvidence.length > 0 ? h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+                  h("span", { className: "pt-caption pt-num" }, `${t("pageEvidenceSection")} (${paperEvidence.length})`),
+                  paperEvidence.map((row) => h("button", {
+                    key: row.evidenceId,
+                    type: "button",
+                    className: "pt-card",
+                    style: { textAlign: "left", cursor: "pointer", padding: "6px 8px" },
+                    onClick: () => openReader({
+                      paperId: reader.paperId,
+                      title: reader.title,
+                      pageIndex: row.pageIndex,
+                      quote: row.quote,
+                      paper: reader,
+                    }, readerOrigin),
+                  },
+                    h("span", { className: "pt-caption pt-num" }, `p.${row.pageIndex + 1}`),
+                    h("span", { className: "pt-meta", style: { display: "block", marginTop: 2, wordBreak: "break-word" } }, row.quote),
+                  )),
+                ) : null,
+                paperAnnotations.length > 0 ? h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+                  h("span", { className: "pt-caption pt-num" }, `${t("pageNotesSection")} (${paperAnnotations.length})`),
+                  paperAnnotations.map((row) => h("button", {
+                    key: row.annotationId,
+                    type: "button",
+                    className: "pt-card",
+                    style: { textAlign: "left", cursor: "pointer", padding: "6px 8px" },
+                    onClick: () => openReader({
+                      paperId: reader.paperId,
+                      title: reader.title,
+                      pageIndex: row.pageIndex,
+                      quote: row.quote || null,
+                      paper: reader,
+                    }, readerOrigin),
+                  },
+                    h("span", { className: "pt-caption pt-num" }, `p.${row.pageIndex + 1}`),
+                    row.note ? h("span", { className: "pt-body", style: { display: "block", marginTop: 2, wordBreak: "break-word" } }, row.note) : null,
+                    row.quote ? h("span", { className: "pt-caption", style: { display: "block", marginTop: 2, wordBreak: "break-word" } }, row.quote) : null,
+                  )),
+                ) : null,
+              ),
+        );
+      };
 
       const renderWatchBar = () => h("div", { className: "pt-toolbar" },
         h(Badge, { tone: watchState?.watching === true ? "support" : undefined },
@@ -4148,65 +6057,335 @@ function describeError(error, t) {
         );
       };
 
-      const renderLibrary = () => h(React.Fragment, null,
-        h("div", { style: { padding: "10px 12px 0", display: "flex", flexDirection: "column", gap: 8 } },
-          h("div", { className: "pt-toolbar" },
-            h("input", {
-              className: "pt-input pt-toolbar-grow",
-              value: query,
-              placeholder: t("searchPlaceholder"),
-              "aria-label": t("searchPlaceholder"),
-              onChange: (event) => setQuery(event.target.value),
-              onKeyDown: (event) => { if (event.key === "Enter") doSearch(); },
-            }),
-            h(Button, { variant: "primary", onClick: doSearch, disabled: busy !== null || query.trim() === "" },
-              busy === "search" ? t("searching") : t("search")),
-            hits !== null ? h(Button, { variant: "ghost", onClick: () => { setHits(null); setQuery(""); } }, t("clear")) : null,
-          ),
-          h("div", { className: "pt-toolbar" },
-            h("span", { className: "pt-caption" }, t("searchScope")),
-            h("select", {
-              className: "pt-input",
-              style: { width: "auto" },
-              value: materialFilter,
-              onChange: (event) => setMaterialFilter(event.target.value),
-            },
-              h("option", { value: "all" }, t("filterAll")),
-              h("option", { value: "metadata" }, t("metaOnly")),
-              h("option", { value: "fulltext" }, t("fulltext")),
+      const renderLibrary = () => {
+        const selectionPanel = selection && (reader !== null || comparePapers.length > 0)
+          ? h("div", { style: { padding: comparePapers.length > 0 ? "8px 12px 0" : 0 } },
+            h("div", { className: "pt-well", style: { padding: 8, display: "flex", flexDirection: "column", gap: 6 } },
+              h("div", { className: "pt-toolbar" },
+                h("span", { className: "pt-caption" },
+                  `${t("selected")} · ${t("page")} ${selection.pageIndex + 1}`),
+                h("div", { className: "pt-spacer" }),
+                h("span", { className: "pt-caption pt-num" }, `${selection.text.length}/${MAX_QUOTE_CHARS}`),
+              ),
+              h("p", { className: "pt-body", style: { margin: 0, maxHeight: 56, overflow: "auto", wordBreak: "break-word" } },
+                selection.text),
+              h("div", { className: "pt-toolbar" },
+                h("input", {
+                  className: "pt-input pt-toolbar-grow",
+                  value: question, placeholder: t("askPlaceholder"), "aria-label": t("askPlaceholder"),
+                  onChange: (event) => setQuestion(event.target.value),
+                  onKeyDown: (event) => {
+                    if (event.key !== "Enter" || isImeCommit(event)) return;
+                    void askSelection();
+                  },
+                }),
+                h(Button, { variant: "primary", onClick: () => { void askSelection(); }, disabled: !inputActions || busy !== null }, t("ask")),
+                h("button", {
+                  type: "button",
+                  className: "pt-chip",
+                  disabled: !inputActions || busy !== null,
+                  onClick: () => { void askSelectionChip("请将这段选中文献原文准确翻译为流畅的学术中文。"); },
+                }, t("chipTranslateZh")),
+                h(Button, {
+                  onClick: async () => {
+                    if (annotationNote.trim() !== "") {
+                      const result = await saveAnnotation({
+                        quote: selection.text,
+                        note: annotationNote,
+                        pageIndex: selection.pageIndex,
+                        kind: "evidence",
+                        alsoEvidence: true,
+                      });
+                      if (result?.ok) {
+                        setAnnotationNote("");
+                        setShowSelectionNote(false);
+                        setAnnotationMessage(t("annotateAndEvidenceSaved"));
+                      } else {
+                        setAnnotationMessage(result?.reason ?? t("annotationSaved"));
+                      }
+                    } else {
+                      await saveEvidence();
+                    }
+                  },
+                  disabled: busy !== null,
+                }, t("evidence")),
+              ),
+              h("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" } },
+                h("button", {
+                  type: "button",
+                  className: "pt-chip",
+                  disabled: !inputActions || busy !== null,
+                  onClick: () => { void askSelectionChip("请用通俗易懂的语言解释这段原文的核心含义与逻辑。"); },
+                }, t("chipExplainPlain")),
+                h("button", {
+                  type: "button",
+                  className: "pt-chip",
+                  disabled: !inputActions || busy !== null,
+                  onClick: () => { void askSelectionChip("请提炼这段原文给出的核心研究结论或关键数据发现。"); },
+                }, t("chipExtractFinding")),
+                h("button", {
+                  type: "button",
+                  className: "pt-chip",
+                  disabled: !inputActions || busy !== null,
+                  onClick: () => { void askSelectionChip("请指出这段原文或该方法设计可能存在的局限性、边界条件或偏误。"); },
+                }, t("chipFindLimitation")),
+                comparePapers.length > 1
+                  ? h(Button, { variant: "ghost", onClick: jumpCompareToMatching, disabled: busy !== null, title: t("compareJumpHint") }, t("compareJump"))
+                  : null,
+                h("div", { className: "pt-spacer" }),
+                h("button", {
+                  type: "button",
+                  className: "pt-btn pt-btn-ghost",
+                  "aria-expanded": showSelectionNote ? "true" : "false",
+                  onClick: () => setShowSelectionNote((v) => !v),
+                }, t("selectionAddNote")),
+              ),
+              showSelectionNote ? h("div", { className: "pt-toolbar" },
+                h("input", {
+                  className: "pt-input pt-toolbar-grow",
+                  value: annotationNote,
+                  placeholder: t("annotateNote"),
+                  "aria-label": t("annotateNote"),
+                  onChange: (event) => setAnnotationNote(event.target.value),
+                }),
+                h(Button, {
+                  variant: "ghost",
+                  onClick: async () => {
+                    const result = await saveAnnotation({
+                      quote: selection.text,
+                      note: annotationNote,
+                      pageIndex: selection.pageIndex,
+                    });
+                    if (result?.ok) {
+                      setAnnotationNote("");
+                      setShowSelectionNote(false);
+                      setAnnotationMessage(t("annotationSaved"));
+                    } else {
+                      setAnnotationMessage(result?.reason ?? t("annotationSaved"));
+                    }
+                  },
+                  disabled: busy !== null,
+                }, t("annotate")),
+              ) : null,
+              lastAsk !== null ? h("div", { style: { display: "flex", flexDirection: "column", gap: 6, paddingTop: 4 } },
+                h("div", { className: "pt-caption" }, `${t("answerPanelTitle")} · ${t("page")} ${lastAsk.selection.pageIndex + 1}${lastAsk.selection.anchored ? ` · ${lastAsk.selection.charStart}-${lastAsk.selection.charEnd}` : ` · ${t("askAnchorMissing")}`}`),
+                h("textarea", {
+                  className: "pt-input",
+                  value: answerText,
+                  placeholder: t("answerPlaceholder"),
+                  "aria-label": t("answerPlaceholder"),
+                  rows: 3,
+                  style: { resize: "vertical", width: "100%", boxSizing: "border-box" },
+                  onChange: (event) => setAnswerText(event.target.value),
+                }),
+                h("div", { className: "pt-toolbar" },
+                  h(Button, { onClick: () => { void saveAnswer("note"); }, disabled: busy !== null }, t("saveAnswerNote")),
+                  h(Button, { variant: "primary", onClick: () => { void saveAnswer("evidence"); }, disabled: busy !== null || !lastAsk.selection.anchored }, t("saveAnswerEvidence")),
+                  h(Button, { onClick: () => { setLastAsk(null); setAnswerText(""); }, disabled: busy !== null }, t("dismiss")),
+                )) : null,
+              annotationMessage !== "" ? h("p", { className: "pt-caption", style: { margin: 0 } }, annotationMessage) : null,
             ),
-            h(Button, {
-              variant: mode === "library" ? "primary" : "ghost",
-              onClick: () => { setMode("library"); setCandidates(null); setFailures([]); setHits(null); },
-            }, t("localLibrary")),
-            h(Button, {
-              variant: mode === "external" ? "primary" : "ghost",
-              onClick: () => { setMode("external"); setHits(null); },
-            }, t("external")),
-            h(Button, {
-              variant: mode === "cnki" ? "primary" : "ghost",
-              onClick: () => { setMode("cnki"); setHits(null); },
-            }, t("cnki")),
-            // The sort control only appears for external search: the local library and
-            // CNKI have one ranking each, so offering the choice there would be a control
-            // that changes nothing.
-            mode === "external"
-              ? h("select", {
-                className: "pt-input",
-                value: sortMode,
-                "aria-label": t("sortBy"),
-                onChange: (event) => setSortMode(event.target.value),
+          )
+          : null;
+
+        const annotationsPanel = reader !== null || comparePapers.length > 0
+          ? h("div", { style: { padding: comparePapers.length > 0 ? "8px 12px 0" : 0, display: "flex", flexDirection: "column", gap: 6 } },
+            h("div", { className: "pt-toolbar" },
+              h("span", { className: "pt-h2" }, `${t("annotationList")} · ${annotations.length}`),
+              h("div", { className: "pt-spacer" }),
+              h(Button, { onClick: loadAnnotations, disabled: busy !== null }, "↻"),
+            ),
+            annotations.length === 0
+              ? h("p", { className: "pt-caption", style: { margin: 0 } }, t("annotationNone"))
+              : h("ul", { className: "pt-list" }, annotations.map((annotation) => h("li", {
+                key: annotation.annotationId,
+                className: "pt-card",
+                style: { display: "flex", flexDirection: "column", gap: 4 },
               },
-                h("option", { value: "relevance" }, t("sortRelevance")),
-                h("option", { value: "citations" }, t("sortCitations")),
-                h("option", { value: "year" }, t("sortYear")),
-              )
-              : null,
-            h("div", { className: "pt-spacer" }),
-            h(Button, { onClick: () => fileInputRef.current?.click(), disabled: busy !== null },
-              busy === "import" ? t("importing") : t("import")),
-            h(Button, { onClick: () => dirInputRef.current?.click(), disabled: busy !== null },
-              t("importFolder")),
+                h("div", { className: "pt-caption" },
+                  `${t("page")} ${annotation.pageIndex + 1}` +
+                    (annotation.tags.length > 0 ? ` · ${annotation.tags.join(" / ")}` : "")),
+                annotation.quote !== ""
+                  ? h("p", { className: "pt-body", style: { margin: 0, wordBreak: "break-word" } }, annotation.quote)
+                  : null,
+                annotation.note !== ""
+                  ? h("p", { className: "pt-caption", style: { margin: 0, wordBreak: "break-word" } }, annotation.note)
+                  : null,
+                h("div", { className: "pt-toolbar" },
+                  h(Button, {
+                    disabled: busy !== null,
+                    onClick: async () => {
+                      const result = await callRemote(sessionId, "promoteAnnotation", {
+                        annotationId: annotation.annotationId,
+                      }).catch((promoteError) => ({ ok: false, reason: promoteError?.message ?? "" }));
+                      setAnnotationMessage(result?.ok ? t("annotationSaved") : (result?.reason ?? ""));
+                      if (result?.ok) await loadEvidence();
+                    },
+                  }, t("annotationPromote")),
+                  h("div", { className: "pt-spacer" }),
+                  h(Button, {
+                    disabled: busy !== null,
+                    onClick: async () => {
+                      await removeAnnotation(annotation.annotationId);
+                    },
+                  }, t("annotationDelete")),
+                ),
+              ))),
+          )
+          : null;
+
+        const projectNameById = new Map(projectStore.projects.map((p) => [p.id, p.name]));
+        const projectList = list.filter((paper) => isPaperInProject(paper.paperId, projectStore.activeProjectId, projectStore.paperMeta));
+        const statusCounts = { all: projectList.length, unread: 0, reading: 0, read: 0, starred: 0 };
+        for (const paper of projectList) {
+          const meta = getPaperMeta(projectStore.paperMeta, paper.paperId);
+          if (meta.starred) statusCounts.starred += 1;
+          if (meta.status === "reading") statusCounts.reading += 1;
+          else if (meta.status === "read") statusCounts.read += 1;
+          else statusCounts.unread += 1;
+        }
+        const filteredList = projectList
+          .filter((paper) => {
+            if (statusFilter === "all") return true;
+            const meta = getPaperMeta(projectStore.paperMeta, paper.paperId);
+            if (statusFilter === "starred") return meta.starred;
+            return meta.status === statusFilter;
+          })
+          .slice()
+          .sort((a, b) => {
+            if (sortOrder === "year") return String(b.year ?? "").localeCompare(String(a.year ?? ""));
+            if (sortOrder === "title") return String(a.title ?? "").localeCompare(String(b.title ?? ""));
+            return 0;
+          });
+        // Only an explicit inspect opens the detail pane. It used to fall back to
+        // the first row, which made the pane look permanently attached to whatever
+        // happened to be first — including after closing it.
+        const activeInspected = inspectedPaperId
+          ? filteredList.find((p) => p.paperId === inspectedPaperId)
+            ?? papers.find((p) => p.paperId === inspectedPaperId)
+            ?? null
+          : null;
+        const inspectedDetail = activeInspected
+          ? { ...activeInspected, ...(inspectedDetailCache[activeInspected.paperId] ?? {}) }
+          : null;
+        const inspectedMeta = inspectedDetail ? getPaperMeta(projectStore.paperMeta, inspectedDetail.paperId) : null;
+        const inspectedAnns = inspectedDetail
+          ? (inspectedAnnotationsCache[inspectedDetail.paperId] ?? (reader?.paperId === inspectedDetail.paperId ? annotations : []))
+          : [];
+        const inspectedCards = inspectedAnns.filter(isReadingCardAnnotation);
+        const inspectedEvidence = inspectedDetail
+          ? evidence.filter((row) => row.paperId === inspectedDetail.paperId)
+          : [];
+
+        return h(React.Fragment, null,
+        h("div", {
+          className: focusMode && reader !== null ? "pt-collapsed" : undefined,
+          style: { padding: "8px 12px 0", display: "flex", flexDirection: "column", gap: 6 },
+        },
+          h("div", { className: "pt-card", style: { display: "flex", flexDirection: "column", gap: 8 } },
+            h("div", { className: "pt-toolbar", role: "group", "aria-label": t("library") },
+              ...[["library", "localLibrary"], ["external", "discoverPapers"], ["topics", "topicsTab"]].map(([target, key]) => {
+                const active = target === "library"
+                  ? mode === "library"
+                  : target === "topics"
+                    ? mode === "topics"
+                    : (mode === "external" || mode === "cnki");
+                return h("button", { key, type: "button", className: `pt-btn ${active ? "pt-btn-primary" : "pt-btn-ghost"}`,
+                  "aria-pressed": active, disabled: busy !== null, onClick: () => { if (!active) switchMode(target); } }, t(key));
+              }),
+            ),
+            mode === "topics" ? null : h(React.Fragment, null,
+            h("div", { className: "pt-toolbar" },
+              h("input", {
+                className: "pt-input pt-toolbar-grow",
+                value: query,
+                placeholder: t(mode === "library" ? "searchPlaceholder" : "discoverPlaceholder"),
+                "aria-label": t(mode === "library" ? "searchPlaceholder" : "discoverPlaceholder"),
+                onChange: (event) => setQuery(event.target.value),
+                onKeyDown: (event) => {
+                  // Enter during IME composition only commits the candidate text;
+                  // busy means a search is still in flight and must not be restarted.
+                  if (event.key !== "Enter") return;
+                  if (event.nativeEvent?.isComposing === true || event.keyCode === 229) return;
+                  if (busy !== null || query.trim() === "") return;
+                  doSearch();
+                },
+              }),
+              h(Button, { variant: "primary", onClick: doSearch, disabled: busy !== null || query.trim() === "" },
+                busy === "search" ? t("searching") : t("search")),
+              hits !== null ? h(Button, { variant: "ghost", onClick: () => { setHits(null); setQuery(""); } }, t("clear")) : null,
+            ),
+            h("div", { className: "pt-toolbar" },
+              // The source switch and the sort are inputs to the search, so they are
+              // locked while one runs: changing either mid-flight would label the
+              // response with a source it was not asked from. `switchMode` also
+              // clears the four result slots, which is what stops one source's rows
+              // (and the index-keyed `picked` ticks) surviving into another.
+              (mode === "external" || mode === "cnki") ? h("div", { className: "pt-seg", role: "group", "aria-label": t("academicSources") },
+                h(Button, {
+                  variant: mode === "external" ? "primary" : "ghost",
+                  disabled: busy === "search",
+                  onClick: () => switchMode("external"),
+                }, t("external")),
+                h(Button, {
+                  variant: mode === "cnki" ? "primary" : "ghost",
+                  disabled: busy === "search",
+                  onClick: () => switchMode("cnki"),
+                }, t("cnki")),
+              ) : null,
+              mode === "external"
+                ? h("select", {
+                  className: "pt-input",
+                  style: { width: "auto" },
+                  value: sortMode,
+                  "aria-label": t("sortBy"),
+                  disabled: busy === "search",
+                  onChange: (event) => setSortMode(event.target.value),
+                },
+                  h("option", { value: "relevance" }, t("sortRelevance")),
+                  h("option", { value: "citations" }, t("sortCitations")),
+                  h("option", { value: "year" }, t("sortYear")),
+                )
+                : null,
+              h("div", { className: "pt-spacer" }),
+              h(Button, { onClick: () => fileInputRef.current?.click(), disabled: busy !== null },
+                busy === "import" ? t("importing") : t("import")),
+              h("button", {
+                type: "button",
+                className: "pt-btn pt-btn-ghost",
+                "aria-expanded": showLibTools ? "true" : "false",
+                onClick: () => setShowLibTools((current) => !current),
+              }, `${t("libToolsToggle")} ${showLibTools ? "▴" : "▾"}`),
+            ),
+            h("div", {
+              className: showLibTools ? undefined : "pt-collapsed",
+              style: { display: "flex", flexDirection: "column", gap: 6, paddingTop: 6, borderTop: "1px dashed var(--dsw-alias-border-l1)" },
+            },
+              h("p", { className: "pt-caption", style: { margin: 0 } }, t("searchSyntaxHint")),
+              h("div", { className: "pt-toolbar" },
+                h("span", { className: "pt-caption" }, t("searchScope")),
+                h("select", {
+                  className: "pt-input",
+                  style: { width: "auto" },
+                  value: materialFilter,
+                  onChange: (event) => setMaterialFilter(event.target.value),
+                },
+                  h("option", { value: "all" }, t("filterAll")),
+                  h("option", { value: "metadata" }, t("metaOnly")),
+                  h("option", { value: "fulltext" }, t("fulltext")),
+                ),
+                h("div", { className: "pt-spacer" }),
+                h(Button, { onClick: () => dirInputRef.current?.click(), disabled: busy !== null },
+                  t("importFolder")),
+                h(Button, {
+                  onClick: () => libCiteImportRef.current?.click(),
+                  disabled: busy !== null,
+                  title: t("citeImportHint"),
+                }, busy === "cite-import" ? t("importing") : t("citeImport")),
+              ),
+              renderWatchBar(),
+            ),
+            ),
             h("input", {
               ref: fileInputRef, type: "file", accept: "application/pdf", multiple: true,
               "aria-label": t("import"),
@@ -4215,16 +6394,25 @@ function describeError(error, t) {
             }),
             h("input", {
               ref: dirInputRef, type: "file", accept: "application/pdf", multiple: true,
-              // Non-standard but universally supported for directory picking, and
-              // there is no standard alternative for it.
               webkitdirectory: "",
               directory: "",
               "aria-label": t("importFolder"),
               style: { display: "none" },
               onChange: (event) => doImport(event.target.files),
             }),
+            h("input", {
+              ref: libCiteImportRef,
+              type: "file",
+              accept: ".bib,.bibtex,.ris",
+              "aria-label": t("citeImport"),
+              style: { display: "none" },
+              onChange: (event) => {
+                const file = event.target.files?.[0] ?? null;
+                event.target.value = "";
+                if (file !== null) void importCitationFile(file);
+              },
+            }),
           ),
-          renderWatchBar(),
           (mode === "external" || mode === "cnki") ? h("div", { className: "pt-toolbar" },
             h(Badge, { tone: cnki?.loggedIn ? "support" : undefined },
               `${t("cnki")} · ${cnki === null ? "—" : cnki.loggedIn ? t("cnkiConnected") : t("cnkiNotLoggedIn")}`),
@@ -4292,7 +6480,7 @@ function describeError(error, t) {
           // stack that much would push the paper list out of the panel and, because the
           // panel is its own scroll container, leave the list unreachable. Scrolling
           // inside the stack keeps both usable.
-          style: { padding: "8px 0 0", height: "30vh", minHeight: "180px", flex: "none", display: "flex", flexDirection: "column", gap: 6, overflowY: "auto" },
+          style: { padding: "8px 0 0", height: "58vh", minHeight: "220px", flex: "none", display: "flex", flexDirection: "column", gap: 6, overflowY: "auto" },
         },
           h("div", { className: "pt-toolbar" },
             h("span", { className: "pt-caption" }, `${t("compareSet")} · ${comparePapers.length}/3`),
@@ -4302,6 +6490,7 @@ function describeError(error, t) {
           ...comparePapers.map((paper) => h("div", {
             key: paper.paperId,
             className: `pt-pane${compareFocus === paper.paperId ? " pt-pane-focus" : ""}`,
+            "data-compare-pane": paper.paperId,
             "data-compare-paper": paper.paperId,
             // The focused pane is marked with an attribute, not only a class: an
             // attribute survives class-list mechanics and is what the gate reads.
@@ -4350,146 +6539,27 @@ function describeError(error, t) {
             // Persisted annotations, so the reader can paint its own marks on every
             // page it renders rather than only showing evidence jump-targets.
             annotations,
+            origin: readerOrigin,
+            focusMode,
+            onToggleFocus: () => setFocusMode((current) => !current),
+            onPageChange: setReaderPage,
+            viewMode: readerViewMode,
+            onViewModeChange: setReaderViewMode,
+            bilingualSlot: renderTranslate(),
+            companionSlot: h(React.Fragment, null, selectionPanel, renderCompanionWorkbench(), annotationsPanel),
             t,
             onSelectionChange: setSelection,
-            onClose: () => { setReader(null); setSelection(null); },
+            onClose: closeReader,
           }),
         ) : null,
 
-        selection && (reader !== null || comparePapers.length > 0) ? h("div", { style: { padding: "8px 12px 0" } },
-          h("div", { className: "pt-well", style: { padding: 8, display: "flex", flexDirection: "column", gap: 6 } },
-            h("div", { className: "pt-caption" },
-              `${t("selected")} · ${t("page")} ${selection.pageIndex + 1} · ${selection.text.length}/${MAX_QUOTE_CHARS}`),
-            h("p", { className: "pt-body", style: { margin: 0, maxHeight: 60, overflow: "auto", wordBreak: "break-word" } },
-              selection.text),
-            h("div", { className: "pt-toolbar" },
-              h("input", {
-                className: "pt-input pt-toolbar-grow",
-                value: question, placeholder: t("askPlaceholder"), "aria-label": t("askPlaceholder"),
-                onChange: (event) => setQuestion(event.target.value),
-                onKeyDown: (event) => {
-                  if (event.key === "Enter") {
-                    // askSelection is async now (it fetches the anchored packet from the
-                    // Host); swallowing the promise keeps an unhandled rejection out of
-                    // the console without hiding errors, which the callback reports.
-                    void askSelection();
-                  }
-                },
-              }),
-              h(Button, { variant: "primary", onClick: () => { void askSelection(); }, disabled: !inputActions || busy !== null }, t("ask")),
-              h(Button, { onClick: saveEvidence, disabled: busy !== null }, t("evidence")),
-              // Only meaningful with more than one pane: with a single reader there is
-              // nothing to jump the comparison to.
-              comparePapers.length > 1
-                ? h(Button, { onClick: jumpCompareToMatching, disabled: busy !== null, title: t("compareJumpHint") }, t("compareJump"))
-                : null,
-            ),
-            // Write-back panel: appears once a question was actually inserted, because
-            // writing an answer back needs a packet — a page and character anchor — to
-            // attach to. Without one this would be a text box with nowhere to put the
-            // result, which is how "answers never come back" happened before.
-            lastAsk !== null ? h("div", { style: { display: "flex", flexDirection: "column", gap: 6, paddingTop: 4 } },
-              h("div", { className: "pt-caption" }, `${t("answerPanelTitle")} · ${t("page")} ${lastAsk.selection.pageIndex + 1}${lastAsk.selection.anchored ? ` · ${lastAsk.selection.charStart}-${lastAsk.selection.charEnd}` : ` · ${t("askAnchorMissing")}`}`),
-              h("textarea", {
-                className: "pt-input",
-                value: answerText,
-                placeholder: t("answerPlaceholder"),
-                "aria-label": t("answerPlaceholder"),
-                rows: 3,
-                style: { resize: "vertical", width: "100%", boxSizing: "border-box" },
-                onChange: (event) => setAnswerText(event.target.value),
-              }),
-              h("div", { className: "pt-toolbar" },
-                // A note always works; evidence additionally needs the source quote,
-                // which the packet carries — so the button is enabled either way and
-                // the Host refuses with a named reason if the quote is missing.
-                h(Button, { onClick: () => { void saveAnswer("note"); }, disabled: busy !== null }, t("saveAnswerNote")),
-                h(Button, { variant: "primary", onClick: () => { void saveAnswer("evidence"); }, disabled: busy !== null || !lastAsk.selection.anchored }, t("saveAnswerEvidence")),
-                h(Button, { onClick: () => { setLastAsk(null); setAnswerText(""); }, disabled: busy !== null }, t("dismiss")),
-              )) : null,
-            // Annotation controls, kept below the evidence/ask row on purpose: saving a
-            // highlight is the low-commitment action, and putting it beside "evidence"
-            // is exactly how the two concepts got confused in the first place.
-            h("div", { className: "pt-toolbar" },
-              h("input", {
-                className: "pt-input pt-toolbar-grow",
-                value: annotationNote,
-                placeholder: t("annotateNote"),
-                "aria-label": t("annotateNote"),
-                onChange: (event) => setAnnotationNote(event.target.value),
-              }),
-              h(Button, {
-                onClick: async () => {
-                  const result = await saveAnnotation({
-                    quote: selection.text,
-                    note: annotationNote,
-                    pageIndex: selection.pageIndex,
-                  });
-                  if (result?.ok) {
-                    setAnnotationNote("");
-                    setAnnotationMessage(t("annotationSaved"));
-                  } else {
-                    setAnnotationMessage(result?.reason ?? t("annotationSaved"));
-                  }
-                },
-                disabled: busy !== null,
-              }, t("annotate")),
-            ),
-            annotationMessage !== "" ? h("p", { className: "pt-caption", style: { margin: 0 } }, annotationMessage) : null,
-            h("p", { className: "pt-caption", style: { margin: 0 } }, t("askHint")),
-          ),
-        ) : null,
+        comparePapers.length > 0 ? selectionPanel : null,
+        comparePapers.length > 0 ? annotationsPanel : null,
 
-        // The annotation list is rendered whenever a paper is open, not only when a
-        // selection exists: its purpose is to show what the reader has already marked,
-        // which is exactly the moment there is no selection.
-        reader !== null || comparePapers.length > 0 ? h("div", { style: { padding: "8px 12px 0", display: "flex", flexDirection: "column", gap: 6 } },
-          h("div", { className: "pt-toolbar" },
-            h("span", { className: "pt-h2" }, `${t("annotationList")} · ${annotations.length}`),
-            h("div", { className: "pt-spacer" }),
-            h(Button, { onClick: loadAnnotations, disabled: busy !== null }, "↻"),
-          ),
-          annotations.length === 0
-            ? h("p", { className: "pt-caption", style: { margin: 0 } }, t("annotationNone"))
-            : h("ul", { className: "pt-list" }, annotations.map((annotation) => h("li", {
-              key: annotation.annotationId,
-              className: "pt-card",
-              style: { display: "flex", flexDirection: "column", gap: 4 },
-            },
-              h("div", { className: "pt-caption" },
-                `${t("page")} ${annotation.pageIndex + 1}` +
-                  (annotation.tags.length > 0 ? ` · ${annotation.tags.join(" / ")}` : "")),
-              annotation.quote !== ""
-                ? h("p", { className: "pt-body", style: { margin: 0, wordBreak: "break-word" } }, annotation.quote)
-                : null,
-              annotation.note !== ""
-                ? h("p", { className: "pt-caption", style: { margin: 0, wordBreak: "break-word" } }, annotation.note)
-                : null,
-              h("div", { className: "pt-toolbar" },
-                // Promoting is offered but only works for an annotation that actually
-                // quotes something; the host refuses the rest and explains why.
-                h(Button, {
-                  disabled: busy !== null,
-                  onClick: async () => {
-                    const result = await callRemote(sessionId, "promoteAnnotation", {
-                      annotationId: annotation.annotationId,
-                    }).catch((promoteError) => ({ ok: false, reason: promoteError?.message ?? "" }));
-                    setAnnotationMessage(result?.ok ? t("annotationSaved") : (result?.reason ?? ""));
-                    if (result?.ok) await loadEvidence();
-                  },
-                }, t("annotationPromote")),
-                h("div", { className: "pt-spacer" }),
-                h(Button, {
-                  disabled: busy !== null,
-                  onClick: async () => {
-                    await removeAnnotation(annotation.annotationId);
-                  },
-                }, t("annotationDelete")),
-              ),
-            ))),
-        ) : null,
+        reader === null && comparePapers.length === 0 && mode === "topics" ? renderTopics() : null,
 
-        candidates !== null ? h("div", { style: { padding: "10px 12px 0", display: "flex", flexDirection: "column", gap: 8 } },
+        mode === "external" && candidates === null && busy !== "search" ? h(Empty, { title: t("discoverStart") }) : null,
+        reader === null && (mode === "external" || mode === "cnki") && candidates !== null ? h("div", { style: { padding: "10px 12px 0", display: "flex", flexDirection: "column", gap: 8 } },
           h("div", { className: "pt-toolbar" },
             h("span", { className: "pt-h2" },
               `${mode === "cnki" ? t("cnki") : t("external")} · ${candidates.length}`),
@@ -4503,54 +6573,140 @@ function describeError(error, t) {
           mode === "external" ? h("p", { className: "pt-caption", style: { margin: 0 } }, t("metadataOnlyNote")) : null,
           candidates.length === 0
             ? h(Empty, { title: t("noCandidates") })
-            : h("ul", { className: "pt-list" }, candidates.map((candidate, index) => h("li", {
-              key: `${candidate.doi || candidate.title}-${index}`,
-            },
-              h("label", { className: "pt-card", style: { display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" } },
-                h("input", {
-                  type: "checkbox", checked: picked[index] === true,
-                  style: { marginTop: 3 },
-                  onChange: (event) => setPicked((current) => ({ ...current, [index]: event.target.checked })),
-                }),
-                h("span", { className: "pt-row-main" },
-                  h("span", { className: "pt-h2", style: { display: "block", color: "var(--dsw-alias-label-primary)", wordBreak: "break-word" } }, candidate.title),
-                  h("span", { className: "pt-meta", style: { display: "block", marginTop: 2 } },
-                    [
-                      candidate.authors,
-                      candidate.year,
-                      candidate.venue,
-                      candidate.source,
-                      candidate.doi,
-                      // A known zero and an unknown count must read differently. arXiv and
-                      // PubMed publish no counts, so their candidates carry no number at all
-                      // — writing "0 引用" would state a fact the source never provided, and
-                      // would make a brand-new preprint look discredited.
-                      candidate.citations === undefined || candidate.citations === null
-                        ? null
-                        : t("citationCount", { n: candidate.citations }),
-                    ].filter(Boolean).join(" · ")),
-                  candidate.abstract
-                    ? h("span", { className: "pt-meta", style: { display: "block", marginTop: 4 } }, candidate.abstract.slice(0, 220))
-                    : null,
+            : h("ul", { className: "pt-list" }, candidates.map((candidate, index) => {
+              const candKey = `${candidate.doi || candidate.title}-${index}`;
+              const inLibrary = findLibraryPaper(candidate, papers);
+              const expanded = expandedAbstracts[candKey] === true;
+              const abstractText = String(candidate.abstract ?? "");
+              return h("li", {
+                key: candKey,
+                className: "pt-card",
+                style: { display: "flex", flexDirection: "column", gap: 6 },
+              },
+                h("label", { style: { display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" } },
+                  h("input", {
+                    type: "checkbox", checked: picked[index] === true,
+                    style: { marginTop: 3 },
+                    onChange: (event) => setPicked((current) => ({ ...current, [index]: event.target.checked })),
+                  }),
+                  h("span", { className: "pt-row-main" },
+                    h("span", { className: "pt-h2", style: { display: "block", color: "var(--dsw-alias-label-primary)", wordBreak: "break-word" } }, candidate.title),
+                    h("span", { className: "pt-meta", style: { display: "block", marginTop: 2 } },
+                      [
+                        candidate.authors,
+                        candidate.year,
+                        candidate.venue,
+                        candidate.source,
+                        candidate.doi,
+                        // A known zero and an unknown count must read differently. arXiv and
+                        // PubMed publish no counts, so their candidates carry no number at all
+                        // — writing "0 引用" would state a fact the source never provided, and
+                        // would make a brand-new preprint look discredited.
+                        candidate.citations === undefined || candidate.citations === null
+                          ? null
+                          : t("citationCount", { n: candidate.citations }),
+                      ].filter(Boolean).join(" · ")),
+                  ),
                 ),
-              ),
-            ))),
+                abstractText !== "" ? h("div", { style: { paddingLeft: 22 } },
+                  h("p", { className: "pt-meta", style: { margin: 0, wordBreak: "break-word" } },
+                    expanded ? abstractText : abstractText.slice(0, 220) + (abstractText.length > 220 ? "…" : "")),
+                  abstractText.length > 220 ? h(Button, {
+                    variant: "ghost",
+                    onClick: () => setExpandedAbstracts((prev) => ({ ...prev, [candKey]: !expanded })),
+                  }, expanded ? t("hideAbstract") : t("toggleAbstract")) : null,
+                ) : null,
+                h("div", { className: "pt-toolbar", style: { paddingLeft: 22 } },
+                  mode === "external" && /^https?:\/\//i.test(candidate.pdfUrl ?? "")
+                    ? h("a", { className: "pt-btn pt-btn-ghost", href: candidate.pdfUrl, target: "_blank", rel: "noopener noreferrer" }, t("sourcePdf")) : null,
+                  inLibrary
+                    ? h(React.Fragment, null,
+                      h(Badge, { tone: "support" }, t("alreadyInLibrary")),
+                      inLibrary.pdfPath ? h(Button, { onClick: () => openReader({ paperId: inLibrary.paperId, title: inLibrary.title, pageIndex: 0, paper: inLibrary }), disabled: busy !== null }, t("open"))
+                        : status?.limits?.attachPdf === true ? h("label", { className: "pt-btn pt-btn-ghost", style: { position: "relative" } }, t("attachPdf"),
+                          h("input", { type: "file", accept: "application/pdf", disabled: busy !== null, "aria-label": t("attachPdf"),
+                            style: { position: "absolute", inset: 0, width: "100%", opacity: 0, cursor: "pointer" },
+                            onChange: (event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void doImport([file], inLibrary.paperId); } })) : null)
+                    : h(Button, {
+                      onClick: () => { void quickImportCandidate(candidate); },
+                      disabled: busy !== null,
+                    }, t("oneClickImport")),
+                  h(Button, {
+                    variant: "ghost",
+                    onClick: () => jumpToSearchFromTopic(candidate.title, "external"),
+                    disabled: busy !== null,
+                  }, t("findSimilarPapers")),
+                ),
+              );
+            })),
         ) : null,
 
         // Hidden for a single reader (which wants the whole column) but NOT for the
         // compare set: adding the second paper requires the list to be reachable.
         // Hiding it made the feature a one-shot.
-        reader !== null ? null : h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 8 } },
-          h("div", { className: "pt-toolbar" },
-            h("span", { className: "pt-caption pt-num" }, hits !== null
-              ? `${hits.length} ${t("total")}`
-              : t("statusLine", {
-                papers: papers.length,
-                pages: status?.library?.pages ?? 0,
-                evidence: status?.library?.evidence ?? 0,
-              })),
+        reader !== null || mode !== "library" ? null : h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 8 } },
+          (() => {
+            if (lastReadDismissed || !lastRead || comparePapers.length > 0) return null;
+            const targetPaper = papers.find((p) => p.paperId === lastRead.paperId);
+            if (!targetPaper || !targetPaper.pdfPath) return null;
+            return h("div", { className: "pt-continue-bar" },
+              h("button", {
+                type: "button",
+                className: "pt-btn pt-btn-ghost",
+                style: { flex: 1, minWidth: 0, justifyContent: "flex-start", overflow: "hidden", textOverflow: "ellipsis" },
+                onClick: () => openReader({
+                  paperId: targetPaper.paperId,
+                  title: targetPaper.title,
+                  pageIndex: lastRead.pageIndex,
+                  quote: null,
+                  paper: targetPaper,
+                }),
+              }, t("continueReading", { title: targetPaper.title || lastRead.title, page: lastRead.pageIndex + 1 })),
+              h(Button, {
+                variant: "ghost", icon: true, label: t("dismiss"),
+                onClick: () => setLastReadDismissed(true),
+              }, "×"),
+            );
+          })(),
+          hits !== null ? h("div", { className: "pt-toolbar" },
+            h("span", { className: "pt-caption pt-num" }, `${hits.length} ${t("total")}`),
+          ) : null,
+          papers.length > 0 ? h("div", { className: "pt-status-bar" },
+            [
+              ["all", `${t("statusAll")} (${statusCounts.all})`],
+              ["starred", `⭐ ${statusCounts.starred}`],
+              ["unread", `${t("statusUnread")} ${statusCounts.unread}`],
+              ["reading", `${t("statusReading")} ${statusCounts.reading}`],
+              ["read", `${t("statusRead")} ${statusCounts.read}`],
+            ].map(([fid, flabel]) => h("button", {
+              key: fid,
+              type: "button",
+              className: statusFilter === fid ? "pt-chip pt-btn-primary" : "pt-chip",
+              onClick: () => setStatusFilter(fid),
+            }, flabel)),
             h("div", { className: "pt-spacer" }),
-            h(Button, { variant: "ghost", onClick: refresh, disabled: busy !== null }, t("reload")),
+            filteredList.length > 0 ? h(Button, {
+              variant: "ghost",
+              onClick: () => setSelectedPaperIds(filteredList.map((paper) => paper.paperId)),
+            }, t("selectAll")) : null,
+            selectedPaperIds.length > 0 ? h(Button, {
+              variant: "ghost",
+              onClick: clearPaperSelection,
+            }, t("clearWorkingSet")) : null,
+            h("select", {
+              className: "pt-select",
+              style: { width: "auto", minHeight: 24, padding: "1px 6px", fontSize: 11 },
+              value: sortOrder,
+              "aria-label": t("sortBy"),
+              onChange: (event) => setSortOrder(event.target.value),
+            },
+              h("option", { value: "recent" }, t("sortRecent")),
+              h("option", { value: "year" }, t("sortYearDesc")),
+              h("option", { value: "title" }, t("sortTitleAsc")),
+            ),
+          ) : null,
+          h("div", { className: selectedPaperIds.length > 0 || showLibTools ? undefined : "pt-collapsed" },
+            renderCrossPaperBar(),
           ),
           list.length === 0
             ? (hits !== null
@@ -4560,54 +6716,216 @@ function describeError(error, t) {
                 hint: t("emptyHint"),
                 action: h(Button, { variant: "primary", onClick: () => fileInputRef.current?.click() }, t("import")),
               }))
-            : h("ul", { className: "pt-list" }, list.map((paper) => h(PaperCard, {
-              key: paper.paperId,
-              paper,
-              t,
-              busy,
-              onOpen: openReader,
-          onCompare: addToCompare,
-              onEdit: openEditor,
-              onReextract: reextractOne,
-              onEnrich: enrichOne,
-              onReocr: reocrOne,
-              onConfirm: confirmOne,
-              onDelete: deletePaper,
-            }))),
-          // Only offered when there is more: a button that does nothing is worse
-          // than no button. Hidden while a search is showing, because those results
-          // are not paged at all.
-          hits === null && paperPaging.hasMore
-            ? h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
-              h(Button, {
-                onClick: loadMorePapers,
-                disabled: busy !== null || paperPaging.loading,
-              }, paperPaging.loading
-                ? t("loadingMore")
-                : t("loadMore", { shown: papers.length, total: paperPaging.total })),
-              h("span", { className: "pt-caption" },
-                t("loadedOf", { shown: papers.length, total: paperPaging.total })))
-            : null,
+            : h("div", { className: "pt-lib-split" },
+              inspectedDetail ? null : h("div", { className: "pt-lib-list" },
+                filteredList.length === 0
+                  ? h(Empty, { title: t("noResults") })
+                  : h("ul", { className: "pt-list" }, filteredList.map((paper) => {
+                    const meta = getPaperMeta(projectStore.paperMeta, paper.paperId);
+                    const pNames = meta.projects.map((id) => projectNameById.get(id)).filter(Boolean);
+                    return h(PaperCard, {
+                      key: paper.paperId,
+                      paper,
+                      selected: selectedPaperIds.includes(paper.paperId),
+                      starred: meta.starred,
+                      readStatus: meta.status,
+                      projectNames: pNames,
+                      inspected: inspectedDetail?.paperId === paper.paperId,
+                      onToggleSelect: togglePaperSelection,
+                      onToggleStar: togglePaperStar,
+                      onCycleStatus: cyclePaperStatus,
+                      onInspect: inspectPaper,
+                      t,
+                      busy,
+                      // Read straight from the ref: a toggle must not re-render
+                      // the list, and the card re-reads this whenever it mounts.
+                      hitPagesOpen: hitPagesRef.current.ids.has(paper.paperId),
+                      onHitPagesToggle: (paperId, open) => {
+                        const ids = hitPagesRef.current.ids;
+                        if (open) ids.add(paperId);
+                        else ids.delete(paperId);
+                      },
+                      onOpenHit: openReaderFromHit,
+                      onOpen: openReader,
+                      onCompare: addToCompare,
+                      onEdit: openEditor,
+                      onReextract: reextractOne,
+                      onEnrich: enrichOne,
+                      onReocr: reocrOne,
+                      onConfirm: confirmOne,
+                      onDelete: deletePaper,
+                      // Capability-gated: without Host support an attach would
+                      // become a second, duplicate paper, so the card gets no
+                      // attach affordance at all rather than a broken one.
+                      onAttach: status?.limits?.attachPdf === true ? doImport : undefined,
+                    });
+                  })),
+                hits === null && paperPaging.hasMore
+                  ? h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+                    h(Button, {
+                      onClick: loadMorePapers,
+                      disabled: busy !== null || paperPaging.loading,
+                    }, paperPaging.loading
+                      ? t("loadingMore")
+                      : t("loadMore", { shown: papers.length, total: paperPaging.total })),
+                    h("span", { className: "pt-caption" },
+                      t("loadedOf", { shown: papers.length, total: paperPaging.total })))
+                  : null,
+              ),
+              inspectedDetail ? h("aside", { className: "pt-lib-inspector" },
+                h("div", { className: "pt-toolbar" },
+                  h("span", { className: "pt-caption" }, t("inspectorTitle")),
+                  h("div", { className: "pt-spacer" }),
+                  h("button", {
+                    type: "button",
+                    className: "pt-star-btn",
+                    "aria-label": t("starToggleAria"),
+                    onClick: () => togglePaperStar(inspectedDetail.paperId),
+                  }, inspectedMeta?.starred ? "★" : "☆"),
+                  h("button", {
+                    type: "button",
+                    className: `pt-status-pill pt-status-${inspectedMeta?.status || "unread"}`,
+                    onClick: () => cyclePaperStatus(inspectedDetail.paperId),
+                  }, inspectedMeta?.status === "read" ? t("statusRead") : inspectedMeta?.status === "reading" ? t("statusReading") : t("statusUnread")),
+                  // Explicit close. The pane is opened by a click on a card, so it
+                  // must be closable by a click too — before this, the only way out
+                  // was opening the reader or switching tabs.
+                  h(Button, {
+                    variant: "ghost", label: t("inspectorClose"),
+                    onClick: () => { setInspectedPaperId(null); restoreHitFocus(`pt-inspect-${inspectedDetail.paperId}`); },
+                  }, t("inspectorClose")),
+                ),
+                h("div", { className: "pt-h1", style: { wordBreak: "break-word" } }, inspectedDetail.title || t("unknownPaper")),
+                h("div", { className: "pt-meta", style: { wordBreak: "break-word" } },
+                  [inspectedDetail.authors, inspectedDetail.year, inspectedDetail.venue, inspectedDetail.doi].filter(Boolean).join(" · ")),
+                h("div", { className: "pt-toolbar" },
+                  h(Button, {
+                    variant: "primary",
+                    disabled: !inspectedDetail.pdfPath || busy === "open",
+                    onClick: () => openReader({
+                      paperId: inspectedDetail.paperId,
+                      title: inspectedDetail.title,
+                      pageIndex: 0,
+                      quote: null,
+                      paper: inspectedDetail,
+                    }),
+                  }, t("inspectorOpenReader")),
+                  inspectedDetail.pdfPath ? h(Button, {
+                    onClick: () => addToCompare({
+                      paperId: inspectedDetail.paperId,
+                      title: inspectedDetail.title,
+                      pageIndex: 0,
+                      quote: null,
+                      paper: inspectedDetail,
+                    }),
+                    disabled: busy !== null,
+                  }, t("compareAdd")) : null,
+                  h(Button, {
+                    variant: "ghost",
+                    onClick: () => openEditor(inspectedDetail),
+                    disabled: busy !== null,
+                  }, t("editMeta")),
+                ),
+                projectStore.projects.length > 0 ? h("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" } },
+                  h("span", { className: "pt-caption" }, t("inspectorProjects")),
+                  ...projectStore.projects.map((proj) => {
+                    const active = inspectedMeta?.projects.includes(proj.id);
+                    return h("button", {
+                      key: proj.id,
+                      type: "button",
+                      className: active ? "pt-chip pt-btn-primary" : "pt-chip",
+                      onClick: () => assignPaperProject(inspectedDetail.paperId, proj.id, !active),
+                    }, `${active ? "✓ " : ""}${proj.name}`);
+                  }),
+                ) : null,
+                h("div", { style: { display: "flex", flexDirection: "column", gap: 3 } },
+                  h("span", { className: "pt-h2" }, t("inspectorAbstract")),
+                  h("p", { className: "pt-caption", style: { margin: 0, wordBreak: "break-word" } },
+                    inspectedDetail.abstract ? inspectedDetail.abstract : t("inspectorAbstractNone")),
+                ),
+                h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+                  h("div", { className: "pt-toolbar" },
+                    h("span", { className: "pt-h2" }, t("inspectorReadingCard")),
+                    h("div", { className: "pt-spacer" }),
+                    h(Button, {
+                      variant: "ghost",
+                      onClick: () => aiGenerateReadingCard(inspectedDetail),
+                      disabled: !inputActions || busy !== null,
+                    }, t("aiBuildReadingCard")),
+                  ),
+                  inspectedCards.length === 0
+                    ? h("p", { className: "pt-caption", style: { margin: 0 } }, t("readingCardEmpty"))
+                    : inspectedCards.map((card) => h("div", { key: card.annotationId, className: "pt-card", style: { whiteSpace: "pre-wrap", wordBreak: "break-word" } },
+                      h("span", { className: "pt-caption" }, card.note))),
+                ),
+                h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+                  h("span", { className: "pt-h2" }, t("inspectorMarks", { n: inspectedEvidence.length + inspectedAnns.length })),
+                  inspectedEvidence.length === 0 && inspectedAnns.length === 0
+                    ? h("p", { className: "pt-caption", style: { margin: 0 } }, t("noResults"))
+                    : h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+                      inspectedEvidence.slice(0, 6).map((row) => h("button", {
+                        key: row.evidenceId,
+                        type: "button",
+                        className: "pt-card",
+                        style: { textAlign: "left", cursor: "pointer", padding: "5px 7px" },
+                        onClick: () => openReader({
+                          paperId: inspectedDetail.paperId,
+                          title: inspectedDetail.title,
+                          pageIndex: row.pageIndex,
+                          quote: row.quote,
+                          paper: inspectedDetail,
+                        }),
+                      }, h("span", { className: "pt-caption" }, `p.${row.pageIndex + 1} · ${row.quote}`))),
+                      inspectedAnns.slice(0, 4).map((row) => h("button", {
+                        key: row.annotationId,
+                        type: "button",
+                        className: "pt-card",
+                        style: { textAlign: "left", cursor: "pointer", padding: "5px 7px" },
+                        onClick: () => openReader({
+                          paperId: inspectedDetail.paperId,
+                          title: inspectedDetail.title,
+                          pageIndex: row.pageIndex,
+                          quote: row.quote || null,
+                          paper: inspectedDetail,
+                        }),
+                      }, h("span", { className: "pt-caption" }, `p.${row.pageIndex + 1} · ${row.note || row.quote}`))),
+                    ),
+                ),
+              ) : null,
+            ),
         ),
         // Backup lives at the bottom of the library view: it is about this library,
         // not about one paper, and it is maintenance rather than daily work.
-        h("hr", { className: "pt-divider" }),
-        backupPanel(),
+        h("div", { className: (focusMode && reader !== null) || !showLibTools ? "pt-collapsed" : undefined },
+          h("hr", { className: "pt-divider" }),
+          backupPanel(),
+        ),
       );
+      };
 
       const renderEvidence = () => {
+        const unanchoredWarnCount = evidencePaging.unanchoredCount ?? excludedCount;
+        const evidenceByPaper = new Map(evidenceGroups);
+        const matrixPaperIds = workingSetPaperIds
+          ? [...new Set([...workingSetPaperIds, ...evidenceGroups.map(([pid]) => pid)])]
+          : evidenceGroups.map(([pid]) => pid);
+
         const evidenceList = evidenceGroups.length === 0
           ? h(Empty, { title: t("noResults") })
           : h("div", { style: { display: "flex", flexDirection: "column", gap: 10 } },
             evidenceGroups.map(([paperId, rows]) => h("section", { key: paperId },
               h("div", { className: "pt-toolbar", style: { marginBottom: 2 } },
                 h("span", { className: "pt-h2", style: { flex: 1, minWidth: 0, wordBreak: "break-word" } },
-                  rows[0].paperTitle || paperId),
+                  formatPaperLocator(paperById.get(paperId), null, rows[0].paperTitle || paperId)),
                 h("span", { className: "pt-caption pt-num" }, `${rows.length}`),
               ),
               h("div", { style: { borderTop: "1px solid var(--dsw-alias-border-l1)" } },
                 rows.map((row) => h(EvidenceRow, {
-                  key: row.evidenceId, row, t, busy,
+                  key: row.evidenceId,
+                  row,
+                  paper: paperById.get(row.paperId),
+                  t,
+                  busy,
                   onJump: jumpToEvidence,
                   onDelete: removeEvidence,
                 })),
@@ -4615,10 +6933,73 @@ function describeError(error, t) {
             )),
           );
 
+        const evidenceMatrixView = matrixPaperIds.length === 0
+          ? h(Empty, { title: t("noResults") })
+          : h("div", { style: { overflowX: "auto" } },
+            h("table", { className: "pt-cmp-table" },
+              h("thead", null,
+                h("tr", null,
+                  h("th", null, t("matrixColPaper")),
+                  h("th", null, t("matrixColCard")),
+                  h("th", null, t("matrixColEvidence")),
+                  h("th", null, t("matrixColClaims")),
+                ),
+              ),
+              h("tbody", null, matrixPaperIds.map((pid) => {
+                const paper = paperById.get(pid);
+                const rows = evidenceByPaper.get(pid) ?? [];
+                const rowIds = new Set(rows.map((r) => r.evidenceId));
+                const cardNote = annotations.find((a) => a.paperId === pid && isReadingCardAnnotation(a))
+                  ?? annotations.find((a) => a.paperId === pid && String(a.note ?? "").trim() !== "");
+                const linkedClaims = claims.filter((c) => (c.evidence ?? []).some((e) => rowIds.has(e.evidenceId)));
+                return h("tr", { key: pid },
+                  h("td", null,
+                    h("div", { style: { fontWeight: 500 } }, formatPaperLocator(paper, null, rows[0]?.paperTitle || pid)),
+                  ),
+                  h("td", null,
+                    cardNote?.note
+                      ? h("span", { className: "pt-caption" }, String(cardNote.note).slice(0, 140) + (String(cardNote.note).length > 140 ? "…" : ""))
+                      : h("span", { className: "pt-caption" }, "—"),
+                  ),
+                  h("td", null,
+                    rows.length === 0
+                      ? h("span", { className: "pt-caption" }, "—")
+                      : h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+                        rows.slice(0, 4).map((row) => h("button", {
+                          key: row.evidenceId,
+                          type: "button",
+                          className: "pt-chip",
+                          style: { borderRadius: 6, textAlign: "left", whiteSpace: "normal", height: "auto" },
+                          onClick: () => jumpToEvidence(row),
+                        }, `p.${row.pageIndex + 1}: ${String(row.quote ?? "").slice(0, 65)}${String(row.quote ?? "").length > 65 ? "…" : ""}`)),
+                      ),
+                  ),
+                  h("td", null,
+                    linkedClaims.length === 0
+                      ? h("span", { className: "pt-caption" }, "—")
+                      : h("div", { style: { display: "flex", flexDirection: "column", gap: 3 } },
+                        linkedClaims.map((claim) => h("span", { key: claim.claimId, className: "pt-caption" }, `• ${claim.text}`)),
+                      ),
+                  ),
+                );
+              })),
+            ),
+          );
+
         const filterBar = h("div", { className: "pt-toolbar" },
           h("span", { className: "pt-caption pt-num" },
             `${evidenceGroups.length} ${t("paperCount")} · ${evidence.length} ${t("evidenceCount")} · ${anchoredTotal} ${t("anchoredCount")}`),
           h("div", { className: "pt-spacer" }),
+          h("div", { className: "pt-seg" },
+            h(Button, {
+              variant: evidenceViewMode === "matrix" ? "primary" : "ghost",
+              onClick: () => setEvidenceViewMode("matrix"),
+            }, t("evidenceViewMatrix")),
+            h(Button, {
+              variant: evidenceViewMode === "list" ? "primary" : "ghost",
+              onClick: () => setEvidenceViewMode("list"),
+            }, t("evidenceViewList")),
+          ),
           // These switch the Host-side filter and reload page one. Filtering the
           // loaded rows in the browser would have answered a different question:
           // it would show the anchored rows *on this page*, while the label claims
@@ -4638,8 +7019,16 @@ function describeError(error, t) {
         );
 
         const evidenceBody = evidence.length === 0
-          ? h(Empty, { title: t("evidenceEmpty"), hint: t("evidenceEmptyHint") })
-          : h(React.Fragment, null, filterBar, evidenceList,
+          ? h(Empty, {
+            title: t("evidenceEmpty"),
+            hint: t("evidenceEmptyHint"),
+            action: h(Button, {
+              variant: "primary",
+              onClick: () => { setView("library"); switchMode("library"); setNote(""); },
+            }, t("goToLibrary")),
+          })
+          : h(React.Fragment, null, filterBar,
+            evidenceViewMode === "matrix" ? evidenceMatrixView : evidenceList,
             evidencePaging.hasMore
               ? h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
                 h(Button, {
@@ -4656,113 +7045,159 @@ function describeError(error, t) {
               : null);
 
         return h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 10 } },
+        renderCrossPaperBar(),
         h("div", { className: "pt-toolbar" },
           h("input", {
             className: "pt-input pt-toolbar-grow",
             value: collectQuery, placeholder: t("collectPlaceholder"), "aria-label": t("collectPlaceholder"),
             onChange: (event) => setCollectQuery(event.target.value),
-            onKeyDown: (event) => { if (event.key === "Enter") collectEvidence(); },
+            onKeyDown: (event) => { if (event.key === "Enter" && !isImeCommit(event)) collectEvidence(); },
           }),
           h(Button, { variant: "primary", onClick: collectEvidence, disabled: busy !== null || collectQuery.trim() === "" },
             t("collect")),
         ),
         h("p", { className: "pt-caption", style: { margin: 0 } }, t("collectHint")),
+        unanchoredWarnCount > 0 ? h(Banner, { tone: "warn" }, t("unanchoredWarning", { n: unanchoredWarnCount })) : null,
         evidenceBody,
 
         h("hr", { className: "pt-divider" }),
-        h("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
-          h("div", { className: "pt-toolbar" },
-            h("span", { className: "pt-h2" }, t("matrix")),
-            h("div", { className: "pt-spacer" }),
-            h(Button, { variant: "ghost", onClick: () => checkMatrix(""), disabled: busy !== null }, t("coverage")),
-          ),
-          h("div", { className: "pt-toolbar" },
-            h("input", {
-              className: "pt-input pt-toolbar-grow",
-              value: matrixClaim, placeholder: t("claimPlaceholder"), "aria-label": t("claimPlaceholder"),
-              onChange: (event) => setMatrixClaim(event.target.value),
-              onKeyDown: (event) => { if (event.key === "Enter") checkMatrix(matrixClaim); },
-            }),
-            h(Button, { variant: "primary", onClick: () => checkMatrix(matrixClaim), disabled: busy !== null },
-              busy === "matrix" ? t("searching") : t("checkStance")),
-          ),
-          matrix ? h("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
-            matrix.text ? h("p", { className: "pt-meta", style: { margin: 0 } }, matrix.text.split("\n").slice(0, 2).join(" ")) : null,
-            (matrix.rows ?? []).length === 0
-              ? h(Empty, { title: t("noResults") })
-              : h("ul", { className: "pt-list" }, matrix.rows.map((row) => {
-                const jumpId = row.evidenceIds?.[0] ?? row.notFoundEvidenceIds?.[0] ?? null;
-                const target = jumpId === null ? null : evidence.find((item) => item.evidenceId === jumpId);
-                return h("li", { key: row.paperId, className: "pt-card" },
-                  h("div", { style: { display: "flex", gap: 6, alignItems: "flex-start" } },
-                    h("span", { className: "pt-body", style: { flex: 1, minWidth: 0, wordBreak: "break-word" } }, row.title),
-                    h(StanceBadge, { stance: row.stance, strength: row.strength, t }),
-                  ),
-                  h("div", { style: { display: "flex", gap: 8, alignItems: "center", marginTop: 4 } },
-                    h("span", { className: "pt-caption pt-num" },
-                      `+${row.supportCount ?? 0} · −${row.conflictCount ?? 0} · ?${row.notFoundCount ?? 0}`),
-                    h("div", { className: "pt-spacer" }),
-                    target !== undefined ? h(Button, {
-                      variant: "ghost", icon: true, label: t("jumpToPage"),
-                      onClick: () => jumpToEvidence(target),
-                    }, "↗") : null,
-                    // The real motivation for PT-020: the matrix already says "3 papers
-                    // support this, 1 conflicts", but to read what those 4 actually said
-                    // the user had to open them one at a time and remember the previous
-                    // sentence. This opens the row's paper beside whatever is currently
-                    // open, landing on the evidence the matrix is pointing at.
-                    h(Button, {
-                      variant: "ghost",
-                      label: t("compareFromMatrix"),
-                      onClick: () => {
-                        const landing = target ?? null;
-                        // Current context first: whichever paper is open in the single
-                        // reader, or the focused pane. Otherwise the click would produce
-                        // a lone pane and there would be nothing to compare against.
-                        const context = reader !== null
-                          ? reader
-                          : (comparePapers.find((paper) => paper.paperId === compareFocus) ?? null);
-                        // A comparison needs two DIFFERENT papers. When the row's paper is
-                        // already the one being read, bring in another paper from the same
-                        // matrix instead of adding a duplicate — otherwise the click lands
-                        // on a single pane and looks like it did nothing.
-                        if (context === null || context.paperId === row.paperId) {
-                          const sibling = (matrix?.rows ?? []).find((candidate) => candidate.paperId !== row.paperId);
-                          if (sibling === undefined) return;
-                          addToCompare({
-                            paperId: sibling.paperId,
-                            title: sibling.title,
-                            pageIndex: 0,
-                            quote: null,
-                            paper: { paperId: sibling.paperId, title: sibling.title },
-                          });
-                        } else {
-                          addToCompare(context);
-                        }
-                        addToCompare({
-                          paperId: row.paperId,
-                          title: row.title,
-                          pageIndex: landing === null ? 0 : landing.pageIndex,
-                          quote: landing === null ? null : landing.quote,
-                          paper: { paperId: row.paperId, title: row.title },
-                        });
-                      },
-                    }, t("compareFromMatrix")),               ),
-                  // The reasons behind this row's verdict. Without them the matrix
-                  // is a set of numbers the reviewer has to take on faith; with
-                  // them it is a list of passages to go read, which is what a
-                  // stance judgement is actually for.
-                  (row.judgements ?? []).length === 0 ? null : h("ul", {
-                    className: "pt-caption",
-                    style: { margin: "4px 0 0", paddingLeft: 16 },
-                  }, row.judgements.slice(0, 3).map((judgement) => h("li",
-                    { key: judgement.evidenceId, style: { marginTop: 2 } },
-                    h("span", { className: "pt-caption" },
-                      `${judgement.stance === "conflict" ? "✕" : judgement.stance === "support" ? "✓" : "?"} ${judgement.rationale}`)))),
-                );
-              })),
-          ) : null,
-        ),
+        (() => {
+          const matrixExpanded = showMatrixTools || matrix !== null || claims.length > 0;
+          return h("div", { className: "pt-card-accent" },
+            h("div", { className: "pt-toolbar" },
+              h("span", { className: "pt-h2" }, t("matrix")),
+              h(Badge, { tone: "info" }, t("rulePrecheckBadge")),
+              h("div", { className: "pt-spacer" }),
+              h("button", {
+                type: "button",
+                className: "pt-btn pt-btn-ghost",
+                "aria-expanded": matrixExpanded ? "true" : "false",
+                onClick: () => setShowMatrixTools((v) => !v),
+              }, matrixExpanded ? t("matrixToggleHide") : t("matrixToggleShow")),
+            ),
+            h("div", {
+              className: matrixExpanded ? undefined : "pt-collapsed",
+              style: { display: "flex", flexDirection: "column", gap: 8 },
+            },
+              h("div", { className: "pt-toolbar" },
+                h("input", {
+                  className: "pt-input pt-toolbar-grow",
+                  value: matrixClaim, placeholder: t("claimPlaceholder"), "aria-label": t("claimPlaceholder"),
+                  onChange: (event) => setMatrixClaim(event.target.value),
+                  onKeyDown: (event) => { if (event.key === "Enter" && !isImeCommit(event)) checkMatrix(matrixClaim); },
+                }),
+                h(Button, { variant: "primary", onClick: () => checkMatrix(matrixClaim), disabled: busy !== null },
+                  busy === "matrix" ? t("searching") : t("checkStance")),
+                h(Button, { variant: "ghost", onClick: () => checkMatrix(""), disabled: busy !== null }, t("coverage")),
+                h(Button, {
+                  onClick: saveClaim,
+                  disabled: busy !== null || (matrixClaim.trim() === "" && (matrix?.claim ?? "").trim() === ""),
+                }, busy === "claim" ? t("saving") : t("saveClaim")),
+                h(Button, {
+                  variant: "ghost",
+                  onClick: aiSemanticStanceCheck,
+                  disabled: !inputActions || busy !== null || matrixClaim.trim() === "",
+                }, t("aiStanceCheck")),
+              ),
+              claims.length > 0 ? h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+                h("span", { className: "pt-caption pt-num" },
+                  `${t("storedClaims")} · ${claimsSummary?.total ?? claims.length}`),
+                h("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
+                  claims.map((claim) => h("button", {
+                    key: claim.claimId,
+                    type: "button",
+                    className: "pt-btn",
+                    style: { maxWidth: "100%", textAlign: "left", whiteSpace: "normal", height: "auto", padding: "3px 8px" },
+                    onClick: () => {
+                      setMatrixClaim(claim.text);
+                      void checkMatrix(claim.text);
+                    },
+                  },
+                    h("span", { style: { wordBreak: "break-word" } }, claim.text),
+                    h(Badge, { tone: (claim.evidence ?? []).length > 0 ? "info" : "warn" },
+                      `${(claim.evidence ?? []).length}`),
+                  ))),
+              ) : null,
+              matrix ? h("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
+                matrix.text ? h("p", { className: "pt-meta", style: { margin: 0 } }, matrix.text.split("\n").slice(0, 2).join(" ")) : null,
+                (matrix.rows ?? []).length === 0
+                  ? h(Empty, { title: t("noResults") })
+                  : h("ul", { className: "pt-list" }, matrix.rows.map((row) => {
+                    const jumpId = row.evidenceIds?.[0] ?? row.notFoundEvidenceIds?.[0] ?? null;
+                    const target = jumpId === null ? null : evidence.find((item) => item.evidenceId === jumpId);
+                    return h("li", { key: row.paperId, className: "pt-card" },
+                      h("div", { style: { display: "flex", gap: 6, alignItems: "flex-start" } },
+                        h("span", { className: "pt-body", style: { flex: 1, minWidth: 0, wordBreak: "break-word" } }, row.title),
+                        h(StanceBadge, { stance: row.stance, strength: row.strength, t }),
+                      ),
+                      h("div", { style: { display: "flex", gap: 8, alignItems: "center", marginTop: 4 } },
+                        h("span", { className: "pt-caption pt-num" },
+                          `+${row.supportCount ?? 0} · −${row.conflictCount ?? 0} · ?${row.notFoundCount ?? 0}`),
+                        h("div", { className: "pt-spacer" }),
+                        target !== undefined ? h(Button, {
+                          variant: "ghost", icon: true, label: t("jumpToPage"),
+                          onClick: () => jumpToEvidence(target),
+                        }, "↗") : null,
+                        // The real motivation for PT-020: the matrix already says "3 papers
+                        // support this, 1 conflicts", but to read what those 4 actually said
+                        // the user had to open them one at a time and remember the previous
+                        // sentence. This opens the row's paper beside whatever is currently
+                        // open, landing on the evidence the matrix is pointing at.
+                        h(Button, {
+                          variant: "ghost",
+                          label: t("compareFromMatrix"),
+                          onClick: () => {
+                            const landing = target ?? null;
+                            // Current context first: whichever paper is open in the single
+                            // reader, or the focused pane. Otherwise the click would produce
+                            // a lone pane and there would be nothing to compare against.
+                            const context = reader !== null
+                              ? reader
+                              : (comparePapers.find((paper) => paper.paperId === compareFocus) ?? null);
+                            // A comparison needs two DIFFERENT papers. When the row's paper is
+                            // already the one being read, bring in another paper from the same
+                            // matrix instead of adding a duplicate — otherwise the click lands
+                            // on a single pane and looks like it did nothing.
+                            if (context === null || context.paperId === row.paperId) {
+                              const sibling = (matrix?.rows ?? []).find((candidate) => candidate.paperId !== row.paperId);
+                              if (sibling === undefined) return;
+                              addToCompare({
+                                paperId: sibling.paperId,
+                                title: sibling.title,
+                                pageIndex: 0,
+                                quote: null,
+                                paper: { paperId: sibling.paperId, title: sibling.title },
+                              });
+                            } else {
+                              addToCompare(context);
+                            }
+                            addToCompare({
+                              paperId: row.paperId,
+                              title: row.title,
+                              pageIndex: landing === null ? 0 : landing.pageIndex,
+                              quote: landing === null ? null : landing.quote,
+                              paper: { paperId: row.paperId, title: row.title },
+                            });
+                          },
+                        }, t("compareFromMatrix")),
+                      ),
+                      // The reasons behind this row's verdict. Without them the matrix
+                      // is a set of numbers the reviewer has to take on faith; with
+                      // them it is a list of passages to go read, which is what a
+                      // stance judgement is actually for.
+                      (row.judgements ?? []).length === 0 ? null : h("ul", {
+                        className: "pt-caption",
+                        style: { margin: "4px 0 0", paddingLeft: 16 },
+                      }, row.judgements.slice(0, 3).map((judgement) => h("li",
+                        { key: judgement.evidenceId, style: { marginTop: 2 } },
+                        h("span", { className: "pt-caption" },
+                          `${judgement.stance === "conflict" ? "✕" : judgement.stance === "support" ? "✓" : "?"} ${judgement.rationale}`)))),
+                    );
+                  })),
+              ) : null,
+            ),
+          );
+        })(),
       );
       };
 
@@ -4811,7 +7246,10 @@ function describeError(error, t) {
 
         return h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 10 } },
           h("p", { className: "pt-caption", style: { margin: 0 } }, t("translateIntro")),
-          h("div", { className: "pt-toolbar" },
+          // Inside the Reader, the translation target is already bound to the open
+          // paper (`reader.paperId`). Keep the picker in the DOM via `.pt-collapsed`
+          // for test/fallback compatibility without cluttering the reader header.
+          h("div", { className: reader !== null ? "pt-toolbar pt-collapsed" : "pt-toolbar" },
             h("select", {
               className: "pt-select pt-toolbar-grow",
               value: translatePaperId,
@@ -4854,7 +7292,16 @@ function describeError(error, t) {
             h(Button, { onClick: loadSegments, disabled: translateBusy !== null || translatePaperId === "" },
               translateBusy === "segments" ? t("loadingSegments") : t("loadSegments")),
             h(Button, {
-              variant: "primary", onClick: saveTranslations,
+              variant: "primary",
+              onClick: aiTranslateSegments,
+              disabled: translateBusy !== null || translatePaperId === "" || !inputActions,
+            }, t("aiTranslate")),
+            h(Button, {
+              onClick: refreshTranslations,
+              disabled: translateBusy !== null || translatePaperId === "",
+            }, t("refreshTranslations")),
+            h(Button, {
+              onClick: saveTranslations,
               disabled: translateBusy !== null || segments.length === 0,
             }, translateBusy === "save" ? t("saving") : t("saveTranslation")),
           ),
@@ -4896,6 +7343,17 @@ function describeError(error, t) {
           ? 0
           : Math.max(...trend.years.map((row) => row.count), 1);
         return h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 10 } },
+          h("div", { className: "pt-card-accent" },
+            h("div", { className: "pt-h2" }, t("topicResearchGapTitle")),
+            h("p", { className: "pt-caption", style: { margin: 0 } }, t("topicResearchGapDesc")),
+            h("div", { className: "pt-toolbar" },
+              h(Button, {
+                variant: "primary",
+                disabled: !inputActions || papers.length === 0,
+                onClick: () => askCrossPaperChip("请基于当前课题/工作集文献，系统梳理各篇文献承认的研究不足、方法与样本瓶颈以及结论分歧，提炼 3 个具备创新性与可行性的具体研究空白。"),
+              }, t("topicResearchGapAction")),
+            ),
+          ),
           h("div", { className: "pt-toolbar" },
             h("input", {
               className: "pt-input pt-toolbar-grow",
@@ -4903,10 +7361,12 @@ function describeError(error, t) {
               placeholder: t("topicPlaceholder"),
               "aria-label": t("topicPlaceholder"),
               onChange: (event) => setTopicQuery(event.target.value),
-              onKeyDown: (event) => { if (event.key === "Enter") void runTopicRecommend(); },
+              onKeyDown: (event) => { if (event.key === "Enter" && !isImeCommit(event)) void runTopicRecommend(); },
             }),
             h(Button, { variant: "primary", onClick: runTopicRecommend, disabled: topicBusy || topicQuery.trim() === "" },
               topicBusy ? t("topicWorking") : t("topicRecommend")),
+            h(Button, { onClick: aiRecommendTopics, disabled: topicBusy || !inputActions },
+              t("aiTopicRecommend")),
           ),
           // The disclaimer sits above the result, not below it: this is the one
           // screen where a user is most likely to read counted material as a
@@ -4970,17 +7430,31 @@ function describeError(error, t) {
               result.gaps.length === 0
                 ? null
                 : h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
-                  h("span", { className: "pt-h2" }, t("topicGaps")),
-                  ...result.gaps.slice(0, 6).map((gap) => h("div", { key: gap.terms.join("+"), className: "pt-topic-gap" },
-                    h("div", { className: "pt-toolbar" },
-                      h("span", { className: "pt-meta" }, gap.terms.join(" × ")),
-                      h("div", { className: "pt-spacer" }),
-                      h("span", { className: "pt-caption" },
-                        `${t("topicCoOccur")} ${gap.coOccurrences} · ${t("topicIndependent")} ${gap.independentA}/${gap.independentB}`),
-                    ),
-                    // The supporting paper ids, so the claim is checkable.
-                    h("span", { className: "pt-caption pt-num" }, gap.paperIds.slice(0, 6).join(", ")),
-                  )),
+                  h("div", { className: "pt-toolbar" },
+                    h("span", { className: "pt-h2" }, t("topicGaps")),
+                    h("div", { className: "pt-spacer" }),
+                    h("button", {
+                      type: "button",
+                      className: "pt-btn pt-btn-ghost",
+                      "aria-expanded": showTopicGaps ? "true" : "false",
+                      onClick: () => setShowTopicGaps((v) => !v),
+                    }, showTopicGaps ? t("topicHideGaps") : t("topicShowGaps")),
+                  ),
+                  h("div", {
+                    className: showTopicGaps ? undefined : "pt-collapsed",
+                    style: { display: "flex", flexDirection: "column", gap: 4 },
+                  },
+                    ...result.gaps.slice(0, 6).map((gap) => h("div", { key: gap.terms.join("+"), className: "pt-topic-gap" },
+                      h("div", { className: "pt-toolbar" },
+                        h("span", { className: "pt-meta" }, gap.terms.join(" × ")),
+                        h("div", { className: "pt-spacer" }),
+                        h("span", { className: "pt-caption" },
+                          `${t("topicCoOccur")} ${gap.coOccurrences} · ${t("topicIndependent")} ${gap.independentA}/${gap.independentB}`),
+                      ),
+                      // The supporting paper ids, so the claim is checkable.
+                      h("span", { className: "pt-caption pt-num" }, gap.paperIds.slice(0, 6).join(", ")),
+                    )),
+                  ),
                 ),
 
               result.candidates.length === 0
@@ -4998,19 +7472,84 @@ function describeError(error, t) {
                     // Provenance is shown, not hidden: every row names what produced it.
                     h("p", { className: "pt-caption pt-num", style: { margin: 0, opacity: 0.75 } },
                       `${candidate.provenance.kind} · ${(candidate.provenance.paperIds ?? []).length} ${t("topicPapers")}`),
+                    h("div", { className: "pt-toolbar", style: { marginTop: 4 } },
+                      h(Button, {
+                        variant: "primary",
+                        onClick: () => aiExpandTopic(candidate),
+                        disabled: !inputActions,
+                      }, t("aiExpandTopic")),
+                      h(Button, {
+                        variant: "ghost",
+                        onClick: () => {
+                          createProject(candidate.title, true);
+                          switchMode("library");
+                          setView("library");
+                        },
+                      }, t("topicNewProjectFrom")),
+                      h(Button, {
+                        variant: "ghost",
+                        onClick: () => {
+                          const terms = Array.isArray(candidate.provenance?.terms) && candidate.provenance.terms.length > 0
+                            ? candidate.provenance.terms.join(" ")
+                            : String(candidate.title ?? "").replace(/\s*×\s*/g, " ");
+                          jumpToSearchFromTopic(terms || topicQuery, "external");
+                        },
+                      }, t("searchRelatedPapers")),
+                    ),
                   )),
                 ),
 
               result.representatives.length === 0
                 ? null
-                : h("div", { style: { display: "flex", flexDirection: "column", gap: 3 } },
+                : h("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
                   h("span", { className: "pt-h2" }, t("topicRepresentatives")),
-                  ...result.representatives.map((paper, index) => h("div", { key: index, className: "pt-toolbar" },
-                    h("span", { className: "pt-meta" }, paper.title),
-                    h("div", { className: "pt-spacer" }),
-                    h("span", { className: "pt-caption pt-num" },
-                      paper.citations === null ? paper.year : `${paper.year} · ${paper.citations}`),
-                  )),
+                  ...result.representatives.map((paper, index) => {
+                    const repKey = `rep-${paper.doi || paper.title}-${index}`;
+                    const inLibrary = findLibraryPaper(paper, papers);
+                    const libPaper = inLibrary ? papers.find((p) => (p.doi && paper.doi && p.doi.toLowerCase() === paper.doi.toLowerCase()) || String(p.title ?? "").trim().toLowerCase() === String(paper.title ?? "").trim().toLowerCase()) : null;
+                    const activeCustomProj = projectStore.activeProjectId !== "all" && projectStore.activeProjectId !== "starred" && projectStore.activeProjectId !== "unassigned";
+                    const inActiveProj = libPaper && activeCustomProj && getPaperMeta(projectStore.paperMeta, libPaper.paperId).projects.includes(projectStore.activeProjectId);
+                    const abstractText = String(paper.abstract ?? "");
+                    const expanded = expandedAbstracts[repKey] === true;
+                    return h("div", {
+                      key: repKey,
+                      className: "pt-card",
+                      style: { display: "flex", flexDirection: "column", gap: 4, padding: "6px 8px" },
+                    },
+                      h("div", { className: "pt-toolbar" },
+                        h("span", { className: "pt-meta", style: { flex: 1, minWidth: 0, wordBreak: "break-word", color: "var(--dsw-alias-label-primary)" } }, paper.title),
+                        h("span", { className: "pt-caption pt-num" },
+                          paper.citations === null ? paper.year : `${paper.year} · ${paper.citations}`),
+                      ),
+                      abstractText !== "" ? h("div", null,
+                        h("p", { className: "pt-caption", style: { margin: 0, wordBreak: "break-word" } },
+                          expanded ? abstractText : abstractText.slice(0, 180) + (abstractText.length > 180 ? "…" : "")),
+                        abstractText.length > 180 ? h(Button, {
+                          variant: "ghost",
+                          onClick: () => setExpandedAbstracts((prev) => ({ ...prev, [repKey]: !expanded })),
+                        }, expanded ? t("hideAbstract") : t("toggleAbstract")) : null,
+                      ) : null,
+                      h("div", { className: "pt-toolbar" },
+                        inLibrary
+                          ? h(Badge, { tone: "support" }, t("alreadyInLibrary"))
+                          : h(Button, {
+                            onClick: () => { void quickImportCandidate(paper); },
+                            disabled: busy !== null,
+                          }, t("oneClickImport")),
+                        libPaper && activeCustomProj && !inActiveProj
+                          ? h(Button, {
+                            variant: "ghost",
+                            onClick: () => assignPaperProject(libPaper.paperId, projectStore.activeProjectId, true),
+                          }, t("topicAddToProject"))
+                          : null,
+                        h(Button, {
+                          variant: "ghost",
+                          onClick: () => jumpToSearchFromTopic(paper.title, "external"),
+                          disabled: busy !== null,
+                        }, t("findSimilarPapers")),
+                      ),
+                    );
+                  }),
                 ),
 
               // Source health last: a source that failed changes how much of the
@@ -5023,252 +7562,319 @@ function describeError(error, t) {
         );
       };
 
-      const renderReview = () => h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 10 } },
-        h("div", { className: "pt-toolbar" },
-          h("span", { className: "pt-h2" }, t("outline")),
-          h("div", { className: "pt-spacer" }),
-          h(Button, { onClick: buildOutline, disabled: busy !== null }, t("generateOutline")),
-          outline?.text ? h(Button, { onClick: sendOutline, disabled: !inputActions, variant: "primary" }, t("sendToChat")) : null,
-        ),
-        outline
-          ? h("pre", { className: "pt-pre" }, outline.text)
-          : h(Empty, { title: t("selectEvidence") }),
-
-        h("hr", { className: "pt-divider" }),
-
-        // --- 章节骨架 ---------------------------------------------------
-        // Sits directly under the evidence outline on purpose: they answer two halves of
-        // the same question, and putting them side by side is what makes the difference
-        // visible instead of something the reader has to take on faith (D-016).
-        h("div", { className: "pt-toolbar" },
-          h("span", { className: "pt-h2" }, t("skeleton")),
-          h("div", { className: "pt-spacer" }),
-          h(Button, { onClick: buildSkeleton, disabled: busy !== null }, t("buildSkeleton")),
-          // Only offered when there are sections to send. An empty result is a refusal
-          // ("no evidence to build from"); sending that sentence to the conversation
-          // would just push a non-answer into the chat.
-          skeleton !== null && skeleton.sections.length > 0
-            ? h(Button, { onClick: sendSkeleton, disabled: !inputActions, variant: "primary" }, t("sendToChat"))
-            : null,
-        ),
-        h("p", { className: "pt-caption", style: { margin: 0 } }, t("skeletonHint")),
-        skeleton
-          ? h("div", { className: "pt-col", style: { gap: 6 } },
-            // Empty and non-empty are different answers, so they render different
-            // things. The empty case is a single banner: the host's note already says
-            // why nothing came back, and printing it twice made it read like two
-            // separate problems.
-            skeleton.sections.length === 0
-              ? h(Banner, { tone: "info" }, skeleton.note)
-              : [
-                // A Fragment with a key, not a bare array: React cannot key the array
-                // elements themselves, and the raw array form warned about it.
-                h(React.Fragment, { key: "sections" },
-                  ...skeleton.sections.map((section, index) => h("div", {
-                  key: section.id,
-                  className: "pt-card",
-                  "data-section": section.id,
-                  style: { padding: "6px 8px" },
-                },
-                  h("div", { className: "pt-toolbar" },
-                    h("span", { className: "pt-meta" }, `${index + 1}. ${section.title}`),
-                    h("div", { className: "pt-spacer" }),
-                    h("span", { className: "pt-caption pt-num" }, `${section.evidenceIds.length} 条 · ${section.paperIds.length} 篇`),
-                  ),
-                  h("p", { className: "pt-caption", style: { margin: 0 } }, section.purpose),
-                  // The bound ids, labelled as such. This used to reuse the overlap
-                  // panel's "命中条目" caption, which said the ids were overlap hits —
-                  // wrong label on real data.
-                  // Readable locators, not raw ids. `f71258aa` appears nowhere else in
-                  // the UI, so printing the id prefix told the writer nothing they could
-                  // act on; the paper title and page are what they need to find it.
-                  h("div", { className: "pt-col", style: { gap: 2 } },
-                    h("p", { className: "pt-caption", style: { margin: 0 } }, t("skeletonBinds")),
-                    ...(section.citations ?? []).map((cite) => h("p", {
-                      key: cite.evidenceId,
-                      className: "pt-caption",
-                      style: { margin: 0 },
-                      title: cite.quote === "" ? undefined : cite.quote,
-                    }, `· ${cite.paperTitle === "" ? t("unknownPaper") : cite.paperTitle}${cite.pageIndex >= 0 ? ` p.${cite.pageIndex + 1}` : ""}`)),
-                  ),
-                  )),
-                ),
-                h("p", { key: "note", className: "pt-caption", style: { margin: 0 } }, skeleton.note),
-              ],
-          )
-          : null,
-
-        h("hr", { className: "pt-divider" }),
-
-        // --- 导入 .bib / .ris -------------------------------------------
-        h("div", { className: "pt-toolbar" },
-          h("span", { className: "pt-h2" }, t("citeImport")),
-          h("div", { className: "pt-spacer" }),
-          h(Button, { onClick: () => citeImportRef.current?.click(), disabled: busy !== null }, t("citeImportPick")),
-          h("input", {
-            ref: citeImportRef,
-            type: "file",
-            // Both extensions: the picker filters by them, and the host detects the
-            // format from the name first and the content second.
-            accept: ".bib,.bibtex,.ris",
-            "aria-label": t("citeImportPick"),
-            style: { display: "none" },
-            onChange: (event) => {
-              const file = event.target.files?.[0] ?? null;
-              // Clear the input so choosing the same file twice still fires onChange.
-              event.target.value = "";
-              if (file !== null) void importCitationFile(file);
-            },
-          }),
-        ),
-        h("p", { className: "pt-caption", style: { margin: 0 } }, t("citeImportHint")),
-        citeImport
-          ? h("div", { className: "pt-col", style: { gap: 4 } },
-            h("p", { className: "pt-caption", style: { margin: 0 } }, citeImport.text),
-            citeImport.imported?.length > 0
-              ? h("p", { className: "pt-caption", style: { margin: 0 } },
-                citeImport.imported.map((row) => row.title).join(" · "))
-              : h("p", { className: "pt-caption", style: { margin: 0 } }, t("citeImportEmpty")),
-          )
-          : null,
-
-        h("hr", { className: "pt-divider" }),
-
-        // --- 库内重叠提示 -----------------------------------------------
-        // Named 重叠 (overlap) rather than 查重 (integrity check) throughout, and the
-        // caption says what it is not. Both choices are load-bearing (D-015): the label
-        // is what stops the next person from growing it into a similarity score.
-        h("div", { className: "pt-toolbar" },
-          h("span", { className: "pt-h2" }, t("similar")),
-          h("div", { className: "pt-spacer" }),
-          h(Button, {
-            onClick: checkSimilarity,
-            // Disabled when there is nothing to compare against, not only when the box
-            // is empty: a click with an empty library used to come back reading like a
-            // clean result. Better to not offer the action.
-            disabled: busy !== null || similarText.trim() === "" || (evidencePaging.allTotal ?? 0) === 0,
-            title: (evidencePaging.allTotal ?? 0) === 0 ? t("similarNoEvidence") : undefined,
-          }, busy === "similar" ? t("searching") : t("similarCheck")),
-        ),
-        h("p", { className: "pt-caption", style: { margin: 0 } }, t("similarHint")),
-        // Said before the click, not after it: with no evidence stored the action has
-        // no input, and the caption is where that can be stated without a round trip.
-        (evidencePaging.allTotal ?? 0) === 0
-          ? h("p", { className: "pt-caption", style: { margin: 0 } }, t("similarNoEvidence"))
-          : null,
-        h("textarea", {
-          className: "pt-input",
-          "aria-label": t("similar"),
-          placeholder: t("similarPlaceholder"),
-          rows: 4,
-          value: similarText,
-          onChange: (event) => setSimilarText(event.target.value),
-          style: { resize: "vertical", fontFamily: "inherit" },
-        }),
-        similar
-          ? h("div", { className: "pt-col", style: { gap: 4 } },
-            h("p", { className: "pt-caption", style: { margin: 0 } }, similar.note),
-            similar.hits.length === 0
-              ? null
-              : similar.hits.map((hit) => h("div", {
-                key: hit.evidenceId,
-                className: "pt-card",
-                "data-similar-hit": hit.evidenceId,
-                style: { padding: "6px 8px" },
-              },
-                h("div", { className: "pt-toolbar" },
-                  h("span", { className: "pt-meta" }, hit.paperTitle || hit.paperId),
-                  h("div", { className: "pt-spacer" }),
-                  h("span", { className: "pt-caption pt-num" }, `p.${hit.pageIndex + 1} · ${hit.overlapChars} 字`),
-                ),
-                h("p", { className: "pt-caption", style: { margin: 0 } }, hit.quote),
-              )),
-            // The disclaimer is rendered from the response's own field, not from a
-            // hardcoded string in the client: if the host's wording changes, the panel
-            // cannot drift away from it.
-            h("p", { className: "pt-caption", style: { margin: 0 } }, similar.disclaimer ?? t("similarDisclosure")),
-          )
-          : null,
-
-        h("hr", { className: "pt-divider" }),
-
-        h("div", { className: "pt-toolbar" },
-          h("span", { className: "pt-h2" }, t("citations")),
-        ),
-        h("div", { className: "pt-toolbar" },
-          h("label", { style: { display: "flex", gap: 4, alignItems: "center" } },
-            h("span", { className: "pt-caption" }, t("style")),
-            h("select", {
-              className: "pt-select", style: { width: "auto", minWidth: 110 },
-              value: citationStyle, "aria-label": t("style"),
-              onChange: (event) => setCitationStyle(event.target.value),
-            }, (status?.styles ?? ["apa", "ieee", "gb-t-7714"]).map((style) => h("option", { key: style, value: style }, style))),
+      const renderReview = () => {
+        const unanchoredWarnCount = evidencePaging.unanchoredCount ?? excludedCount;
+        const scopedPaperCount = workingSetPaperIds ? workingSetPaperIds.length : libraryCount;
+        return h("div", { style: { padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 10 } },
+          h("div", { className: "pt-flow-bar" },
+            h("span", { className: "pt-num" }, t("reviewFlowProgress", {
+              papers: scopedPaperCount,
+              evidence: anchoredTotal,
+              claims: claims.length,
+            })),
           ),
-          h("label", { style: { display: "flex", gap: 4, alignItems: "center" } },
-            h("span", { className: "pt-caption" }, t("locale")),
-            h("select", {
-              className: "pt-select", style: { width: "auto", minWidth: 80 },
-              value: citationLocale, "aria-label": t("locale"),
-              onChange: (event) => setCitationLocale(event.target.value),
+          h("div", { className: "pt-wizard-step" },
+            h("div", { className: "pt-toolbar" },
+              h("span", { className: "pt-h2" }, t("reviewStep1Title")),
+              h("div", { className: "pt-spacer" }),
+              h(Badge, { tone: workingSetPaperIds ? "info" : undefined },
+                workingSetPaperIds ? `${workingSetPaperIds.length} ${t("paperCount")}` : t("workingSetScopeAll")),
+              claims.length > 0
+                ? h(Badge, { tone: "info" }, `${t("storedClaims")} ${claims.length}`)
+                : null,
+            ),
+            unanchoredWarnCount > 0
+              ? h(Banner, { tone: "warn" }, t("unanchoredWarning", { n: unanchoredWarnCount }))
+              : null,
+            claims.length > 0 ? h("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } },
+              claims.slice(0, 6).map((claim) => h(Badge, { key: claim.claimId, tone: (claim.evidence ?? []).length > 0 ? "support" : "warn" },
+                `${claim.text.slice(0, 32)}${claim.text.length > 32 ? "…" : ""} (${(claim.evidence ?? []).length})`)),
+            ) : null,
+          ),
+
+          h("div", { className: "pt-wizard-step" },
+            h("div", { className: "pt-toolbar" },
+              h("span", { className: "pt-h2" }, t("reviewStep2Title")),
+            ),
+            h("div", { className: "pt-toolbar" },
+              h("span", { className: "pt-h2" }, t("outline")),
+              h("div", { className: "pt-spacer" }),
+              h(Button, { onClick: buildOutline, disabled: busy !== null }, t("generateOutline")),
+              outline?.text ? h(Button, { onClick: sendOutline, disabled: !inputActions, variant: "primary" }, t("sendToChat")) : null,
+            ),
+            outline
+              ? h("pre", { className: "pt-pre" }, outline.text)
+              : h(Empty, { title: t("selectEvidence") }),
+
+            h("hr", { className: "pt-divider" }),
+
+            // --- 章节骨架 ---------------------------------------------------
+            // Sits directly under the evidence outline on purpose: they answer two halves of
+            // the same question, and putting them side by side is what makes the difference
+            // visible instead of something the reader has to take on faith (D-016).
+            h("div", { className: "pt-toolbar" },
+              h("span", { className: "pt-h2" }, t("skeleton")),
+              h("div", { className: "pt-spacer" }),
+              h(Button, { onClick: buildSkeleton, disabled: busy !== null }, t("buildSkeleton")),
+              // Only offered when there are sections to send. An empty result is a refusal
+              // ("no evidence to build from"); sending that sentence to the conversation
+              // would just push a non-answer into the chat.
+              skeleton !== null && skeleton.sections.length > 0
+                ? h(Button, { onClick: sendSkeleton, disabled: !inputActions, variant: "primary" }, t("sendToChat"))
+                : null,
+            ),
+            h("p", { className: "pt-caption", style: { margin: 0 } }, t("skeletonHint")),
+            skeleton
+              ? h("div", { className: "pt-col", style: { gap: 6 } },
+                // Empty and non-empty are different answers, so they render different
+                // things. The empty case is a single banner: the host's note already says
+                // why nothing came back, and printing it twice made it read like two
+                // separate problems.
+                skeleton.sections.length === 0
+                  ? h(Banner, { tone: "info" }, skeleton.note)
+                  : [
+                    // A Fragment with a key, not a bare array: React cannot key the array
+                    // elements themselves, and the raw array form warned about it.
+                    h(React.Fragment, { key: "sections" },
+                      ...skeleton.sections.map((section, index) => h("div", {
+                      key: section.id,
+                      className: "pt-card",
+                      "data-section": section.id,
+                      style: { padding: "6px 8px" },
+                    },
+                      h("div", { className: "pt-toolbar" },
+                        h("span", { className: "pt-meta" }, `${index + 1}. ${section.title}`),
+                        h("div", { className: "pt-spacer" }),
+                        h("span", { className: "pt-caption pt-num" }, `${section.evidenceIds.length} 条 · ${section.paperIds.length} 篇`),
+                      ),
+                      h("p", { className: "pt-caption", style: { margin: 0 } }, section.purpose),
+                      // The bound ids, labelled as such. This used to reuse the overlap
+                      // panel's "命中条目" caption, which said the ids were overlap hits —
+                      // wrong label on real data.
+                      // Readable locators, not raw ids. `f71258aa` appears nowhere else in
+                      // the UI, so printing the id prefix told the writer nothing they could
+                      // act on; the paper title and page are what they need to find it.
+                      h("div", { className: "pt-col", style: { gap: 2 } },
+                        h("p", { className: "pt-caption", style: { margin: 0 } }, t("skeletonBinds")),
+                        ...(section.citations ?? []).map((cite) => h("p", {
+                          key: cite.evidenceId,
+                          className: "pt-caption",
+                          style: { margin: 0 },
+                          title: cite.quote === "" ? undefined : cite.quote,
+                        }, `· ${cite.paperTitle === "" ? t("unknownPaper") : cite.paperTitle}${cite.pageIndex >= 0 ? ` p.${cite.pageIndex + 1}` : ""}`)),
+                      ),
+                      )),
+                    ),
+                    h("p", { key: "note", className: "pt-caption", style: { margin: 0 } }, skeleton.note),
+                  ],
+              )
+              : null,
+          ),
+
+          h("div", { className: "pt-wizard-step" },
+            h("div", { className: "pt-toolbar" },
+              h("span", { className: "pt-h2" }, t("reviewStep3Title")),
+              h("div", { className: "pt-spacer" }),
+              h(Button, {
+                variant: "primary",
+                onClick: writeTraceableReview,
+                disabled: busy !== null || !inputActions,
+              }, busy === "bodyplan" ? t("working") : t("aiWriteReview")),
+            ),
+            h("div", { className: "pt-toolbar" },
+              h("span", { className: "pt-h2" }, t("citations")),
+            ),
+            h("div", { className: "pt-toolbar" },
+              h("label", { style: { display: "flex", gap: 4, alignItems: "center" } },
+                h("span", { className: "pt-caption" }, t("style")),
+                h("select", {
+                  className: "pt-select", style: { width: "auto", minWidth: 110 },
+                  value: citationStyle, "aria-label": t("style"),
+                  onChange: (event) => setCitationStyle(event.target.value),
+                }, (status?.styles ?? ["apa", "ieee", "gb-t-7714"]).map((style) => h("option", { key: style, value: style }, style))),
+              ),
+              h("label", { style: { display: "flex", gap: 4, alignItems: "center" } },
+                h("span", { className: "pt-caption" }, t("locale")),
+                h("select", {
+                  className: "pt-select", style: { width: "auto", minWidth: 80 },
+                  value: citationLocale, "aria-label": t("locale"),
+                  onChange: (event) => setCitationLocale(event.target.value),
+                },
+                  h("option", { value: "zh-CN" }, "zh-CN"),
+                  h("option", { value: "en-US" }, "en-US"),
+                ),
+              ),
+              h("div", { className: "pt-spacer" }),
+              h(Button, { variant: "primary", onClick: renderCitations, disabled: busy !== null || anchoredTotal === 0 },
+                busy === "citations" ? t("searching") : t("generateCitations")),
+            ),
+            h("p", { className: "pt-caption", style: { margin: 0 } },
+              // Counted over the whole library, not the loaded page: this caption sits
+              // next to the citation button and describes what that button will cite.
+              anchoredTotal === 0
+                ? t("noEvidence")
+                : `${anchoredTotal} ${t("evidenceCount")} · ${t("anchoredCount")}${excludedCount > 0 ? ` · ${t("unlocatedExcluded", { n: excludedCount })}` : ""}`),
+
+            citation?.ok
+              ? h("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
+                h("span", { className: "pt-caption" }, t("inText")),
+                h("pre", { className: "pt-pre", style: { maxHeight: "16vh" } }, citation.citation),
+                h("span", { className: "pt-caption" }, t("bibliography")),
+                h("pre", { className: "pt-pre" }, citation.bibliography),
+                citation.warnings?.length > 0
+                  ? h("p", { className: "pt-caption", style: { margin: 0 } }, citation.warnings.join(" · "))
+                  : null,
+              )
+              : citation && citation.ok === false
+                ? h(Banner, { tone: "error" }, citation.text ?? "citation failed")
+                : null,
+
+            h("div", { className: "pt-toolbar" },
+              h(Button, {
+                variant: "primary", onClick: doExport,
+                disabled: busy !== null || anchoredTotal === 0,
+              }, busy === "export" ? t("exporting") : t("export")),
+              h(Button, { onClick: copyMarkdown, disabled: !exported?.markdown && !citation?.bibliography }, t("copy")),
+              h(Button, { onClick: downloadMarkdown, disabled: !exported?.markdown }, t("downloadMd")),
+            ),
+
+            exported?.ok
+              ? h("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
+                h("p", { className: "pt-meta", style: { margin: 0, wordBreak: "break-all" } },
+                  `${t("exported")} · ${exported.paths?.dir ?? ""}`),
+                (exported.unanchoredCount ?? 0) > 0
+                  ? h(Banner, { tone: "warn" }, t("unanchoredWarning", { n: exported.unanchoredCount }))
+                  : null,
+                exported.markdown
+                  ? h(React.Fragment, null,
+                    h("span", { className: "pt-caption" }, t("exportPreview")),
+                    h("pre", { className: "pt-pre", style: { maxHeight: "42vh" } }, exported.markdown),
+                  )
+                  : null,
+                exported.warnings?.length > 0
+                  ? h("div", null,
+                    h("p", { className: "pt-caption", style: { margin: "0 0 2px" } }, t("warnings")),
+                    h("ul", { className: "pt-list" }, exported.warnings.map((warning, index) => h("li", {
+                      key: index, className: "pt-meta",
+                    }, `· ${warning}`))),
+                  )
+                  : h("p", { className: "pt-caption", style: { margin: 0 } }, t("noWarnings")),
+              )
+              : null,
+          ),
+
+          h("div", { className: "pt-wizard-step" },
+            h("div", { className: "pt-toolbar" },
+              h("span", { className: "pt-h2" }, t("reviewToolsTitle")),
+              h("div", { className: "pt-spacer" }),
+              h("button", {
+                type: "button",
+                className: "pt-btn pt-btn-ghost",
+                "aria-expanded": showReviewAdvanced ? "true" : "false",
+                onClick: () => setShowReviewAdvanced((v) => !v),
+              }, showReviewAdvanced ? t("reviewAdvancedHide") : t("reviewAdvancedShow")),
+            ),
+            h("div", {
+              className: showReviewAdvanced ? undefined : "pt-collapsed",
+              style: { display: "flex", flexDirection: "column", gap: 8 },
             },
-              h("option", { value: "zh-CN" }, "zh-CN"),
-              h("option", { value: "en-US" }, "en-US"),
+              // --- 导入 .bib / .ris -------------------------------------------
+              h("div", { className: "pt-toolbar" },
+              h("span", { className: "pt-h2" }, t("citeImport")),
+              h("div", { className: "pt-spacer" }),
+              h(Button, { onClick: () => citeImportRef.current?.click(), disabled: busy !== null }, t("citeImportPick")),
+              h("input", {
+                ref: citeImportRef,
+                type: "file",
+                // Both extensions: the picker filters by them, and the host detects the
+                // format from the name first and the content second.
+                accept: ".bib,.bibtex,.ris",
+                "aria-label": t("citeImportPick"),
+                style: { display: "none" },
+                onChange: (event) => {
+                  const file = event.target.files?.[0] ?? null;
+                  // Clear the input so choosing the same file twice still fires onChange.
+                  event.target.value = "";
+                  if (file !== null) void importCitationFile(file);
+                },
+              }),
+            ),
+            h("p", { className: "pt-caption", style: { margin: 0 } }, t("citeImportHint")),
+            citeImport
+              ? h("div", { className: "pt-col", style: { gap: 4 } },
+                h("p", { className: "pt-caption", style: { margin: 0 } }, citeImport.text),
+                citeImport.imported?.length > 0
+                  ? h("p", { className: "pt-caption", style: { margin: 0 } },
+                    citeImport.imported.map((row) => row.title).join(" · "))
+                  : h("p", { className: "pt-caption", style: { margin: 0 } }, t("citeImportEmpty")),
+              )
+              : null,
+
+            h("hr", { className: "pt-divider" }),
+
+            // --- 库内重叠提示 -----------------------------------------------
+            // Named 重叠 (overlap) rather than 查重 (integrity check) throughout, and the
+            // caption says what it is not. Both choices are load-bearing (D-015): the label
+            // is what stops the next person from growing it into a similarity score.
+            h("div", { className: "pt-toolbar" },
+              h("span", { className: "pt-h2" }, t("similar")),
+              h("div", { className: "pt-spacer" }),
+              h(Button, {
+                onClick: checkSimilarity,
+                // Disabled when there is nothing to compare against, not only when the box
+                // is empty: a click with an empty library used to come back reading like a
+                // clean result. Better to not offer the action.
+                disabled: busy !== null || similarText.trim() === "" || (evidencePaging.allTotal ?? 0) === 0,
+                title: (evidencePaging.allTotal ?? 0) === 0 ? t("similarNoEvidence") : undefined,
+              }, busy === "similar" ? t("searching") : t("similarCheck")),
+            ),
+            h("p", { className: "pt-caption", style: { margin: 0 } }, t("similarHint")),
+            // Said before the click, not after it: with no evidence stored the action has
+            // no input, and the caption is where that can be stated without a round trip.
+            (evidencePaging.allTotal ?? 0) === 0
+              ? h("p", { className: "pt-caption", style: { margin: 0 } }, t("similarNoEvidence"))
+              : null,
+            h("textarea", {
+              className: "pt-input",
+              "aria-label": t("similar"),
+              placeholder: t("similarPlaceholder"),
+              rows: 4,
+              value: similarText,
+              onChange: (event) => setSimilarText(event.target.value),
+              style: { resize: "vertical", fontFamily: "inherit" },
+            }),
+            similar
+              ? h("div", { className: "pt-col", style: { gap: 4 } },
+                h("p", { className: "pt-caption", style: { margin: 0 } }, similar.note),
+                similar.hits.length === 0
+                  ? null
+                  : similar.hits.map((hit) => h("div", {
+                    key: hit.evidenceId,
+                    className: "pt-card",
+                    "data-similar-hit": hit.evidenceId,
+                    style: { padding: "6px 8px" },
+                  },
+                    h("div", { className: "pt-toolbar" },
+                      h("span", { className: "pt-meta" }, hit.paperTitle || hit.paperId),
+                      h("div", { className: "pt-spacer" }),
+                      h("span", { className: "pt-caption pt-num" }, `p.${hit.pageIndex + 1} · ${hit.overlapChars} 字`),
+                    ),
+                    h("p", { className: "pt-caption", style: { margin: 0 } }, hit.quote),
+                  )),
+                // The disclaimer is rendered from the response's own field, not from a
+                // hardcoded string in the client: if the host's wording changes, the panel
+                // cannot drift away from it.
+                h("p", { className: "pt-caption", style: { margin: 0 } }, similar.disclaimer ?? t("similarDisclosure")),
+              )
+              : null,
             ),
           ),
-          h("div", { className: "pt-spacer" }),
-          h(Button, { variant: "primary", onClick: renderCitations, disabled: busy !== null || anchoredTotal === 0 },
-            busy === "citations" ? t("searching") : t("generateCitations")),
-        ),
-        h("p", { className: "pt-caption", style: { margin: 0 } },
-          // Counted over the whole library, not the loaded page: this caption sits
-          // next to the citation button and describes what that button will cite.
-          anchoredTotal === 0
-            ? t("noEvidence")
-            : `${anchoredTotal} ${t("evidenceCount")} · ${t("anchoredCount")}${excludedCount > 0 ? ` · ${t("unlocatedExcluded", { n: excludedCount })}` : ""}`),
-
-        citation?.ok
-          ? h("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
-            h("span", { className: "pt-caption" }, t("inText")),
-            h("pre", { className: "pt-pre", style: { maxHeight: "16vh" } }, citation.citation),
-            h("span", { className: "pt-caption" }, t("bibliography")),
-            h("pre", { className: "pt-pre" }, citation.bibliography),
-            citation.warnings?.length > 0
-              ? h("p", { className: "pt-caption", style: { margin: 0 } }, citation.warnings.join(" · "))
-              : null,
-          )
-          : citation && citation.ok === false
-            ? h(Banner, { tone: "error" }, citation.text ?? "citation failed")
-            : null,
-
-        h("div", { className: "pt-toolbar" },
-          h(Button, {
-            variant: "primary", onClick: doExport,
-            disabled: busy !== null || anchoredTotal === 0,
-          }, busy === "export" ? t("exporting") : t("export")),
-          h(Button, { onClick: copyMarkdown, disabled: !exported?.markdown && !citation?.bibliography }, t("copy")),
-        ),
-
-        exported?.ok
-          ? h("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
-            h("p", { className: "pt-meta", style: { margin: 0, wordBreak: "break-all" } },
-              `${t("exported")} · ${exported.paths?.dir ?? ""}`),
-            exported.warnings?.length > 0
-              ? h("div", null,
-                h("p", { className: "pt-caption", style: { margin: "0 0 2px" } }, t("warnings")),
-                h("ul", { className: "pt-list" }, exported.warnings.map((warning, index) => h("li", {
-                  key: index, className: "pt-meta",
-                }, `· ${warning}`))),
-              )
-              : h("p", { className: "pt-caption", style: { margin: 0 } }, t("noWarnings")),
-          )
-          : null,
-      );
+        );
+      };
 
       const tabs = [
         ["library", t("library"), counts.library],
         ["evidence", t("evidenceTab"), counts.evidence],
-        ["translate", t("translateTab"), translationRows.length > 0 ? translationRows.length : null],
-        ["topics", t("topicsTab"), topicResult === null ? null : topicResult.candidates.length],
         ["review", t("reviewTab"), null],
       ];
       return h("div", {
@@ -5300,10 +7906,11 @@ function describeError(error, t) {
             type: "button",
             role: "tab",
             className: "pt-tab",
+            "data-tab": id,
             "aria-selected": view === id ? "true" : "false",
             // Clear the banner on a tab change. `note` is one piece of state shared by
             // every view and it renders above the switch, so without this a "45 段"
-            // confirmation from the translate tab stayed pinned over the topics tab
+            // confirmation from the translate view stayed pinned over another tab
             // after the user moved on. `error` is deliberately NOT cleared here: an
             // error is usually why the user is changing tabs, and hiding it would make
             // the failure disappear before it was read. `note` is only ever a
@@ -5313,6 +7920,162 @@ function describeError(error, t) {
             ? null
             : h("span", { className: "pt-tab-count" }, ` ${count}`))),
         ),
+        (() => {
+          const readingActive = reader !== null || comparePapers.length > 0;
+          const projCounts = new Map();
+          let starredTotal = 0;
+          let unassignedTotal = 0;
+          for (const p of papers) {
+            const m = getPaperMeta(projectStore.paperMeta, p.paperId);
+            if (m.starred) starredTotal += 1;
+            if (m.projects.length === 0) unassignedTotal += 1;
+            for (const pid of m.projects) projCounts.set(pid, (projCounts.get(pid) ?? 0) + 1);
+          }
+          const isCustomProject = projectStore.activeProjectId !== "all"
+            && projectStore.activeProjectId !== "starred"
+            && projectStore.activeProjectId !== "unassigned";
+          const activeProjectObj = projectStore.projects.find((p) => p.id === projectStore.activeProjectId) ?? null;
+          const activeProjectLabel = projectStore.activeProjectId === "starred"
+            ? t("projectStarred", { n: starredTotal })
+            : projectStore.activeProjectId === "unassigned"
+              ? t("projectUnassigned", { n: unassignedTotal })
+              : activeProjectObj ? `📁 ${activeProjectObj.name}` : "";
+          const projectScopedCount = isCustomProject
+            ? (projCounts.get(projectStore.activeProjectId) ?? 0)
+            : projectStore.activeProjectId === "starred"
+              ? starredTotal
+              : projectStore.activeProjectId === "unassigned"
+                ? unassignedTotal
+                : papers.length;
+
+          return h(React.Fragment, null,
+            h("div", { className: readingActive ? "pt-project-bar pt-collapsed" : "pt-project-bar" },
+              h("span", { className: "pt-caption" }, t("projectBarLabel")),
+              h("select", {
+                className: "pt-select",
+                style: { width: "auto", flex: "1 1 140px", minHeight: 26, padding: "2px 6px" },
+                value: projectStore.activeProjectId,
+                "aria-label": t("projectBarLabel"),
+                onChange: (event) => {
+                  const nextId = event.target.value;
+                  setSelectedPaperIds([]);
+                  setRenamingProject(false);
+                  updateProjectStore((cur) => ({ ...cur, activeProjectId: nextId }));
+                },
+              },
+                h("option", { value: "all" }, t("projectAll", { n: papers.length })),
+                h("option", { value: "starred" }, t("projectStarred", { n: starredTotal })),
+                projectStore.projects.map((proj) => h("option", { key: proj.id, value: proj.id },
+                  `📁 ${proj.name} (${projCounts.get(proj.id) ?? 0})`)),
+                h("option", { value: "unassigned" }, t("projectUnassigned", { n: unassignedTotal })),
+              ),
+              h(Button, {
+                variant: "ghost",
+                onClick: () => { setNewProjectOpen((v) => !v); setRenamingProject(false); },
+              }, t("newProject")),
+              isCustomProject ? h(Button, {
+                variant: "ghost",
+                onClick: () => {
+                  setRenameProjectName(activeProjectObj?.name ?? "");
+                  setRenamingProject((v) => !v);
+                  setNewProjectOpen(false);
+                },
+              }, t("renameProject")) : null,
+              isCustomProject ? h(Button, {
+                variant: "ghost",
+                onClick: deleteActiveProject,
+              }, t("deleteProject")) : null,
+              newProjectOpen ? h("div", { className: "pt-toolbar", style: { width: "100%", marginTop: 4 } },
+                h("input", {
+                  className: "pt-input pt-toolbar-grow",
+                  value: newProjectName,
+                  placeholder: t("projectNamePlaceholder"),
+                  "aria-label": t("projectNamePlaceholder"),
+                  onChange: (event) => setNewProjectName(event.target.value),
+                  onKeyDown: (event) => {
+                    if (event.key !== "Enter") return;
+                    // Enter that commits an IME candidate is not a submit.
+                    if (isImeCommit(event)) return;
+                    if (newProjectName.trim() !== "") {
+                      createProject(newProjectName, true);
+                      setNewProjectName("");
+                      setNewProjectOpen(false);
+                    }
+                  },
+                }),
+                h(Button, {
+                  variant: "primary",
+                  disabled: newProjectName.trim() === "",
+                  onClick: () => {
+                    createProject(newProjectName, true);
+                    setNewProjectName("");
+                    setNewProjectOpen(false);
+                  },
+                }, t("createProject")),
+              ) : null,
+              renamingProject && isCustomProject ? h("div", { className: "pt-toolbar", style: { width: "100%", marginTop: 4 } },
+                h("input", {
+                  className: "pt-input pt-toolbar-grow",
+                  value: renameProjectName,
+                  "aria-label": t("renameProject"),
+                  onChange: (event) => setRenameProjectName(event.target.value),
+                  onKeyDown: (event) => {
+                    if (event.key !== "Enter") return;
+                    // The rename field holds a Chinese name as often as not; an Enter
+                    // that only accepts a candidate must not close the editor.
+                    if (isImeCommit(event)) return;
+                    if (renameProjectName.trim() !== "") {
+                      renameActiveProject(renameProjectName);
+                      setRenamingProject(false);
+                    }
+                  },
+                }),
+                h(Button, {
+                  variant: "primary",
+                  disabled: renameProjectName.trim() === "",
+                  onClick: () => {
+                    renameActiveProject(renameProjectName);
+                    setRenamingProject(false);
+                  },
+                }, t("save")),
+              ) : null,
+            ),
+            selectedPaperIds.length > 0 ? h("div", { className: "pt-scope-bar" },
+              h("span", { style: { fontWeight: 500 } }, t("workingSetBanner", { n: selectedPaperIds.length })),
+              h("div", { className: "pt-spacer" }),
+              projectStore.projects.length > 0 ? h("select", {
+                className: "pt-select",
+                style: { width: "auto", minHeight: 24, padding: "1px 6px", fontSize: 11 },
+                value: "",
+                "aria-label": t("assignToProject"),
+                onChange: (event) => {
+                  if (event.target.value !== "") batchAssignProject(event.target.value);
+                },
+              },
+                h("option", { value: "" }, `${t("assignToProject")}…`),
+                projectStore.projects.map((proj) => h("option", { key: proj.id, value: proj.id }, proj.name)),
+              ) : null,
+              h("select", {
+                className: "pt-select",
+                style: { width: "auto", minHeight: 24, padding: "1px 6px", fontSize: 11 },
+                value: "",
+                "aria-label": t("batchMarkStatus"),
+                onChange: (event) => {
+                  if (event.target.value !== "") batchSetStatus(event.target.value);
+                },
+              },
+                h("option", { value: "" }, `${t("batchMarkStatus")}…`),
+                h("option", { value: "unread" }, t("statusUnread")),
+                h("option", { value: "reading" }, t("statusReading")),
+                h("option", { value: "read" }, t("statusRead")),
+                h("option", { value: "starred" }, "⭐ 核心必引"),
+              ),
+              h(Button, { variant: "ghost", onClick: clearPaperSelection }, t("clearWorkingSet")),
+            ) : (projectStore.activeProjectId !== "all" ? h("div", { className: "pt-scope-bar" },
+              h("span", { style: { fontWeight: 500 } }, t("workingSetProjectBanner", { name: activeProjectLabel, n: projectScopedCount })),
+            ) : null),
+          );
+        })(),
         error ? h("div", { style: { padding: "8px 12px 0" } },
           h(Banner, {
             tone: "error", title: t("errorTitle"), children: error,
@@ -5346,7 +8109,7 @@ function describeError(error, t) {
           // Keyed by view so a crash in one tab does not leave the other tabs
           // showing a stale error, and so switching tabs clears the failure.
           h(ViewBoundary, { key: view, t },
-            view === "library" ? renderLibrary() : view === "evidence" ? renderEvidence() : view === "translate" ? renderTranslate() : view === "topics" ? renderTopics() : renderReview()),
+            view === "library" ? renderLibrary() : view === "evidence" ? renderEvidence() : renderReview()),
         ),
       );
     }

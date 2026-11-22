@@ -80,6 +80,94 @@ check("export without sentences reports no body field", noBody.body === undefine
 check("claim section still present", md.includes("## 论断与证据"));
 check("claim line still carries its anchor", /\[E:[0-9a-f]{8}\]/.test(md.slice(md.indexOf("## 论断与证据"))));
 
+// --- a claim stored outside the exported scope must not leak into review.md ---
+store.upsertPaper({
+  paperId: "p2", title: "Customer citizenship in service encounters", authors: "Wang, Mei",
+  year: "2019", venue: "JSM", doi: "10.1/p2", source: "test", pdfPath: "", fingerprint: "f2",
+  material: "fulltext", pages: ["Customer citizenship behaviour follows perceived justice."],
+  pageSources: ["text-layer"],
+});
+const EV2 = "e2bbbbbb22223333444455556666";
+store.addEvidence({ evidenceId: EV2, paperId: "p2", pageIndex: 0, charStart: 0, charEnd: 20, quote: "Customer citizenship" });
+
+const recordedOutside = await service.recordClaims(scope, {
+  claims: [{ text: "Outside scoped claim", evidenceIds: [EV2] }],
+});
+check("claim outside the scope is stored", recordedOutside.accepted.length === 1, JSON.stringify(recordedOutside.rejected));
+
+const scoped = await service.exportReview(scope, { style: "apa", paperIds: ["p1"], includeStoredClaims: true });
+check("scoped export succeeds", scoped.ok === true, scoped.reason);
+const scopedMd = scoped.markdown ?? "";
+check("scoped export omits the claim stored for another paper", !scopedMd.includes("Outside scoped claim"));
+check("scoped export still carries the p1 claim", scopedMd.includes("服务场景影响公民行为"));
+
+// --- two pieces of evidence must land in two different slots --------------
+const bothPlan = await service.reviewBodyPlan(scope, { paperIds: ["p1", "p2"] });
+const slotForEvidence = (id) => bothPlan.slots.find((s) => s.evidence.some((e) => e.evidenceId === id))?.slotId;
+const slotP1 = slotForEvidence(EV1);
+const slotP2 = slotForEvidence(EV2);
+check("p1 and p2 evidence get distinct slots",
+  slotP1 !== undefined && slotP2 !== undefined && slotP1 !== slotP2, `${slotP1} vs ${slotP2}`);
+
+// Swapping evidenceIds onto another slot is the subtle invented citation: the id
+// resolves, but it does not support this sentence's slot. It must be refused.
+const swapped = await service.renderBody(scope, {
+  paperIds: ["p1", "p2"],
+  sentences: [{ slotId: slotP2, text: "拿 p1 的证据写 p2 的句子。", evidenceIds: [EV1] }],
+});
+check("renderBody refuses evidence borrowed from the other slot",
+  swapped.summary.accepted === 0 && swapped.summary.rejected === 1, JSON.stringify(swapped.summary));
+check("borrowed evidence never reaches the rendered body", swapped.markdown === "", swapped.markdown);
+
+// Evidence-narrowed export: the slot and the claim that reach outside the exported
+// evidence set must be refused, and the mixed claim must not be written at all.
+const mixed = "混用 p1 与 p2 证据的论断。";
+const scopedBody = await service.exportReview(scope, {
+  style: "apa", evidenceIds: [EV1], bodySection: "研究现状",
+  sentences: [{ slotId: slotP1, text: "只用 p1 的证据写这句。" }, { slotId: slotP2, text: "拿 p2 的证据写这句。" }],
+  claims: [
+    { text: "只用 p1 证据的论断。", section: "研究现状", evidenceIds: [EV1] },
+    { text: mixed, section: "研究现状", evidenceIds: [EV1, EV2] },
+  ],
+});
+check("evidence-narrowed export succeeds", scopedBody.ok === true, scopedBody.reason);
+const scopedBodyMd = scopedBody.markdown ?? "";
+check("only the in-scope sentence and claim are rendered",
+  scopedBodyMd.includes("只用 p1 的证据写这句") && !scopedBodyMd.includes("拿 p2 的证据写这句") &&
+  scopedBodyMd.includes("只用 p1 证据的论断") && !scopedBodyMd.includes(mixed));
+check("body and claims report the rejected sentence and claim",
+  scopedBody.body?.sentences === 1 && scopedBody.body?.rejected.length === 1 &&
+  scopedBody.claims?.accepted === 1 && scopedBody.claims?.rejected === 1,
+  JSON.stringify([scopedBody.body, scopedBody.claims]));
+check("the mixed claim never reaches the store", store.listClaims({ limit: 5000 }).every((c) => c.text !== mixed));
+
+// --- formatCitations honours optional paperIds and matches export scope 100% ---
+const citedScoped = await service.formatCitations(scope, { style: "apa", anchor: "anchored", paperIds: ["p1"] });
+check("formatCitations with paperIds succeeds", citedScoped.ok === true, citedScoped.reason ?? "");
+check("formatCitations with paperIds only cites the requested paper",
+  citedScoped.entries.length === 1 && citedScoped.entries[0].paperId === "p1",
+  JSON.stringify(citedScoped.entries.map((e) => e.paperId)));
+check("formatCitations bibliography matches scoped exportReview bibliography",
+  citedScoped.bibliography === scoped.bibliography,
+  JSON.stringify({ preview: citedScoped.bibliography, exported: scoped.bibliography }));
+
+const citedIntersect = await service.formatCitations(scope, {
+  style: "apa", anchor: "anchored", evidenceIds: [EV1, EV2], paperIds: ["p1"],
+});
+check("formatCitations intersects evidenceIds and paperIds",
+  citedIntersect.ok === true && citedIntersect.entries.length === 1 && citedIntersect.entries[0].paperId === "p1",
+  JSON.stringify(citedIntersect.entries.map((e) => e.paperId)));
+
+const citedEmptyScope = await service.formatCitations(scope, { style: "apa", anchor: "anchored", paperIds: ["no-such-paper"] });
+check("formatCitations with unmatched paperIds fails honestly",
+  citedEmptyScope.ok === false && citedEmptyScope.entries.length === 0 && citedEmptyScope.bibliography === "",
+  JSON.stringify({ ok: citedEmptyScope.ok, entries: citedEmptyScope.entries.length }));
+
+const citedUnfiltered = await service.formatCitations(scope, { style: "apa", anchor: "anchored", paperIds: [] });
+check("formatCitations treats empty paperIds array as unfiltered",
+  citedUnfiltered.ok === true && citedUnfiltered.entries.length === 2,
+  JSON.stringify(citedUnfiltered.entries.map((e) => e.paperId)));
+
 store.close?.();
 rmSync(dir, { recursive: true, force: true });
 
