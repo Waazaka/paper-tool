@@ -134,6 +134,23 @@ If you are an AI agent: read [`AGENTS.md`](AGENTS.md) first. It documents the
 profile-detection rules and the failure modes, which is where a guessed install
 goes wrong.
 
+### Let an AI agent install it for you
+
+Paste this prompt into DSH, Claude Code, Codex, or Antigravity:
+
+```text
+Clone https://github.com/Waazaka/paper-tool.git into a permanent local folder, read AGENTS.md, run node install.mjs to install and verify the plugin, and tell me whether I need to restart DSH.
+```
+
+### Contributing & reporting issues
+
+Because `install.mjs` links the checkout live into your DSH profile, there is no build step:
+- **Client changes** (`client.js`): reload the DSH page to see updates.
+- **Host changes** (`index.js`, `lib/**`): fully restart DSH.
+- **Verify before submitting**: run `node test/all.mjs` from the repository root.
+
+To submit a fix or improvement, fork the repository, make your changes on a new branch, ensure `node test/all.mjs` passes, and open a Pull Request against `main`. To report a bug without coding, open a GitHub Issue with reproduction steps and your DSH error log (`%USERPROFILE%\.dsh-desktop\desktop.stderr.log` on Windows).
+
 ### What it actually does
 
 Three things must be true for DSH to load a plugin, and each one has a different

@@ -103,24 +103,39 @@
 
 ## 安装
 
+### 一键安装（推荐）
+
 ```powershell
-git clone <本仓库> paper-tool
+git clone https://github.com/Waazaka/paper-tool.git paper-tool
 cd paper-tool
-pnpm install
+node install.mjs
 ```
 
-插件以 bundle 形式载入 DSH 的 `desktop` profile，所以 DSH 必须在 `node_modules` 下
-看得到它。开发时用目录 junction，好处是仓库保持「活的」——改文件、刷页面、立刻看到：
+`install.mjs` 会自动完成全部部署：安装运行时依赖、定位你电脑上真实的 DSH profile（如 `~/.dsh-desktop/profiles/desktop`）、通过目录软链挂载插件、注册到 `dsh.profile.bundles`，并执行可用性验证。安装完成后，**完整退出并重启一次 DSH**，右侧边栏就会出现「论文」面板。
 
-```powershell
-mklink /J "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\@local\paper-tool" (Get-Location)
+### 让 AI Agent 帮我自动安装
+
+直接把下面这段话发给你的 AI 助手（DSH / Claude Code / Codex / Antigravity 等）：
+
+```text
+请帮我把 https://github.com/Waazaka/paper-tool.git 克隆到本地一个固定目录，阅读仓库里的 AGENTS.md 并运行 node install.mjs 完成安装和验证，完成后告诉我是否需要重启 DSH。
 ```
 
-然后在 profile 里注册这个 bundle，重启 DSH 一次。host 侧改动需要重启 DSH；
-client 侧改动会以新的内容版本号下发，只需刷新页面。
+> 给 AI Agent 的提示：请先阅读 [`AGENTS.md`](AGENTS.md)，其中记录了 profile 识别规则与常见排错路径。
 
-注意 `@napi-rs/canvas` 按平台分发预编译原生二进制，`pnpm install` 会挑对的那个。
-在不支持的平台上，OCR 不可用，但插件其它部分照常工作。
+### 开发调试与提交修改（贡献指南）
+
+由于 `install.mjs` 通过目录软链挂载插件，克隆目录本身就是「活的」开发环境，无需额外构建步骤：
+
+- **只修改前端**（`client.js`）：保存后在 DSH 中刷新页面即可生效。
+- **修改后端**（`index.js`、`lib/**`）：保存后需**完整重启一次 DSH**。
+- **提交前跑门禁**：在仓库根目录执行 `node test/all.mjs`（如需覆盖实测 PDF 门禁，可传一个包含 PDF 的目录路径作为参数）。
+
+发现问题或想改进功能时：
+1. **提交代码**：在 GitHub 上 Fork 本仓库 → 本地新建分支修改并跑通 `node test/all.mjs` → 推送并向 `main` 分支发起 Pull Request。
+2. **反馈问题**：直接在本仓库的 Issues 页面提交，建议附上复现步骤及错误日志（Windows 桌面端默认在 `%USERPROFILE%\.dsh-desktop\desktop.stderr.log`）。
+
+注意 `@napi-rs/canvas` 按平台分发预编译原生二进制，安装时会自动匹配当前平台。在不支持的平台上，OCR 不可用，但插件其它部分照常工作。
 
 ## 当前状态
 
